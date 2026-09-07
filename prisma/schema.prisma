@@ -1,0 +1,1061 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  PUBLISH
+  SHARE
+  REVOKE
+}
+
+enum ProjectStatus {
+  DRAFT
+  PLANNING
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+  CANCELED
+}
+
+enum BudgetVersionStatus {
+  DRAFT
+  APPROVED
+  SUPERSEDED
+}
+
+enum BudgetLineType {
+  MATERIAL
+  LABOR
+  OTHER
+}
+
+enum ScheduleActivityStatus {
+  PENDING
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+}
+
+enum ScheduleDependencyType {
+  FINISH_TO_START
+  START_TO_START
+}
+
+enum SyncOperationStatus {
+  PENDING
+  SYNCING
+  SYNCED
+  FAILED
+}
+
+enum DailyReportMediaType {
+  BEFORE
+  DURING
+  AFTER
+  OTHER
+}
+
+enum DailyReportStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  APPROVED
+  PUBLISHED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  RETURN
+  WASTE
+  ADJUSTMENT
+  TRANSFER
+}
+
+enum InventoryResourceType {
+  MATERIAL
+  TOOL
+  EQUIPMENT
+}
+
+enum RequisitionStatus {
+  DRAFT
+  REQUESTED
+  REVIEWED
+  APPROVED
+  PURCHASED
+  RECEIVED
+  DELIVERED
+  CLOSED
+  REJECTED
+}
+
+enum RequisitionType {
+  MATERIAL
+  TOOL
+  EQUIPMENT
+  LABOR
+  SERVICE
+  SUBCONTRACT
+}
+
+enum FinancialExpenseStatus {
+  DRAFT
+  VALID
+  VOID
+}
+
+enum PaymentStatus {
+  REGISTERED
+  VOID
+}
+
+enum ProjectDocumentStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  ARCHIVED
+}
+
+enum WebsiteInquiryStatus {
+  NEW
+  IN_PROGRESS
+  CLOSED
+  SPAM
+}
+
+enum RequisitionPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum RequisitionDestinationType {
+  PROJECT
+  WAREHOUSE
+}
+
+model User {
+  id                       String               @id @default(uuid())
+  email                    String               @unique
+  name                     String
+  phone                    String?              @db.VarChar(8)
+  passwordHash             String
+  status                   UserStatus           @default(ACTIVE)
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  roles                    UserRole[]
+  auditLogs                AuditLog[]
+  responsibleProjects      Project[]            @relation("ProjectResponsible")
+  createdProjects          Project[]            @relation("ProjectCreatedBy")
+  updatedProjects          Project[]            @relation("ProjectUpdatedBy")
+  projectMemberships       ProjectMember[]
+  approvedBudgets          BudgetVersion[]      @relation("BudgetVersionApprovedBy")
+  scheduleAssignments      ScheduleAssignment[]
+  createdDailyReports      DailyReport[]        @relation("DailyReportCreatedBy")
+  updatedDailyReports      DailyReport[]        @relation("DailyReportUpdatedBy")
+  approvedDailyReports     DailyReport[]        @relation("DailyReportApprovedBy")
+  syncOperations           SyncOperation[]
+  dailyReportMedias        DailyReportMedia[]   @relation("DailyReportMediaUploadedBy")
+  stockMovements           StockMovement[]      @relation("StockMovementCreatedBy")
+  createdRequisitions      Requisition[]        @relation("RequisitionCreatedBy")
+  approvedRequisitions     Requisition[]        @relation("RequisitionApprovedBy")
+  financialExpenses        FinancialExpense[]   @relation("FinancialExpenseCreatedBy")
+  clientPayments           ClientPayment[]      @relation("ClientPaymentCreatedBy")
+  supplierPayments         SupplierPayment[]    @relation("SupplierPaymentCreatedBy")
+  createdProjectDocuments  ProjectDocument[]    @relation("ProjectDocumentCreatedBy")
+  approvedProjectDocuments ProjectDocument[]    @relation("ProjectDocumentApprovedBy")
+  uploadedDocumentVersions DocumentVersion[]    @relation("DocumentVersionUploadedBy")
+  createdPortalShares      PortalShare[]        @relation("PortalShareCreatedBy")
+  passkeys                 UserPasskey[]
+  handledWebsiteInquiries  WebsiteInquiry[]     @relation("WebsiteInquiryHandledBy")
+}
+
+model UserPasskey {
+  id             String    @id @db.VarChar(512)
+  userId         String
+  webAuthnUserId String    @db.VarChar(128)
+  publicKey      Bytes     @db.LongBlob
+  counter        BigInt    @default(0)
+  deviceType     String    @db.VarChar(32)
+  backedUp       Boolean   @default(false)
+  transports     String?   @db.VarChar(255)
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  name        String
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  name        String
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String?
+  action     AuditAction
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime    @default(now())
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model Client {
+  id          String    @id @default(uuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  taxId       String?
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projects    Project[]
+
+  @@index([name])
+}
+
+model Project {
+  id                 String             @id @default(uuid())
+  internalId         String             @unique
+  code               String             @unique
+  name               String
+  description        String?            @db.Text
+  clientId           String?
+  location           String?
+  startDate          DateTime?
+  expectedEndDate    DateTime?
+  actualEndDate      DateTime?
+  responsibleId      String?
+  status             ProjectStatus      @default(DRAFT)
+  currency           String             @default("GTQ")
+  baseBudget         Decimal            @default(0) @db.Decimal(14, 2)
+  progressPercentage Decimal            @default(0) @db.Decimal(5, 2)
+  observations       String?            @db.Text
+  portalEnabled      Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  createdById        String?
+  updatedById        String?
+  client             Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  responsible        User?              @relation("ProjectResponsible", fields: [responsibleId], references: [id], onDelete: SetNull)
+  createdBy          User?              @relation("ProjectCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy          User?              @relation("ProjectUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  members            ProjectMember[]
+  budgets            Budget[]
+  schedules          Schedule[]
+  dailyReports       DailyReport[]
+  syncOperations     SyncOperation[]
+  stockMovements     StockMovement[]
+  requisitions       Requisition[]
+  financialExpenses  FinancialExpense[]
+  clientPayments     ClientPayment[]
+  documents          ProjectDocument[]
+  portalShares       PortalShare[]
+
+  @@index([clientId])
+  @@index([responsibleId])
+  @@index([status])
+  @@index([startDate])
+  @@index([expectedEndDate])
+}
+
+model PortalShare {
+  id          String    @id @default(uuid())
+  projectId   String
+  token       String?   @unique
+  tokenHash   String    @unique
+  label       String?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   User?     @relation("PortalShareCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([revokedAt])
+  @@index([expiresAt])
+}
+
+model ProjectMember {
+  projectId String
+  userId    String
+  roleLabel String?
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, userId])
+  @@index([userId])
+}
+
+model Budget {
+  id        String          @id @default(uuid())
+  projectId String
+  title     String          @default("Presupuesto")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions  BudgetVersion[]
+
+  @@index([projectId])
+}
+
+model BudgetVersion {
+  id                       String              @id @default(uuid())
+  budgetId                 String
+  versionNumber            Int
+  status                   BudgetVersionStatus @default(DRAFT)
+  sourceReference          String?
+  notes                    String?             @db.Text
+  executorName             String?
+  lineSubtotal             Decimal             @default(0) @db.Decimal(14, 2)
+  siteManagerCost          Decimal             @default(0) @db.Decimal(14, 2)
+  contingencyPercentage    Decimal             @default(5) @db.Decimal(5, 2)
+  contingencyAmount        Decimal             @default(0) @db.Decimal(14, 2)
+  administrationPercentage Decimal             @default(15) @db.Decimal(5, 2)
+  administrationAmount     Decimal             @default(0) @db.Decimal(14, 2)
+  profitPercentage         Decimal             @default(0) @db.Decimal(5, 2)
+  profitAmount             Decimal             @default(0) @db.Decimal(14, 2)
+  vatPercentage            Decimal             @default(0) @db.Decimal(5, 2)
+  vatAmount                Decimal             @default(0) @db.Decimal(14, 2)
+  financingPercentage      Decimal             @default(0) @db.Decimal(5, 2)
+  financingAmount          Decimal             @default(0) @db.Decimal(14, 2)
+  subtotal                 Decimal             @default(0) @db.Decimal(14, 2)
+  grandTotal               Decimal             @default(0) @db.Decimal(14, 2)
+  approvedAt               DateTime?
+  approvedById             String?
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  budget                   Budget              @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  approvedBy               User?               @relation("BudgetVersionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  sections                 BudgetSection[]
+
+  @@unique([budgetId, versionNumber])
+  @@index([budgetId, status])
+  @@index([approvedById])
+}
+
+model BudgetSection {
+  id               String           @id @default(uuid())
+  budgetVersionId  String
+  code             String
+  name             String
+  category         String?
+  position         Int
+  materialSubtotal Decimal          @default(0) @db.Decimal(14, 2)
+  laborSubtotal    Decimal          @default(0) @db.Decimal(14, 2)
+  otherSubtotal    Decimal          @default(0) @db.Decimal(14, 2)
+  total            Decimal          @default(0) @db.Decimal(14, 2)
+  budgetVersion    BudgetVersion    @relation(fields: [budgetVersionId], references: [id], onDelete: Cascade)
+  lineItems        BudgetLineItem[]
+  clientPayments   ClientPayment[]
+
+  @@index([budgetVersionId])
+  @@index([position])
+}
+
+model BudgetLineItem {
+  id               String            @id @default(uuid())
+  budgetSectionId  String
+  type             BudgetLineType
+  position         Int
+  description      String
+  quantity         Decimal           @default(0) @db.Decimal(14, 2)
+  unit             String?
+  days             Decimal?          @db.Decimal(14, 2)
+  unitPrice        Decimal           @default(0) @db.Decimal(14, 2)
+  subtotal         Decimal           @default(0) @db.Decimal(14, 2)
+  section          BudgetSection     @relation(fields: [budgetSectionId], references: [id], onDelete: Cascade)
+  requisitionItems RequisitionItem[]
+  clientPayments   ClientPayment[]
+
+  @@index([budgetSectionId])
+  @@index([type, position])
+}
+
+model Schedule {
+  id              String             @id @default(uuid())
+  projectId       String
+  title           String             @default("Cronograma")
+  sourceReference String?
+  notes           String?            @db.Text
+  startDate       DateTime?
+  endDate         DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  activities      ScheduleActivity[]
+
+  @@index([projectId])
+}
+
+model ScheduleActivity {
+  id                String                       @id @default(uuid())
+  scheduleId        String
+  code              String
+  description       String
+  labor             String?
+  budgetSectionCode String?
+  budgetSectionName String?
+  status            ScheduleActivityStatus       @default(PENDING)
+  plannedStart      DateTime
+  plannedEnd        DateTime
+  actualStart       DateTime?
+  actualEnd         DateTime?
+  progress          Decimal                      @default(0) @db.Decimal(5, 2)
+  position          Int
+  notes             String?                      @db.Text
+  schedule          Schedule                     @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  dependencies      ScheduleActivityDependency[] @relation("ActivityDependencies")
+  dependents        ScheduleActivityDependency[] @relation("ActivityDependents")
+  assignments       ScheduleAssignment[]
+  dailyReportItems  DailyReportActivity[]
+  requisitionItems  RequisitionItem[]
+
+  @@index([scheduleId])
+  @@index([status])
+  @@index([plannedStart])
+  @@index([plannedEnd])
+}
+
+model ScheduleActivityDependency {
+  id                  String                 @id @default(uuid())
+  activityId          String
+  dependsOnActivityId String
+  type                ScheduleDependencyType @default(FINISH_TO_START)
+  activity            ScheduleActivity       @relation("ActivityDependencies", fields: [activityId], references: [id], onDelete: Cascade)
+  dependsOnActivity   ScheduleActivity       @relation("ActivityDependents", fields: [dependsOnActivityId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, dependsOnActivityId])
+  @@index([dependsOnActivityId])
+}
+
+model ScheduleAssignment {
+  id         String           @id @default(uuid())
+  activityId String
+  userId     String?
+  label      String
+  createdAt  DateTime         @default(now())
+  activity   ScheduleActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  user       User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([activityId])
+  @@index([userId])
+}
+
+model DailyReport {
+  id                  String                @id @default(uuid())
+  projectId           String
+  reportNumber        String
+  reportDate          DateTime
+  siteManager         String
+  location            String?
+  workShift           String?
+  startTime           String?
+  endTime             String?
+  weather             String?
+  generalObservations String?               @db.Text
+  status              DailyReportStatus     @default(DRAFT)
+  submittedAt         DateTime?
+  reviewedAt          DateTime?
+  approvedAt          DateTime?
+  publishedAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  createdById         String?
+  updatedById         String?
+  approvedById        String?
+  project             Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy           User?                 @relation("DailyReportCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy           User?                 @relation("DailyReportUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  approvedBy          User?                 @relation("DailyReportApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  activities          DailyReportActivity[]
+  laborEntries        DailyReportLabor[]
+  materialEntries     DailyReportMaterial[]
+  mediaEntries        DailyReportMedia[]
+
+  @@unique([projectId, reportNumber])
+  @@index([projectId])
+  @@index([reportDate])
+  @@index([status])
+}
+
+model DailyReportActivity {
+  id                  String                 @id @default(uuid())
+  dailyReportId       String
+  scheduleActivityId  String?
+  activityCode        String
+  activityName        String
+  budgetSectionCode   String?
+  budgetSectionName   String?
+  workDescription     String                 @db.Text
+  unit                String?
+  contractedQuantity  Decimal                @default(0) @db.Decimal(14, 2)
+  previousQuantity    Decimal                @default(0) @db.Decimal(14, 2)
+  todayQuantity       Decimal                @default(0) @db.Decimal(14, 2)
+  accumulatedQuantity Decimal                @default(0) @db.Decimal(14, 2)
+  previousProgress    Decimal                @default(0) @db.Decimal(5, 2)
+  newProgress         Decimal                @default(0) @db.Decimal(5, 2)
+  status              ScheduleActivityStatus @default(PENDING)
+  issues              String?                @db.Text
+  position            Int
+  dailyReport         DailyReport            @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  scheduleActivity    ScheduleActivity?      @relation(fields: [scheduleActivityId], references: [id], onDelete: SetNull)
+  mediaEntries        DailyReportMedia[]
+
+  @@index([dailyReportId])
+  @@index([scheduleActivityId])
+  @@index([status])
+}
+
+model DailyReportLabor {
+  id            String      @id @default(uuid())
+  dailyReportId String
+  position      Int
+  workerLabel   String
+  role          String?
+  people        Decimal     @default(0) @db.Decimal(14, 2)
+  hours         Decimal     @default(0) @db.Decimal(14, 2)
+  rate          Decimal     @default(0) @db.Decimal(14, 2)
+  amount        Decimal     @default(0) @db.Decimal(14, 2)
+  notes         String?     @db.Text
+  dailyReport   DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+
+  @@index([dailyReportId])
+}
+
+model DailyReportMaterial {
+  id               String             @id @default(uuid())
+  dailyReportId    String
+  position         Int
+  materialName     String
+  warehouse        String?
+  quantityUsed     Decimal            @default(0) @db.Decimal(14, 2)
+  unit             String?
+  wasteQuantity    Decimal            @default(0) @db.Decimal(14, 2)
+  returnedQuantity Decimal            @default(0) @db.Decimal(14, 2)
+  activityCode     String?
+  notes            String?            @db.Text
+  materialId       String?
+  warehouseId      String?
+  dailyReport      DailyReport        @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  material         InventoryMaterial? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  warehouseRecord  Warehouse?         @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  stockMovements   StockMovement[]
+
+  @@index([dailyReportId])
+  @@index([activityCode])
+  @@index([materialId])
+  @@index([warehouseId])
+}
+
+model SyncOperation {
+  id             String              @id @default(uuid())
+  idempotencyKey String              @unique
+  projectId      String
+  userId         String?
+  operationType  String
+  payload        Json
+  status         SyncOperationStatus @default(PENDING)
+  result         Json?
+  lastError      String?             @db.Text
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DailyReportMedia {
+  id                    String                @id @default(uuid())
+  dailyReportId         String
+  dailyReportActivityId String?
+  activityCode          String?
+  mediaType             DailyReportMediaType  @default(DURING)
+  title                 String?
+  description           String?               @db.Text
+  fileName              String
+  originalName          String
+  mimeType              String
+  fileSize              Int
+  storageKey            String
+  publicUrl             String
+  sortOrder             Int                   @default(0)
+  uploadedById          String?
+  createdAt             DateTime              @default(now())
+  dailyReport           DailyReport           @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  dailyReportActivity   DailyReportActivity?  @relation(fields: [dailyReportActivityId], references: [id], onDelete: SetNull)
+  uploadedBy            User?                 @relation("DailyReportMediaUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  websitePhotos         WebsiteProjectPhoto[]
+
+  @@index([dailyReportId])
+  @@index([dailyReportActivityId])
+  @@index([activityCode])
+  @@index([mediaType])
+  @@index([uploadedById])
+}
+
+model InventoryMaterial {
+  id                   String                @id @default(uuid())
+  code                 String                @unique
+  name                 String
+  resourceType         InventoryResourceType @default(MATERIAL)
+  specification        String?
+  brand                String?
+  model                String?
+  trackIndividually    Boolean               @default(false)
+  unit                 String
+  unitCost             Decimal               @default(0) @db.Decimal(14, 2)
+  minimumStock         Decimal               @default(0) @db.Decimal(14, 2)
+  active               Boolean               @default(true)
+  notes                String?               @db.Text
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  stocks               Stock[]
+  stockMovements       StockMovement[]
+  requisitionItems     RequisitionItem[]
+  dailyReportMaterials DailyReportMaterial[]
+
+  @@index([name])
+  @@index([active])
+  @@index([resourceType, active])
+}
+
+model Warehouse {
+  id                   String                @id @default(uuid())
+  code                 String                @unique
+  name                 String
+  location             String?
+  active               Boolean               @default(true)
+  notes                String?               @db.Text
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  stocks               Stock[]
+  stockMovements       StockMovement[]
+  dailyReportMaterials DailyReportMaterial[]
+  requisitions         Requisition[]
+
+  @@index([name])
+  @@index([active])
+}
+
+model Stock {
+  id          String            @id @default(uuid())
+  materialId  String
+  warehouseId String
+  quantity    Decimal           @default(0) @db.Decimal(14, 2)
+  updatedAt   DateTime          @updatedAt
+  material    InventoryMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse         @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([materialId, warehouseId])
+  @@index([warehouseId])
+}
+
+model StockMovement {
+  id                    String               @id @default(uuid())
+  transferGroupId       String?
+  materialId            String
+  warehouseId           String
+  projectId             String?
+  dailyReportMaterialId String?
+  idempotencyKey        String?              @unique
+  type                  StockMovementType
+  quantity              Decimal              @db.Decimal(14, 2)
+  unitCost              Decimal              @default(0) @db.Decimal(14, 2)
+  totalCost             Decimal              @default(0) @db.Decimal(14, 2)
+  reference             String?
+  notes                 String?              @db.Text
+  responsibleName       String?
+  expectedReturnDate    DateTime?
+  createdById           String?
+  createdAt             DateTime             @default(now())
+  material              InventoryMaterial    @relation(fields: [materialId], references: [id], onDelete: Restrict)
+  warehouse             Warehouse            @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  project               Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  dailyReportMaterial   DailyReportMaterial? @relation(fields: [dailyReportMaterialId], references: [id], onDelete: SetNull)
+  createdBy             User?                @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([transferGroupId])
+  @@index([materialId])
+  @@index([warehouseId])
+  @@index([projectId])
+  @@index([dailyReportMaterialId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Requisition {
+  id            String              @id @default(uuid())
+  projectId     String?
+  warehouseId   String?
+  number        String              @unique
+  title         String
+  destinationType RequisitionDestinationType @default(PROJECT)
+  type          RequisitionType     @default(MATERIAL)
+  priority      RequisitionPriority @default(NORMAL)
+  status        RequisitionStatus   @default(DRAFT)
+  requestedDate DateTime            @default(now())
+  neededDate    DateTime?
+  requestedBy   String?
+  notes         String?             @db.Text
+  createdById   String?
+  approvedById  String?
+  approvedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  project       Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  warehouse     Warehouse?          @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  createdBy     User?               @relation("RequisitionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy    User?               @relation("RequisitionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  items         RequisitionItem[]
+
+  @@index([projectId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([requestedDate])
+}
+
+model RequisitionItem {
+  id                 String             @id @default(uuid())
+  requisitionId      String
+  materialId         String?
+  budgetLineItemId   String?
+  scheduleActivityId String?
+  description        String
+  quantity           Decimal            @default(0) @db.Decimal(14, 2)
+  unit               String?
+  estimatedCost      Decimal            @default(0) @db.Decimal(14, 2)
+  notes              String?            @db.Text
+  requisition        Requisition        @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  material           InventoryMaterial? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  budgetLineItem     BudgetLineItem?    @relation(fields: [budgetLineItemId], references: [id], onDelete: SetNull)
+  scheduleActivity   ScheduleActivity?  @relation(fields: [scheduleActivityId], references: [id], onDelete: SetNull)
+  financialExpense   FinancialExpense?
+
+  @@index([requisitionId])
+  @@index([materialId])
+  @@index([budgetLineItemId])
+  @@index([scheduleActivityId])
+}
+
+model FinancialExpense {
+  id                   String                 @id @default(uuid())
+  projectId            String
+  requisitionItemId    String?                @unique
+  supportingDocumentId String?                @unique
+  expenseDate          DateTime
+  description          String                 @db.Text
+  vendor               String?
+  quantity             Decimal                @default(0) @db.Decimal(14, 2)
+  unit                 String?
+  subtotal             Decimal                @default(0) @db.Decimal(14, 2)
+  type                 String?
+  phase                String?
+  budgetSectionNo      String?
+  activity             String?
+  documentNumber       String?
+  documentType         String?
+  fileName             String?
+  paymentMethod        String?
+  status               FinancialExpenseStatus @default(VALID)
+  notes                String?                @db.Text
+  createdById          String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requisitionItem      RequisitionItem?       @relation(fields: [requisitionItemId], references: [id], onDelete: SetNull)
+  supportingDocument   ProjectDocument?       @relation("FinancialExpenseSupportingDocument", fields: [supportingDocumentId], references: [id], onDelete: SetNull)
+  createdBy            User?                  @relation("FinancialExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  supplierPayments     SupplierPayment[]
+
+  @@index([projectId])
+  @@index([expenseDate])
+  @@index([status])
+  @@index([budgetSectionNo])
+}
+
+model SupplierPayment {
+  id                 String           @id @default(uuid())
+  financialExpenseId String
+  paymentNumber      String
+  paymentDate        DateTime
+  amount             Decimal          @db.Decimal(14, 2)
+  method             String?
+  reference          String?
+  notes              String?          @db.Text
+  status             PaymentStatus    @default(REGISTERED)
+  createdById        String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  financialExpense   FinancialExpense @relation(fields: [financialExpenseId], references: [id], onDelete: Cascade)
+  createdBy          User?            @relation("SupplierPaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([financialExpenseId, paymentNumber])
+  @@index([paymentDate])
+  @@index([status])
+}
+
+model ClientPayment {
+  id               String          @id @default(uuid())
+  projectId        String
+  paymentNumber    String
+  paymentDate      DateTime
+  amount           Decimal         @db.Decimal(14, 2)
+  method           String?
+  reference        String?
+  receiptFile      String?
+  observations     String?         @db.Text
+  concept          String?
+  budgetSectionId  String?
+  budgetLineItemId String?
+  status           PaymentStatus   @default(REGISTERED)
+  createdById      String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  project          Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  budgetSection    BudgetSection?  @relation(fields: [budgetSectionId], references: [id], onDelete: SetNull)
+  budgetLineItem   BudgetLineItem? @relation(fields: [budgetLineItemId], references: [id], onDelete: SetNull)
+  createdBy        User?           @relation("ClientPaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, paymentNumber])
+  @@index([projectId])
+  @@index([paymentDate])
+  @@index([status])
+  @@index([budgetSectionId])
+  @@index([budgetLineItemId])
+}
+
+model DocumentCategory {
+  id          String            @id @default(uuid())
+  key         String            @unique
+  name        String
+  description String?           @db.Text
+  sortOrder   Int               @default(0)
+  active      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  documents   ProjectDocument[]
+
+  @@index([active, sortOrder])
+}
+
+model ProjectDocument {
+  id                      String                @id @default(uuid())
+  projectId               String
+  categoryId              String
+  title                   String
+  description             String?               @db.Text
+  tags                    String?               @db.Text
+  status                  ProjectDocumentStatus @default(DRAFT)
+  portalVisible           Boolean               @default(false)
+  authorId                String?
+  approvedById            String?
+  approvedAt              DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  project                 Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category                DocumentCategory      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  author                  User?                 @relation("ProjectDocumentCreatedBy", fields: [authorId], references: [id], onDelete: SetNull)
+  approvedBy              User?                 @relation("ProjectDocumentApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  versions                DocumentVersion[]
+  financialExpenseReceipt FinancialExpense?     @relation("FinancialExpenseSupportingDocument")
+
+  @@index([projectId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([portalVisible])
+  @@index([authorId])
+  @@index([approvedById])
+}
+
+model DocumentVersion {
+  id            String          @id @default(uuid())
+  documentId    String
+  versionNumber Int
+  originalName  String
+  fileName      String
+  mimeType      String
+  fileSize      Int
+  storageKey    String
+  publicUrl     String
+  checksum      String
+  notes         String?         @db.Text
+  uploadedById  String?
+  createdAt     DateTime        @default(now())
+  document      ProjectDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  uploadedBy    User?           @relation("DocumentVersionUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+  @@index([uploadedById])
+  @@index([checksum])
+}
+
+// A raw, unqualified lead from the public site's contact form. Distinct from
+// Client: an inquiry may never become a client, and becoming one is a
+// deliberate staff action, not automatic.
+model WebsiteInquiry {
+  id          String               @id @default(uuid())
+  name        String
+  phone       String
+  email       String
+  message     String               @db.Text
+  status      WebsiteInquiryStatus @default(NEW)
+  ipAddress   String?
+  userAgent   String?              @db.Text
+  handledById String?
+  handledAt   DateTime?
+  notes       String?              @db.Text
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  handledBy   User?                @relation("WebsiteInquiryHandledBy", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([ipAddress, createdAt])
+}
+
+// Singleton (single row, fixed id "singleton"): freeform texts and contact
+// data that only ever have one current value, editable from /website without
+// touching code. History of changes lives in AuditLog like everywhere else.
+model WebsiteSettings {
+  id                  String   @id @default("singleton")
+  heroEyebrow         String?
+  heroHeading         String?  @db.Text
+  heroSubheading      String?  @db.Text
+  heroImageUrl        String?
+  homeServicesEyebrow String?
+  homeServicesHeading String?  @db.Text
+  ctaHeading          String?  @db.Text
+  ctaText             String?  @db.Text
+  aboutHeading        String?  @db.Text
+  aboutText           String?  @db.Text
+  missionText         String?  @db.Text
+  visionText          String?  @db.Text
+  phonePrimary        String?
+  phoneSecondary      String?
+  email               String?
+  address             String?
+  hoursWeekdays       String?
+  hoursSaturday       String?
+  facebookUrl         String?
+  instagramUrl        String?
+  servicesEyebrow     String?
+  servicesHeading     String?  @db.Text
+  projectsEyebrow     String?
+  projectsHeading     String?  @db.Text
+  projectsSubheading  String?  @db.Text
+  contactEyebrow      String?
+  contactHeading      String?  @db.Text
+  contactSubheading   String?  @db.Text
+  seoTitle            String?
+  seoDescription      String?  @db.Text
+  published           Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// A service card shown on / and /servicios. Not the same concept as a
+// requisition/budget "service" line -- this is public marketing copy only.
+model WebsiteService {
+  id          String   @id @default(uuid())
+  title       String
+  description String   @db.Text
+  icon        String?
+  position    Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active, position])
+}
+
+// A gallery item on /proyectos. The image is either uploaded specifically
+// for the site or reused (by reference, never by copying the file) from an
+// existing DailyReportMedia -- publishing it here is the explicit action
+// that makes an internal evidence photo public.
+model WebsiteProjectPhoto {
+  id                       String            @id @default(uuid())
+  title                    String
+  imageUrl                 String
+  storageKey               String?
+  altText                  String?
+  position                 Int               @default(0)
+  active                   Boolean           @default(true)
+  sourceDailyReportMediaId String?
+  sourceDailyReportMedia   DailyReportMedia? @relation(fields: [sourceDailyReportMediaId], references: [id], onDelete: SetNull)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  @@index([active, position])
+  @@index([sourceDailyReportMediaId])
+}

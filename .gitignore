@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+dist
+coverage
+public/uploads/
+.env
+.env.local
+.env.*.local
+*.log
+*.tsbuildinfo
+repomix-output.xml
+Dockerfile.local
+.logs

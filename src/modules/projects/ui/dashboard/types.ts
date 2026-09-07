@@ -1,0 +1,47 @@
+export type DashboardProjectRow = {
+  id: string;
+  code: string;
+  name: string;
+  clientName: string;
+  responsibleName: string;
+  status: string;
+  startDate: string | null;
+  expectedEndDate: string | null;
+  daysRemaining: number | null;
+  budgetTotal: number;
+  spent: number;
+  paid: number;
+  balance: number;
+  plannedProgress: number;
+  realProgress: number;
+  overdueActivities: number;
+  pendingRequirements: number;
+  pendingReports: number;
+  risk: string;
+};
+
+export type DashboardMetricsView = {
+  totalProjects: number;
+  activeProjects: number;
+  baseBudgetTotal: number;
+  approvedBudgetTotal: number;
+  spentTotal: number;
+  paidTotal: number;
+  balanceTotal: number;
+  plannedProgressAverage: number;
+  realProgressAverage: number;
+  pendingRequirements: number;
+  pendingReports: number;
+  overdueActivities: number;
+  lowStock: number;
+  peopleWorking: number;
+  statusCounts: Array<{ status: string; count: number }>;
+  activityStatusCounts: Array<{ status: string; count: number }>;
+  projectSummaries: DashboardProjectRow[];
+  timeline: Array<{ date: string; planned: number; real: number | null; financial: number | null }>;
+  financialFlow: Array<{ month: string; spent: number; paid: number }>;
+  stockAlerts: Array<{ material: string; unit: string; quantity: number; minimum: number; level: string }>;
+  ganttRows: Array<{ id: string; code: string; name: string; start: string | null; end: string | null; risk: string; progress: number }>;
+  recentActivity: Array<{ at: string; title: string; detail: string; href: string }>;
+  operationalAlerts: Array<{ severity: string; title: string; detail: string; href: string }>;
+};
