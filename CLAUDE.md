@@ -2,7 +2,7 @@
 
 HM CONSTRUCTORA — INSTRUCCIONES DE TRABAJO PARA CLAUDE CODE
 
-Última actualización: 2026-09-02
+Última actualización: 2026-09-07
 
 PROPÓSITO
 
@@ -11,6 +11,62 @@ Estas instrucciones son el contexto permanente del proyecto. No vuelvas a pedir 
 Trabaja sobre el sistema existente. No lo reconstruyas desde cero, no elimines funciones válidas y no hagas refactors masivos sin necesidad.
 
 Si este archivo contradice el código real, manda el código real. Corrige este archivo solo cuando cambie una decisión permanente del proyecto.
+
+0. ARQUITECTURA Y MÓDULOS ACTUALES (referencia rápida)
+
+Esta sección resume el estado real del código (no un plan) para no tener que releer todo el repositorio en cada tarea. El detalle completo vive en docs/ (ver docs/README.md como índice); esta sección es solo el mapa rápido.
+
+Stack: Next.js 16 (App Router, Turbopack) + React 19 + TypeScript + Prisma 7 + MySQL (driver `mariadb` vía `@prisma/adapter-mariadb`, NO `mysql2`) + Tailwind CSS 4. PWA con `next-pwa`/service worker propio (`public/sw.js`) y sincronización offline con Dexie (IndexedDB).
+
+Convención de capas por módulo (`src/modules/<modulo>/`), solo se crean las carpetas que tengan contenido real:
+
+- `domain/`: tipos, validación (Zod), reglas puras y cálculos.
+- `application/`: casos de uso, Server Actions, Route Handlers, acceso a Prisma.
+- `ui/`: componentes y vistas específicas del módulo.
+
+Módulos reales en `src/modules/` y su responsabilidad:
+
+- `auth`: login, sesión JWT (`jose`), passkeys/WebAuthn, rate limiting de login, hashing de contraseñas.
+- `roles`: catálogo de permisos y roles del sistema (`src/modules/roles/domain/permissions.ts` es la fuente de verdad de qué permisos y roles existen).
+- `users`: gestión de usuarios internos (alta, edición, estado, reseteo de contraseña, asignación de roles).
+- `audit`: bitácora de acciones sensibles (`AuditLog`).
+- `projects`: CRUD de proyectos, responsables, integrantes (`ProjectMember`, hoy no se usa para autorización — ver docs/security-audit.md M4).
+- `client-portal`: enlaces de portal por token (`PortalShare`), acotados por proyecto.
+- `budgets`: presupuestos, versiones, secciones, renglones.
+- `schedules`: cronograma, actividades, dependencias, asignaciones.
+- `progress`: informes diarios de avance, mano de obra, materiales usados, evidencia multimedia, sincronización offline (`SyncOperation`).
+- `inventory`: materiales, bodegas, existencias (`Stock`), movimientos (`StockMovement`).
+- `requisitions`: solicitudes de material/compra y sus renglones.
+- `finances`: gastos (`FinancialExpense`), pagos a proveedor (`SupplierPayment`) y pagos de cliente (`ClientPayment`) — son tres conceptos distintos, no fusionarlos.
+- `documents`: repositorio documental por proyecto, categorías, versiones, almacenamiento (hoy en `public/uploads/...`, servido vía Route Handler autenticado — ver docs/security-audit.md H1).
+- `reports`: solo `ui/` (plantillas de reporte reutilizan datos de progress/budgets/finances, no tiene modelos propios).
+- `notifications`: avisos internos.
+- `website`: CMS del sitio público (`WebsiteSettings` singleton, `WebsiteService`, `WebsiteProjectPhoto`, `WebsiteInquiry` para el formulario de contacto). Ver sección 4 y 5 de este archivo para las reglas de negocio de este módulo.
+
+Nota histórica: `docs/modules.md`/`docs/project-structure.md` originales (Etapa 0) planeaban módulos separados `workforce`, `media`, `contracts`, `plans` y `sync` que nunca se crearon como módulos independientes — quedaron absorbidos dentro de `progress` (mano de obra y media van en `DailyReportLabor`/`DailyReportMedia`), `documents` y la ruta de offline-sync (`SyncOperation`). Si vas a crear alguno de esos conceptos, revisa primero si ya vive dentro de otro módulo antes de crear uno nuevo.
+
+Rutas (`src/app/`):
+
+- `(public)/` — sitio público sin sesión: `/`, `/servicios`, `/proyectos`, `/contacto`.
+- `login/`, `account/` — autenticación y gestión de la propia cuenta/passkeys.
+- `dashboard/`, `projects/`, `inventory/`, `requisitions/`, `finances/`, `documents/`, `reports/`, `users/`, `website/` — rutas internas autenticadas (protegidas también por `src/proxy.ts` como red de seguridad; cada página valida su propio permiso además).
+- `portal/[token]/` — vista del cliente por enlace de portal, sin sesión de empleado.
+- `api/` — Route Handlers: `api/auth/*` (login/passkeys), `api/documents/*` (descarga autenticada de documentos), `api/projects/[id]/progress/offline-sync` (sync offline), `api/dev/reset-database` (solo desarrollo, triple-gateado), `api/health`, `api/notifications`.
+- `offline/` — página de fallback del service worker.
+
+Inicialización del proyecto (desarrollo local):
+
+1. `docker compose up -d` — levanta MySQL (puerto 3307, no 3306, para no chocar con instalaciones locales) y MinIO. Nota: MinIO está declarado en `docker-compose.yml`/`.env.example` y `@aws-sdk/client-s3` está en `package.json`, pero hoy **no se usa en ningún lado de `src/`** — el almacenamiento real de documentos/imágenes es el sistema de archivos local (`public/uploads/...`, ver `src/modules/documents/application/storage.ts`). Antes de "aprovechar" MinIO para algo nuevo, confirma si sigue siendo el plan o es un remanente sin terminar de migrar.
+2. Copiar `.env.example` a `.env` y ajustar si hace falta (`DATABASE_URL`, `AUTH_SECRET` de al menos 32 caracteres). `ALLOW_DEV_DB_RESET=true` habilita `/api/dev/reset-database` solo en local, además de requerir `NODE_ENV=development` y sesión de superadministrador.
+3. `npm install`.
+4. `npm run prisma:generate` (genera el cliente Prisma con el adaptador `mariadb`).
+5. `npm run prisma:migrate` (aplica migraciones a la base local).
+6. `npm run prisma:seed` (crea roles/permisos iniciales y el usuario semilla — ver README.md para las credenciales de desarrollo).
+7. `npm run dev` (Next.js con Turbopack).
+
+Scripts de verificación relevantes (ver package.json): `npm run typecheck`, `npm run lint` (Biome), `npm run test` (Vitest, pruebas en `tests/*.test.ts` — no `tests/unit|integration|e2e`, esa subdivisión nunca se implementó), `npm run build`.
+
+Documentos vivos a los que referirse para más detalle (ver docs/README.md para el índice completo, incluyendo cuáles están desactualizados): `docs/architecture.md`, `docs/modules.md`, `docs/project-structure.md`, `docs/data-model.md`, `docs/roles-permissions.md`, `docs/database-audit.md`, `docs/security-audit.md`.
 
 1. FORMA DE TRABAJO
 

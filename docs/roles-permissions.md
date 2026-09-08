@@ -1,5 +1,7 @@
 # Roles y permisos
 
+Fuente de verdad en codigo: `src/modules/roles/domain/permissions.ts` (roles, permisos y matriz de presets por rol). Este documento resume ese archivo en prosa; si difieren, el codigo manda.
+
 ## Roles iniciales
 
 - `superadministrador`
@@ -22,6 +24,8 @@ No existe rol de cliente.
 - `presupuesto.ver`
 - `presupuesto.editar`
 - `presupuesto.aprobar`
+- `cronograma.ver`
+- `cronograma.editar`
 - `avance.crear`
 - `avance.revisar`
 - `avance.aprobar`
@@ -33,6 +37,8 @@ No existe rol de cliente.
 - `documentos.compartir`
 - `portal.gestionar`
 - `usuarios.gestionar`
+- `usuarios.administradores` — gestionar cuentas con rol de superadministrador (mas restrictivo que `usuarios.gestionar`).
+- `sitio.editar` — editar contenido del CMS del sitio publico (modulo `website`).
 
 ## Matriz preliminar
 
@@ -40,7 +46,7 @@ No existe rol de cliente.
 | --- | --- |
 | superadministrador | Todos los permisos |
 | administrador | Gestion operativa, proyectos, usuarios no superadmin, documentos y portal |
-| gerente_proyecto | Proyectos asignados, presupuesto, cronograma, avances, reportes y portal |
+| gerente_proyecto | Presupuesto, cronograma, avances, reportes y portal — la descripcion de rol dice "proyectos asignados" pero hoy el permiso `proyectos.editar` no esta acotado por `ProjectMember`, asi que en la practica puede editar cualquier proyecto, no solo los asignados (ver `docs/security-audit.md` M4, pendiente de decision de producto) |
 | supervisor_obra | Avances, evidencia, materiales usados y consulta de proyecto asignado |
 | contabilidad | Finanzas, abonos, gastos, estados de cuenta y reportes financieros |
 | compras | Requerimientos, proveedores, compras y documentos relacionados |

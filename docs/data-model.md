@@ -1,98 +1,82 @@
-# Modelo de datos preliminar
+# Modelo de datos
 
-Este modelo es preliminar y debe revisarse antes de generar migraciones completas. Las entidades usaran UUID, `createdAt`, `updatedAt`, indices por relaciones principales y campos de auditoria cuando aplique.
+Refleja `prisma/schema.prisma` real (40 modelos). Todas las entidades usan `id` UUID (salvo excepciones señaladas), `createdAt`/`updatedAt` donde aplica, `Decimal` para dinero/cantidades e indices sobre relaciones y campos de consulta frecuente (proyecto, fecha, estado). Para el detalle de indices y decisiones de normalizacion ver `docs/database-audit.md`.
 
-## Seguridad
+## Seguridad y acceso
 
-- `User`: usuario interno.
-- `Role`: rol asignable.
-- `Permission`: permiso granular.
-- `UserRole`: relacion usuario-rol.
-- `RolePermission`: relacion rol-permiso.
-- `AuditLog`: acciones sensibles, usuario, entidad, accion, fecha, metadata e IP cuando aplique.
+- `User`: usuario interno (email, nombre, telefono, `passwordHash`, estado activo/inactivo).
+- `UserPasskey`: credencial WebAuthn de un usuario (clave publica, contador anti-clonado, tipo de dispositivo).
+- `Role` / `Permission`: catalogos de rol y permiso.
+- `UserRole` / `RolePermission`: tablas de relacion muchos-a-muchos.
+- `AuditLog`: accion sensible (login, cambio de estado/rol, aprobacion, publicacion, etc.), usuario, entidad afectada, metadata e IP cuando aplica.
 
 ## Proyectos
 
-- `Client`: registro informativo del cliente.
-- `Project`: codigo, nombre, descripcion, ubicacion, fechas, responsable, estado, moneda, presupuesto base, avance y observaciones.
-- `ProjectMember`: usuarios internos asignados al proyecto.
+- `Client`: registro informativo del cliente (no es un usuario del sistema).
+- `Project`: codigo, nombre, ubicacion, fechas, responsable, estado, moneda.
+- `ProjectMember`: usuarios internos asignados a un proyecto (hoy solo se usa para limpieza al borrar un proyecto, no para autorizacion — ver `docs/security-audit.md` M4).
+- `PortalShare`: enlace de portal por token para el cliente, acotado a un proyecto (token hasheado antes de guardarse, con expiracion/revocacion).
 
 ## Presupuesto
 
-- `Budget`: presupuesto asociado a proyecto.
-- `BudgetVersion`: version inicial, vigente o historica.
+- `Budget`: presupuesto de un proyecto.
+- `BudgetVersion`: version inicial, vigente o historica de un presupuesto.
 - `BudgetSection`: secciones del presupuesto.
-- `BudgetItem`: renglones, cantidades, unidades, dias, personas, precios, subtotales y observaciones.
-- `BudgetChangeOrder`: ordenes de cambio, trabajos adicionales y modificaciones aprobadas.
+- `BudgetLineItem`: renglones (cantidades, unidades, precios, subtotales).
 
 ## Cronograma
 
-- `Schedule`: cronograma por proyecto.
-- `Activity`: actividad con fechas planificadas/reales, responsable, estado, avance, costos y trabajadores.
-- `ActivityDependency`: dependencias entre actividades.
-- `ActivityAssignment`: asignaciones de usuarios, cuadrillas o responsables.
+- `Schedule`: cronograma de un proyecto.
+- `ScheduleActivity`: actividad con fechas planificadas/reales, responsable, estado, avance.
+- `ScheduleActivityDependency`: dependencias entre actividades.
+- `ScheduleAssignment`: asignacion de un usuario a una actividad.
 
 ## Avance diario
 
-- `DailyReport`: informe diario, estado, proyecto, fecha, encargado, jornada y observaciones.
-- `DailyReportActivity`: actividad ejecutada, cantidades, acumulados y porcentaje.
-- `DailyReportLabor`: personal individual o cuadrilla.
-- `DailyReportMaterial`: materiales utilizados, desperdicio y devolucion.
-- `DailyReportMedia`: evidencia multimedia.
-- `DailyReportVersion`: versiones aprobadas o corregidas.
-- `Approval`: aprobaciones por flujo y entidad.
-
-## Personal
-
-- `Worker`: trabajador individual.
-- `Crew`: cuadrilla.
+- `DailyReport`: informe diario (proyecto, fecha, encargado, estado, jornada).
+- `DailyReportActivity`: actividad ejecutada ese dia, cantidad acumulada y nuevo porcentaje de avance.
+- `DailyReportLabor`: mano de obra registrada en el informe (personal o cuadrilla, sin modelo maestro `Worker`/`Crew` separado).
+- `DailyReportMaterial`: material utilizado/desperdiciado/devuelto ese dia; puede generar un `StockMovement` de consumo.
+- `DailyReportMedia`: evidencia fotografica/video del informe — puede reusarse (por referencia) como foto publica desde `WebsiteProjectPhoto`.
+- `SyncOperation`: operacion de sincronizacion offline (clave de idempotencia unica, `userId` propietario, payload, estado, resultado o error) — usada por el flujo de avance diario offline via `api/projects/[id]/progress/offline-sync`.
 
 ## Inventario
 
-- `UnitOfMeasure`: unidades.
-- `Material`: catalogo de materiales.
+- `InventoryMaterial`: catalogo de materiales/recursos (código, unidad, costo unitario, stock minimo).
 - `Warehouse`: bodegas.
-- `Stock`: existencia por material y bodega.
-- `StockMovement`: entradas, salidas, transferencias, ajustes, devoluciones y consumos.
+- `Stock`: existencia de un material en una bodega (unico por par material+bodega).
+- `StockMovement`: entrada, salida, transferencia o ajuste; puede relacionarse con proyecto, informe diario o usuario que lo registro.
 
 ## Requerimientos y compras
 
-- `Requisition`: solicitud.
-- `RequisitionItem`: articulos solicitados.
-- `RequisitionApproval`: aprobaciones.
-- `Supplier`: proveedor.
-- `Purchase`: compra asociada.
+- `Requisition`: solicitud de material/compra (numero unico, proyecto, bodega destino, estado, prioridad).
+- `RequisitionItem`: renglon solicitado; puede enlazar a un material de inventario, un renglon de presupuesto y/o una actividad de cronograma.
 
 ## Finanzas
 
-- `Expense`: gastos.
-- `ClientDeposit`: abonos del cliente.
-- `FinancialAdjustment`: ajustes aprobados.
+Tres conceptos distintos, no fusionar:
 
-## Documentos y multimedia
+- `FinancialExpense`: gasto de un proyecto (puede originarse de un `RequisitionItem` y tener un `ProjectDocument` como comprobante de soporte).
+- `SupplierPayment`: pago hecho **a un proveedor** por un gasto especifico (`FinancialExpense`).
+- `ClientPayment`: pago/abono recibido **del cliente** del proyecto, opcionalmente enlazado a una seccion o renglon de presupuesto.
 
-- `Document`: archivo logico y metadatos.
-- `DocumentVersion`: versiones de archivo.
-- `DocumentCategory`: categorias.
-- `Contract`: contratos.
-- `Plan`: planos.
-- `MediaAsset`: fotos y videos.
+## Documentos
 
-## Portal privado
+- `DocumentCategory`: categoria de documento (contratos, planos, comprobantes, permisos, evidencias, presupuestos generados, estados de cuenta, informes, requerimientos, otros).
+- `ProjectDocument`: documento logico de un proyecto (categoria, estado, si es visible en el portal).
+- `DocumentVersion`: version de archivo de un documento (nombre original, mime, tamaño, `storageKey` en disco, checksum). Servido a la UI interna via Route Handler autenticado, no via URL publica directa.
 
-- `ShareLink`: enlace hash, estado, expiracion, PIN opcional y proyecto.
-- `ShareLinkPermission`: informacion visible.
-- `ShareLinkAccessLog`: accesos, fecha, IP y resultado.
+## Sitio web publico (CMS)
 
-## Notificaciones y sincronizacion
+- `WebsiteInquiry`: solicitud del formulario de contacto publico (con IP/user agent para rate limiting y estado de seguimiento interno).
+- `WebsiteSettings`: fila unica (`id: "singleton"`) con los textos y datos de contacto editables del sitio (hero, nosotros, mision/vision, telefonos, redes, SEO). Editar esto no requiere tocar codigo.
+- `WebsiteService`: tarjeta de servicio mostrada en `/` y `/servicios` (no es lo mismo que un renglon de requisicion/presupuesto llamado "servicio").
+- `WebsiteProjectPhoto`: foto de la galeria de `/proyectos`; puede apuntar por referencia a un `DailyReportMedia` existente (nunca copia el archivo) — publicarla aqui es la accion explicita que la hace publica.
 
-- `Notification`: aviso interno.
-- `NotificationPreference`: preferencias por usuario.
-- `SyncOperation`: operacion offline, clave de idempotencia, payload, estado y errores.
+## Relaciones y reglas criticas
 
-## Relaciones criticas
-
-- Todo dato operativo principal debe relacionarse con `Project`.
-- Los movimientos de inventario pueden relacionarse con proyecto, actividad, requerimiento, compra, informe diario y usuario.
-- Los gastos pueden relacionarse con proyecto, fase, renglon, actividad y comprobante.
-- Los reportes aprobados deben versionarse, no editarse directamente.
+- Todo dato operativo principal cuelga de `Project` (directa o indirectamente).
+- Un `StockMovement` puede relacionarse con proyecto, informe diario (via `dailyReportMaterialId`) y usuario, pero no depende obligatoriamente de ninguno (movimientos de bodega a bodega sin proyecto son validos).
+- `FinancialExpense` es distinto de `SupplierPayment` (pago a proveedor) y de `ClientPayment` (pago de cliente) — no son la misma tabla ni deben tratarse como sinonimos.
+- `ProjectMember` existe en el esquema pero no participa hoy en ninguna verificacion de autorizacion (ver `docs/security-audit.md` M4) — no asumir que filtra nada automaticamente.
+- Una evidencia (`DailyReportMedia`) nunca es publica solo por existir: se vuelve publica unicamente cuando se crea/activa una fila de `WebsiteProjectPhoto` que la referencia.

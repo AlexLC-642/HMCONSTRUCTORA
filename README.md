@@ -1,10 +1,12 @@
 ﻿# HM Constructora
 
-Sistema interno de gestion de proyectos de construccion.
+Sistema interno de gestion de proyectos de construccion (proyectos, presupuesto, cronograma, avance diario, inventario, requerimientos, finanzas, documentos, reportes, portal de cliente) mas el sitio publico y su CMS interno.
 
 ## Estado
 
-Etapa 2 en progreso: proyectos y dashboard inicial sobre la fundacion Next.js, TypeScript, Prisma, MySQL, permisos y auditoria basica. MySQL local usa el puerto 3307 para evitar conflicto con servicios existentes en Windows.
+Sistema en operacion con modulos funcionales de extremo a extremo (ver `docs/modules.md`). Fundacion: Next.js 16 (App Router, Turbopack), React 19, TypeScript, Prisma 7 sobre MySQL, autenticacion propia (JWT + bcrypt + passkeys/WebAuthn), permisos granulares y auditoria. MySQL local usa el puerto 3307 para evitar conflicto con servicios existentes en Windows.
+
+Para el mapa completo de modulos, rutas y decisiones de arquitectura ver `CLAUDE.md` (seccion 0) y `docs/README.md` (indice de documentacion, indica que documentos siguen vigentes y cuales son historicos de planificacion).
 
 ## Requisitos locales
 
@@ -15,7 +17,7 @@ Etapa 2 en progreso: proyectos y dashboard inicial sobre la fundacion Next.js, T
 ## Configuracion
 
 1. Copiar `.env.example` a `.env`.
-2. Levantar servicios locales:
+2. Levantar servicios locales (MySQL en el puerto 3307, MinIO):
 
 ```bash
 docker compose up -d
@@ -33,13 +35,13 @@ npm install
 npm run prisma:generate
 ```
 
-5. Crear migracion local:
+5. Aplicar migraciones locales:
 
 ```bash
 npm run prisma:migrate
 ```
 
-6. Ejecutar datos semilla:
+6. Ejecutar datos semilla (roles, permisos y usuario inicial):
 
 ```bash
 npm run prisma:seed
@@ -49,6 +51,15 @@ npm run prisma:seed
 
 ```bash
 npm run dev
+```
+
+## Verificacion
+
+```bash
+npm run typecheck
+npm run lint
+npm run test
+npm run build
 ```
 
 ## Usuario semilla
