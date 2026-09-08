@@ -20,9 +20,16 @@ import type { NextConfig } from "next";
 //     style-src governs inline style attributes the same as <style> blocks,
 //     so blocking it without a large refactor would break real UI.
 // Revisit both if the app ever moves fully to nonce-based CSP.
+//
+// 'unsafe-eval' is added to script-src ONLY in development: Next.js/Turbopack
+// dev mode uses eval() for its own debugging tooling (reconstructing stack
+// traces across the dev server boundary), and refuses to run without it -
+// see https://nextjs.org/docs/messages/csp-eval. React itself never calls
+// eval() in production, so the production CSP below stays eval-free.
+const isDev = process.env.NODE_ENV === "development";
 const cspDirectives = [
 	"default-src 'self'",
-	"script-src 'self' 'unsafe-inline'",
+	`script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
 	"style-src 'self' 'unsafe-inline'",
 	"img-src 'self' data: blob:",
 	"font-src 'self'",
