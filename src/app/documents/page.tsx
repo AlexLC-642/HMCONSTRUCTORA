@@ -19,7 +19,7 @@ import {
 	buildDocumentPreview,
 	getDocumentLibrary,
 } from "@/modules/documents/application/queries";
-import { documentStatusLabels, manualDocumentCategoryKeys } from "@/modules/documents/domain/catalog";
+import { documentFileUrl, documentStatusLabels, manualDocumentCategoryKeys } from "@/modules/documents/domain/catalog";
 import { DocumentPreviewModal } from "@/modules/documents/ui/document-preview-modal";
 import {
 	DocumentEmpty,
@@ -704,7 +704,7 @@ export default async function DocumentsPage({
 																<a
 																	className="documents-row-action documents-row-action--dark focus-ring"
 																	download
-																	href={latest.publicUrl}
+																	href={documentFileUrl(latest.id)}
 																>
 																	<Download size={14} />
 																	Descargar

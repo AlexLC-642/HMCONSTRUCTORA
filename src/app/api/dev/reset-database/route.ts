@@ -1,18 +1,39 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/modules/auth/application/current-user";
+import { isSuperAdministrator } from "@/modules/auth/application/authorization";
 import { prisma } from "@/shared/lib/prisma";
 
 /**
  * POST /api/dev/reset-database
- * 
+ *
  * DEVELOPMENT ONLY - Removes all project data for testing
  * Keeps: Users, Roles, Permissions
  * Deletes: Projects, Budgets, Schedules, Reports, Documents, Inventory
+ *
+ * Triple-gated on purpose: NODE_ENV alone is not a reliable production
+ * guard (a misconfigured deployment can leave it as "development"), so an
+ * unauthenticated caller must not be able to wipe all operational data just
+ * because that one variable was set wrong. Every condition below must hold.
  */
 export async function POST() {
-  // Only available in development
   if (process.env.NODE_ENV !== "development") {
     return NextResponse.json(
       { error: "Not available in production" },
+      { status: 403 }
+    );
+  }
+
+  if (process.env.ALLOW_DEV_DB_RESET !== "true") {
+    return NextResponse.json(
+      { error: "Set ALLOW_DEV_DB_RESET=true locally to enable this endpoint." },
+      { status: 403 }
+    );
+  }
+
+  const user = await getCurrentUser();
+  if (!user || !isSuperAdministrator(user.roles)) {
+    return NextResponse.json(
+      { error: "Requires an authenticated superadministrator session." },
       { status: 403 }
     );
   }

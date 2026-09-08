@@ -321,8 +321,8 @@ export default async function UsersPage() {
 											className="min-w-0 flex-1 px-3 text-base outline-none placeholder:text-[#7c8681]"
 											name="password"
 											required
-											minLength={8}
-											placeholder="Mínimo 8 caracteres"
+											minLength={10}
+											placeholder="Mínimo 10 caracteres"
 											type="password"
 										/>
 									</div>
@@ -777,9 +777,9 @@ export default async function UsersPage() {
 																		autoComplete="new-password"
 																		className={fieldClass}
 																		name="password"
-																		minLength={8}
+																		minLength={10}
 																		required
-																		placeholder="Nueva contraseña (mínimo 8 caracteres)"
+																		placeholder="Nueva contraseña (mínimo 10 caracteres)"
 																		type="password"
 																	/>
 																</label>

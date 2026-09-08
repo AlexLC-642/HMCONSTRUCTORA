@@ -12,8 +12,10 @@ type LoginPageProps = {
 };
 
 function errorMessage(error?: string) {
-  if (error === "db") return "No se pudo conectar con la base de datos. Revisa Docker Desktop y vuelve a intentar.";
-  if (error) return "Credenciales invalidas o usuario inactivo.";
+  // Deliberately one generic message regardless of cause (bad credentials,
+  // inactive account, rate limit, or a transient DB error) - see
+  // docs/security-audit.md M6 for why the causes are not distinguished here.
+  if (error) return "No se pudo iniciar sesión. Verifica tus datos e inténtalo de nuevo.";
   return "";
 }
 

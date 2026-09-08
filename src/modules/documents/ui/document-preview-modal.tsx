@@ -11,6 +11,7 @@ import {
 	X,
 } from "lucide-react";
 import type { DocumentPreviewData } from "@/modules/documents/application/queries";
+import { documentFileUrl } from "@/modules/documents/domain/catalog";
 
 interface DocumentPreviewModalProps {
 	document: DocumentPreviewData;
@@ -100,7 +101,7 @@ export function DocumentPreviewModal({
 									alt={document.title}
 									className="max-h-full max-w-full rounded-lg object-contain shadow-md"
 									height={1200}
-									src={safeVersion.publicUrl}
+									src={documentFileUrl(safeVersion.id)}
 									unoptimized
 									width={1200}
 								/>
@@ -110,7 +111,7 @@ export function DocumentPreviewModal({
 								<video
 									className="max-h-full max-w-full rounded-lg bg-black"
 									controls
-									src={safeVersion.publicUrl}
+									src={documentFileUrl(safeVersion.id)}
 								>
 									<track kind="captions" />
 								</video>
@@ -118,7 +119,7 @@ export function DocumentPreviewModal({
 						) : isPdf ? (
 							<iframe
 								className="h-full w-full rounded-xl border border-[#dfe3dc] bg-white"
-								src={safeVersion.publicUrl}
+								src={documentFileUrl(safeVersion.id)}
 								title={document.title}
 							/>
 						) : (
@@ -139,7 +140,7 @@ export function DocumentPreviewModal({
 								<a
 									className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-[var(--brand-red)] px-5 text-sm font-semibold text-white hover:bg-[#b51d2a]"
 									download
-									href={safeVersion.publicUrl}
+									href={documentFileUrl(safeVersion.id)}
 								>
 									<Download size={16} />
 									Descargar
@@ -306,7 +307,7 @@ export function DocumentPreviewModal({
 							<a
 								className="documents-secondary-action focus-ring"
 								download
-								href={safeVersion.publicUrl}
+								href={documentFileUrl(safeVersion.id)}
 							>
 								<Download size={16} />
 								Descargar

@@ -9,8 +9,8 @@ import {
 	laborUnitUsesJornadas,
 } from "../domain/units";
 import {
-	budgetLineTypeLabels,
 	type BudgetVersionInput,
+	budgetLineTypeLabels,
 } from "../domain/validation";
 
 type BudgetLineType =

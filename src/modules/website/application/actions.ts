@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requirePermission } from "@/modules/auth/application/authorization";
+import { requestIp } from "@/shared/lib/request-ip";
 import {
 	addWebsitePhotoFromEvidence,
 	addWebsitePhotoFromUpload,
@@ -33,13 +34,6 @@ function refresh(tab?: string) {
 	revalidatePath("/proyectos");
 	revalidatePath("/contacto");
 	redirect(`/website${tab ? `?tab=${tab}` : ""}` as Route);
-}
-
-async function requestIp() {
-	const headerList = await headers();
-	const forwardedFor = headerList.get("x-forwarded-for");
-	if (forwardedFor) return forwardedFor.split(",")[0]?.trim() ?? null;
-	return headerList.get("x-real-ip");
 }
 
 export async function submitWebsiteInquiryAction(formData: FormData) {

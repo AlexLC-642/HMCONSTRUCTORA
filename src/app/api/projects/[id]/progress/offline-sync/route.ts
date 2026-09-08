@@ -40,6 +40,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     where: { idempotencyKey: body.data.idempotencyKey }
   });
 
+  // idempotencyKey is client-generated and globally unique, but it must not
+  // let one user read back another user's cached sync result just by
+  // reusing/guessing their key - always confirm ownership before trusting it.
+  if (existing && existing.userId !== user.id) {
+    return apiError(409, "IDEMPOTENCY_KEY_CONFLICT", "Esta operacion ya fue registrada por otra sesion.");
+  }
+
   if (existing?.status === "SYNCED") {
     return NextResponse.json({ success: true, data: existing.result, error: null, meta: { replayed: true } });
   }

@@ -19,6 +19,14 @@ export const manualDocumentCategoryKeys = new Set([
   "otros"
 ]);
 
+// Internal document views/downloads always go through this authenticated
+// route (session + "proyectos.ver" permission check) instead of the raw
+// publicUrl field, which points at a static file under public/uploads with
+// no access control at all - see docs/security-audit.md H1.
+export function documentFileUrl(versionId: string) {
+  return `/api/documents/versions/${versionId}/file`;
+}
+
 export const documentStatusLabels = {
   DRAFT: "Borrador",
   REVIEW: "En revision",

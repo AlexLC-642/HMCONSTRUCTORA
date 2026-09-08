@@ -47,7 +47,7 @@ export const createUserSchema = z.object({
 		.string()
 		.trim()
 		.regex(/^\d{8}$/, "El teléfono debe tener exactamente 8 dígitos"),
-	password: z.string().min(8, "Minimo 8 caracteres"),
+	password: z.string().min(10, "Minimo 10 caracteres"),
 	status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
 	roleIds: z.array(z.string().uuid()).min(1, "Selecciona al menos un rol"),
 });
@@ -77,5 +77,5 @@ export const updateUserSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-	password: z.string().min(8, "Minimo 8 caracteres"),
+	password: z.string().min(10, "Minimo 10 caracteres"),
 });

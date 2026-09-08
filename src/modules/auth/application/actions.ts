@@ -5,8 +5,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { recordAuditLog } from "@/modules/audit/application/audit";
 import { COMPANY_EMAIL_DOMAIN } from "@/modules/auth/domain/email-domain";
+import { requestIp } from "@/shared/lib/request-ip";
 import { prisma } from "@/shared/lib/prisma";
-import { verifyPassword } from "./password";
+import {
+  clearLoginAttempts,
+  isLoginRateLimited,
+  recordFailedLogin
+} from "./login-rate-limit";
+import { verifyPasswordTimingSafe } from "./password";
 import { createSessionToken, sessionCookieOptions } from "./session";
 import { loginSchema } from "../domain/validation";
 
@@ -16,58 +22,79 @@ function normalizeLoginEmail(value: FormDataEntryValue | null) {
   return raw.includes("@") ? raw : `${raw}@${COMPANY_EMAIL_DOMAIN}`;
 }
 
-function loginErrorUrl(error: "1" | "db" = "1") {
-  return `/login?error=${error}` as Route;
+// Deliberately a single generic error for every failure mode (bad email
+// format, unknown email, wrong password, inactive account, rate limit, DB
+// hiccup): telling an attacker *which* of those happened is username
+// enumeration / unnecessary information disclosure. The UI copy stays
+// friendly ("credenciales inválidas o cuenta no disponible") without
+// revealing which part was wrong.
+function loginErrorUrl() {
+  return "/login?error=1" as Route;
 }
 
 export async function loginAction(formData: FormData) {
+  const email = normalizeLoginEmail(formData.get("email"));
+  const ipAddress = await requestIp();
+
+  if (isLoginRateLimited(email, ipAddress)) {
+    redirect(loginErrorUrl());
+  }
+
   const parsed = loginSchema.safeParse({
-    email: normalizeLoginEmail(formData.get("email")),
+    email,
     password: formData.get("password")
   });
 
   if (!parsed.success) {
+    recordFailedLogin(email, ipAddress);
     redirect(loginErrorUrl());
   }
 
-  let user: Awaited<ReturnType<typeof prisma.user.findUnique>>;
+  let user: Awaited<ReturnType<typeof prisma.user.findUnique>> = null;
   try {
     user = await prisma.user.findUnique({
       where: { email: parsed.data.email }
     });
   } catch (error) {
+    // Logged for operators; the user only ever sees the generic message
+    // above so a database outage can't be distinguished from bad
+    // credentials by an outside observer.
     console.error("Login database connection failed", error);
-    redirect(loginErrorUrl("db"));
   }
 
-  if (user?.status !== "ACTIVE") {
-    redirect(loginErrorUrl());
-  }
+  const activeUser = user?.status === "ACTIVE" ? user : null;
 
-  const validPassword = await verifyPassword(
+  // Always run bcrypt, even when the user does not exist or is inactive:
+  // returning early here would make "unknown email" measurably faster than
+  // "wrong password for a real email", letting an attacker enumerate valid
+  // accounts purely from response timing.
+  const validPassword = await verifyPasswordTimingSafe(
     parsed.data.password,
-    user.passwordHash
+    activeUser?.passwordHash ?? null
   );
 
-  if (!validPassword) {
+  if (!activeUser || !validPassword) {
+    recordFailedLogin(email, ipAddress);
     redirect(loginErrorUrl());
   }
 
+  clearLoginAttempts(email, ipAddress);
+
   const token = await createSessionToken({
-    sub: user.id,
-    email: user.email,
-    name: user.name
+    sub: activeUser.id,
+    email: activeUser.email,
+    name: activeUser.name
   });
 
   const cookieStore = await cookies();
   cookieStore.set("session", token, sessionCookieOptions);
 
   await recordAuditLog({
-    userId: user.id,
+    userId: activeUser.id,
     action: "LOGIN",
     entityType: "User",
-    entityId: user.id,
-    metadata: { email: user.email }
+    entityId: activeUser.id,
+    metadata: { email: activeUser.email }
   });
 
   redirect("/dashboard");
