@@ -12,3 +12,4 @@ public/uploads/
 repomix-output.xml
 Dockerfile.local
 .logs
+tmp/
