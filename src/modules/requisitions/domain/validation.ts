@@ -5,7 +5,7 @@ const decimalInput = z.coerce
 	.finite()
 	.min(0, "No puede ser negativo.");
 
-export const requisitionItemInputSchema = z.object({
+const requisitionItemInputSchema = z.object({
 	resourceType: z.enum(["MATERIAL", "TOOL", "EQUIPMENT"]).default("MATERIAL"),
 	budgetLineItemId: z.string().trim().optional(),
 	scheduleActivityId: z.string().trim().optional(),
@@ -39,8 +39,7 @@ export const requisitionInputSchema = z
 		neededDate: z
 			.string()
 			.trim()
-			.regex(/^$|^\d{4}-\d{2}-\d{2}$/, "Debe indicar una fecha valida.")
-			.optional(),
+			.regex(/^\d{4}-\d{2}-\d{2}$/, "Debe indicar una fecha válida."),
 		requestedBy: z.string().trim().optional(),
 		notes: z.string().trim().optional(),
 		items: z
@@ -108,13 +107,32 @@ export type RequisitionMaterialLinkInput = z.infer<
 export const requisitionStatusLabels = {
 	DRAFT: "Borrador",
 	REQUESTED: "Pendiente",
-	REVIEWED: "Revisado",
-	APPROVED: "Aprobado",
-	PURCHASED: "Comprado",
+	REVIEWED: "Pendiente",
+	APPROVED: "Autorizado",
+	PURCHASED: "En compra",
 	RECEIVED: "Recibido",
-	DELIVERED: "Entregado",
-	CLOSED: "Cerrado",
+	DELIVERED: "Completado",
+	CLOSED: "Completado",
 	REJECTED: "Rechazado",
+} as const;
+
+export const requisitionStatusFilters = {
+	PENDING: {
+		label: "Pendientes",
+		statuses: ["REQUESTED", "REVIEWED"],
+	},
+	IN_PROGRESS: {
+		label: "En atención",
+		statuses: ["APPROVED", "PURCHASED", "RECEIVED"],
+	},
+	COMPLETED: {
+		label: "Completados",
+		statuses: ["DELIVERED", "CLOSED"],
+	},
+	REJECTED: {
+		label: "Rechazados",
+		statuses: ["REJECTED"],
+	},
 } as const;
 
 export const requisitionPriorityLabels = {

@@ -3,11 +3,12 @@
 import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/modules/auth/application/authorization";
+import { requireScopedProjectPermission } from "@/modules/auth/application/authorization";
 import {
 	attachExpenseDocument,
 	createClientPayment,
 	createExpense,
+	createPurchaseInvoice,
 	recordSupplierPayment,
 } from "./service";
 
@@ -16,14 +17,44 @@ function value(formData: FormData, key: string) {
 	return typeof raw === "string" ? raw : "";
 }
 
+export async function createPurchaseInvoiceAction(formData: FormData) {
+	const projectId = value(formData, "projectId");
+	const user = await requireScopedProjectPermission(
+		projectId,
+		"finanzas.registrar",
+		"finances",
+	);
+	const file = formData.get("documentFile");
+	if (!(file instanceof File) || file.size <= 0) {
+		throw new Error("Adjunte el archivo de la factura.");
+	}
+	await createPurchaseInvoice(
+		{
+			projectId,
+			purchaseOrderId: value(formData, "purchaseOrderId"),
+			expenseDate: value(formData, "expenseDate"),
+			documentNumber: value(formData, "documentNumber"),
+			subtotal: value(formData, "subtotal"),
+			notes: value(formData, "notes"),
+		},
+		file,
+		{ userId: user.id },
+	);
+	returnTo(projectId);
+}
+
 function returnTo(projectId: string) {
 	revalidatePath("/finances");
 	redirect(`/finances?projectId=${projectId}` as Route);
 }
 
 export async function createExpenseAction(formData: FormData) {
-	const user = await requirePermission("finanzas.registrar");
 	const projectId = value(formData, "projectId");
+	const user = await requireScopedProjectPermission(
+		projectId,
+		"finanzas.registrar",
+		"finances",
+	);
 	await createExpense(
 		{
 			projectId,
@@ -51,8 +82,12 @@ export async function createExpenseAction(formData: FormData) {
 }
 
 export async function attachExpenseDocumentAction(formData: FormData) {
-	const user = await requirePermission("finanzas.registrar");
 	const projectId = value(formData, "projectId");
+	const user = await requireScopedProjectPermission(
+		projectId,
+		"finanzas.registrar",
+		"finances",
+	);
 	const file = formData.get("documentFile");
 	if (!(file instanceof File)) throw new Error("Selecciona un archivo.");
 	await attachExpenseDocument(
@@ -68,8 +103,12 @@ export async function attachExpenseDocumentAction(formData: FormData) {
 }
 
 export async function recordSupplierPaymentAction(formData: FormData) {
-	const user = await requirePermission("finanzas.registrar");
 	const projectId = value(formData, "projectId");
+	const user = await requireScopedProjectPermission(
+		projectId,
+		"finanzas.registrar",
+		"finances",
+	);
 	await recordSupplierPayment(
 		{
 			financialExpenseId: value(formData, "financialExpenseId"),
@@ -85,8 +124,12 @@ export async function recordSupplierPaymentAction(formData: FormData) {
 }
 
 export async function createClientPaymentAction(formData: FormData) {
-	const user = await requirePermission("finanzas.registrar");
 	const projectId = value(formData, "projectId");
+	const user = await requireScopedProjectPermission(
+		projectId,
+		"finanzas.registrar",
+		"finances",
+	);
 	await createClientPayment(
 		{
 			projectId,

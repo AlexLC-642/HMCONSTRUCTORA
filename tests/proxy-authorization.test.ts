@@ -31,6 +31,7 @@ describe("proxy — session gate on internal route groups", () => {
 		"/finances",
 		"/inventory",
 		"/projects/abc-123",
+		"/purchases",
 		"/reports",
 		"/requisitions",
 		"/users",

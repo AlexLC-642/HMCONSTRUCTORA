@@ -7,6 +7,7 @@ import {
 	Globe,
 	LayoutDashboard,
 	Package,
+	ShoppingCart,
 	UsersRound,
 	WalletCards,
 } from "lucide-react";
@@ -34,6 +35,7 @@ export function SidebarNav({
 	const canManageRequisitions =
 		canManageInventory || hasPermission(permissions, "requerimiento.aprobar");
 	const canViewFinances = hasPermission(permissions, "finanzas.ver");
+	const canViewPurchases = hasPermission(permissions, "compras.ver");
 	const canViewDocuments = canViewProjects;
 	const canManageWebsite = hasPermission(permissions, "sitio.editar");
 
@@ -79,6 +81,17 @@ export function SidebarNav({
 				>
 					<ClipboardList aria-hidden="true" size={18} />
 					<span className="app-shell-nav-label">Requerimientos</span>
+				</a>
+			) : null}
+			{canViewPurchases ? (
+				<a
+					aria-label="Compras"
+					className={className(pathname.startsWith("/purchases"))}
+					href="/purchases"
+					title={collapsed ? "Compras" : undefined}
+				>
+					<ShoppingCart aria-hidden="true" size={18} />
+					<span className="app-shell-nav-label">Compras</span>
 				</a>
 			) : null}
 			{canViewDocuments ? (

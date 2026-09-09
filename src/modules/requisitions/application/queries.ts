@@ -1,5 +1,11 @@
 import type { RequisitionStatus } from "@prisma/client";
+import {
+	hasProjectScopePortfolioAccess,
+	projectScopeWhere,
+} from "@/modules/auth/application/authorization";
+import type { AuthenticatedUser } from "@/modules/auth/domain/types";
 import { prisma } from "@/shared/lib/prisma";
+import { requisitionStatusFilters } from "../domain/validation";
 
 type RequisitionWorkspaceFilters = {
 	projectId?: string;
@@ -45,18 +51,30 @@ const receivedStatuses = new Set<RequisitionStatus>([
 
 export async function getRequisitionWorkspace(
 	filters: RequisitionWorkspaceFilters = {},
+	user: Pick<AuthenticatedUser, "id" | "roles">,
 ) {
 	const projectId = clean(filters.projectId);
 	const warehouseId = clean(filters.warehouseId);
 	const requestedStatus = clean(filters.status);
+	const groupedStatuses = requestedStatus
+		? requisitionStatusFilters[
+				requestedStatus as keyof typeof requisitionStatusFilters
+			]?.statuses
+		: undefined;
 	const status =
+		!groupedStatuses &&
 		requestedStatus &&
 		requisitionStatusValues.has(requestedStatus as RequisitionStatus)
 			? (requestedStatus as RequisitionStatus)
 			: undefined;
+	const canSeeAllProjects = hasProjectScopePortfolioAccess(
+		user,
+		"requisitions",
+	);
 
 	const [projects, warehouses] = await Promise.all([
 		prisma.project.findMany({
+			where: projectScopeWhere(user, "requisitions"),
 			select: { id: true, code: true, name: true },
 			orderBy: { updatedAt: "desc" },
 			take: 50,
@@ -74,88 +92,92 @@ export async function getRequisitionWorkspace(
 		approvedBudgets,
 		requisitionItems,
 		scheduleActivities,
-	] =
-		await Promise.all([
-			prisma.requisition.findMany({
-				where: {
-					...(projectId ? { projectId } : {}),
-					...(warehouseId ? { warehouseId } : {}),
-					...(status ? { status } : {}),
-				},
-				include: {
-					project: true,
-					warehouse: true,
-					items: {
-						include: {
-							material: true,
-							budgetLineItem: true,
-							scheduleActivity: true,
-						},
+	] = await Promise.all([
+		prisma.requisition.findMany({
+			where: {
+				...(!canSeeAllProjects ? { projectId: { in: projectIds } } : {}),
+				...(projectId ? { projectId } : {}),
+				...(warehouseId ? { warehouseId } : {}),
+				...(groupedStatuses
+					? { status: { in: [...groupedStatuses] } }
+					: status
+						? { status }
+						: {}),
+			},
+			include: {
+				project: true,
+				warehouse: true,
+				items: {
+					include: {
+						material: true,
+						budgetLineItem: true,
+						scheduleActivity: true,
 					},
-					createdBy: { select: { name: true, email: true } },
-					approvedBy: { select: { name: true, email: true } },
 				},
-				orderBy: { createdAt: "desc" },
-				take: 50,
-			}),
-			prisma.inventoryMaterial.findMany({
-				where: { active: true },
-				orderBy: { name: "asc" },
-			}),
-			prisma.budget.findMany({
-				where: { projectId: { in: projectIds } },
-				select: {
-					projectId: true,
-					versions: {
-						where: { status: "APPROVED" },
-						orderBy: { updatedAt: "desc" },
-						take: 1,
-						select: {
-							versionNumber: true,
-							sections: {
-								select: {
-									lineItems: {
-										where: { type: "MATERIAL" },
-										orderBy: { position: "asc" },
-										select: {
-											id: true,
-											description: true,
-											unit: true,
-											quantity: true,
-											unitPrice: true,
-										},
+				createdBy: { select: { name: true, email: true } },
+				approvedBy: { select: { name: true, email: true } },
+			},
+			orderBy: { createdAt: "desc" },
+			take: 50,
+		}),
+		prisma.inventoryMaterial.findMany({
+			where: { active: true },
+			orderBy: { name: "asc" },
+		}),
+		prisma.budget.findMany({
+			where: { projectId: { in: projectIds } },
+			select: {
+				projectId: true,
+				versions: {
+					where: { status: "APPROVED" },
+					orderBy: { updatedAt: "desc" },
+					take: 1,
+					select: {
+						versionNumber: true,
+						sections: {
+							select: {
+								lineItems: {
+									where: { type: "MATERIAL" },
+									orderBy: { position: "asc" },
+									select: {
+										id: true,
+										description: true,
+										unit: true,
+										quantity: true,
+										unitPrice: true,
 									},
 								},
 							},
 						},
 					},
 				},
-			}),
-			prisma.requisitionItem.findMany({
-				where: {
-					requisition: {
-						projectId: { in: projectIds },
-						status: { not: "REJECTED" },
-					},
+			},
+		}),
+		prisma.requisitionItem.findMany({
+			where: {
+				requisition: {
+					projectId: { in: projectIds },
+					status: { not: "REJECTED" },
 				},
-				select: {
-					budgetLineItemId: true,
-					description: true,
-					quantity: true,
-					requisition: { select: { projectId: true, status: true } },
-				},
-			}),
-			prisma.scheduleActivity.findMany({
-				where: { schedule: { projectId: { in: projectIds } } },
-				select: {
-					id: true,
-					code: true,
-					description: true,
-					schedule: { select: { projectId: true } },
-				},
-				orderBy: [{ scheduleId: "asc" }, { position: "asc" }],
-			}),
-		]);
+			},
+			select: {
+				budgetLineItemId: true,
+				description: true,
+				quantity: true,
+				requisition: { select: { projectId: true, status: true } },
+			},
+		}),
+		prisma.scheduleActivity.findMany({
+			where: { schedule: { projectId: { in: projectIds } } },
+			select: {
+				id: true,
+				code: true,
+				description: true,
+				schedule: { select: { projectId: true } },
+			},
+			orderBy: [{ scheduleId: "asc" }, { position: "asc" }],
+		}),
+	]);
 
 	const requestedByMaterial = new Map<
 		string,
@@ -215,10 +237,9 @@ export async function getRequisitionWorkspace(
 		}
 
 		return Array.from(grouped.values()).map((material) => {
-			const progress =
-				requestedByMaterial.get(
-					`${budget.projectId}:budget:${material.budgetLineItemId}`,
-				) ?? { requested: 0, purchased: 0, received: 0 };
+			const progress = requestedByMaterial.get(
+				`${budget.projectId}:budget:${material.budgetLineItemId}`,
+			) ?? { requested: 0, purchased: 0, received: 0 };
 			return {
 				...material,
 				id: `budget-${material.id}`,
@@ -233,8 +254,44 @@ export async function getRequisitionWorkspace(
 		});
 	});
 
+	const stockRows = await prisma.stock.findMany({
+		where: {
+			warehouseId: {
+				in: requisitions
+					.map((requisition) => requisition.warehouseId)
+					.filter((id): id is string => Boolean(id)),
+			},
+			materialId: {
+				in: requisitions.flatMap((requisition) =>
+					requisition.items
+						.map((item) => item.materialId)
+						.filter((id): id is string => Boolean(id)),
+				),
+			},
+		},
+		select: { warehouseId: true, materialId: true, quantity: true },
+	});
+	const stockByLocation = new Map(
+		stockRows.map((stock) => [
+			`${stock.warehouseId}:${stock.materialId}`,
+			stock.quantity.toNumber(),
+		]),
+	);
+	const requisitionsWithAvailability = requisitions.map((requisition) => ({
+		...requisition,
+		items: requisition.items.map((item) => ({
+			...item,
+			availableStock:
+				requisition.warehouseId && item.materialId
+					? (stockByLocation.get(
+							`${requisition.warehouseId}:${item.materialId}`,
+						) ?? 0)
+					: 0,
+		})),
+	}));
+
 	return {
-		requisitions,
+		requisitions: requisitionsWithAvailability,
 		materials,
 		warehouses,
 		projects,

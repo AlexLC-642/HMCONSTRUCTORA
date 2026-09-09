@@ -48,8 +48,12 @@ export default async function ServiciosPage() {
 
 			<section className="public-section">
 				<div className="public-service-grid public-service-grid--full">
-					{services.map((service) => (
-						<div className="public-service-card" key={service.id}>
+					{services.map((service, index) => (
+						<div
+							className="public-service-card"
+							key={service.id}
+							style={{ "--i": index } as React.CSSProperties}
+						>
 							<span className="public-service-card__icon">
 								<service.icon aria-hidden="true" size={22} />
 							</span>

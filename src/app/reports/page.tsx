@@ -17,7 +17,11 @@ import {
 	X,
 } from "lucide-react";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/modules/auth/application/authorization";
+import {
+	projectAccessWhere,
+	requirePermission,
+	requireProjectPermission,
+} from "@/modules/auth/application/authorization";
 import { buildDocumentPreview } from "@/modules/documents/application/queries";
 import { DocumentPreviewModal } from "@/modules/documents/ui/document-preview-modal";
 import {
@@ -97,8 +101,10 @@ async function handleNewReportRedirect(formData: FormData) {
 	"use server";
 	await requirePermission("proyectos.ver");
 	const projectId = formData.get("projectId");
-	if (typeof projectId === "string" && projectId)
+	if (typeof projectId === "string" && projectId) {
+		await requireProjectPermission(projectId, "proyectos.ver");
 		redirect(`/projects/${projectId}/progress?tab=registro`);
+	}
 }
 
 export default async function ReportsPage({
@@ -106,7 +112,7 @@ export default async function ReportsPage({
 }: {
 	searchParams?: Promise<ReportsSearch>;
 }) {
-	await requirePermission("proyectos.ver");
+	const user = await requirePermission("proyectos.ver");
 	const params = searchParams ? await searchParams : {};
 	const activeTab =
 		searchValue(params.tab) === "reportes" ? "reportes" : "avance-diario";
@@ -119,10 +125,12 @@ export default async function ReportsPage({
 	const showNewReportModal = searchValue(params.newReport) === "true";
 
 	const allProjects = await prisma.project.findMany({
+		where: projectAccessWhere(user),
 		select: { id: true, code: true, name: true },
 		orderBy: { code: "asc" },
 	});
 	const dailyReportsRaw = await prisma.dailyReport.findMany({
+		where: { project: projectAccessWhere(user) },
 		include: {
 			project: { select: { id: true, code: true, name: true } },
 			mediaEntries: { select: { id: true } },
@@ -130,7 +138,10 @@ export default async function ReportsPage({
 		orderBy: { reportDate: "desc" },
 	});
 	const manualReportsRaw = await prisma.projectDocument.findMany({
-		where: { category: { key: "informes" } },
+		where: {
+			category: { key: "informes" },
+			project: projectAccessWhere(user),
+		},
 		include: {
 			project: { select: { id: true, code: true, name: true } },
 			category: { select: { name: true } },

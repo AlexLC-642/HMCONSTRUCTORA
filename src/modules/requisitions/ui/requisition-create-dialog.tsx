@@ -239,6 +239,7 @@ export function RequisitionCreateDialog({
 								<input
 									className="requisitions-input"
 									name="neededDate"
+									required
 									type="date"
 								/>
 							</label>

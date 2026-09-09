@@ -1,17 +1,19 @@
-import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { ensureDocumentCategories } from "@/modules/documents/application/service";
 import { storeProjectDocumentFile } from "@/modules/documents/application/storage";
 import { prisma } from "@/shared/lib/prisma";
 import {
+	type ExpenseDocumentInput,
+	type ExpenseInput,
 	expenseDocumentInputSchema,
 	expenseInputSchema,
-	paymentInputSchema,
-	supplierPaymentInputSchema,
-	type ExpenseInput,
-	type ExpenseDocumentInput,
 	type PaymentInput,
+	type PurchaseInvoiceInput,
+	paymentInputSchema,
+	purchaseInvoiceInputSchema,
 	type SupplierPaymentInput,
+	supplierPaymentInputSchema,
 } from "../domain/validation";
 
 type FinanceContext = { userId: string };
@@ -32,6 +34,126 @@ function date(value: string) {
 function normalizeDocumentNumber(value?: string | null) {
 	const clean = value?.trim().replace(/\s+/g, " ");
 	return clean ? clean.toUpperCase() : null;
+}
+
+export async function createPurchaseInvoice(
+	rawInput: unknown,
+	file: File,
+	context: FinanceContext,
+) {
+	const parsed = purchaseInvoiceInputSchema.parse(
+		rawInput,
+	) as PurchaseInvoiceInput;
+	if (!(file instanceof File) || file.size <= 0) {
+		throw new Error("Adjunte el archivo de la factura.");
+	}
+	const order = await prisma.purchaseOrder.findUnique({
+		where: { id: parsed.purchaseOrderId },
+		include: {
+			supplier: {
+				select: { id: true, code: true, businessName: true },
+			},
+			financialExpenses: { where: { status: "VALID" } },
+		},
+	});
+	if (!order || !["ISSUED", "PARTIAL", "RECEIVED"].includes(order.status)) {
+		throw new Error("La factura debe corresponder a una orden emitida.");
+	}
+	if (!order.projectId) {
+		throw new Error(
+			"La orden debe estar vinculada a un proyecto para facturarla.",
+		);
+	}
+	if (order.projectId !== parsed.projectId) {
+		throw new Error("La orden no pertenece al proyecto seleccionado.");
+	}
+	const invoiceTotal = decimal(parsed.subtotal);
+	const invoiced = order.financialExpenses.reduce(
+		(sum, expense) => sum.add(expense.subtotal),
+		new Prisma.Decimal(0),
+	);
+	const available = order.total.sub(invoiced).toDecimalPlaces(2);
+	if (invoiceTotal.gt(available)) {
+		throw new Error(
+			`La factura supera el saldo por facturar de la orden (${available.toString()}).`,
+		);
+	}
+	const documentNumber = normalizeDocumentNumber(
+		parsed.documentNumber,
+	) as string;
+	const duplicate = await prisma.financialExpense.findFirst({
+		where: { supplierId: order.supplierId, documentNumber, status: "VALID" },
+		select: { id: true },
+	});
+	if (duplicate)
+		throw new Error(
+			`La factura ${documentNumber} ya esta registrada para este proveedor.`,
+		);
+
+	const categories = await ensureDocumentCategories();
+	const category = categories.find((item) => item.key === "comprobantes");
+	if (!category)
+		throw new Error("No se encontro la categoria de facturas y recibos.");
+	const documentId = randomUUID();
+	const storedFile = await storeProjectDocumentFile(
+		order.projectId,
+		documentId,
+		file,
+	);
+
+	return prisma.$transaction(async (tx) => {
+		await tx.projectDocument.create({
+			data: {
+				id: documentId,
+				projectId: order.projectId as string,
+				categoryId: category.id,
+				title: `Factura ${documentNumber}`,
+				description: `Factura de ${order.supplier.businessName} para ${order.number}`,
+				tags: "finanzas, factura, orden de compra",
+				authorId: context.userId,
+				versions: {
+					create: {
+						versionNumber: 1,
+						...storedFile,
+						uploadedById: context.userId,
+					},
+				},
+			},
+		});
+		const expense = await tx.financialExpense.create({
+			data: {
+				projectId: order.projectId as string,
+				supplierId: order.supplierId,
+				purchaseOrderId: order.id,
+				expenseDate: date(parsed.expenseDate),
+				description: `Compra ${order.number}`,
+				vendor: order.supplier.businessName,
+				quantity: decimal(1),
+				unit: "global",
+				subtotal: invoiceTotal,
+				type: "Compra",
+				documentNumber,
+				documentType: "FACTURA",
+				supportingDocumentId: documentId,
+				notes: nullable(parsed.notes),
+				createdById: context.userId,
+			},
+		});
+		await tx.auditLog.create({
+			data: {
+				userId: context.userId,
+				action: "CREATE",
+				entityType: "FinancialExpense",
+				entityId: expense.id,
+				metadata: {
+					purchaseOrderId: order.id,
+					documentNumber,
+					subtotal: invoiceTotal.toString(),
+				},
+			},
+		});
+		return expense;
+	});
 }
 
 async function nextPaymentNumber(
@@ -67,17 +189,26 @@ export async function createExpense(
 	}
 
 	let supportingDocument:
-		| { id: string; categoryId: string; storedFile: Awaited<ReturnType<typeof storeProjectDocumentFile>> }
+		| {
+				id: string;
+				categoryId: string;
+				storedFile: Awaited<ReturnType<typeof storeProjectDocumentFile>>;
+		  }
 		| undefined;
 	if (hasReceipt && receiptFile) {
 		const categories = await ensureDocumentCategories();
 		const category = categories.find((item) => item.key === "comprobantes");
-		if (!category) throw new Error("No se encontró la categoría de facturas y recibos.");
+		if (!category)
+			throw new Error("No se encontró la categoría de facturas y recibos.");
 		const id = randomUUID();
 		supportingDocument = {
 			id,
 			categoryId: category.id,
-			storedFile: await storeProjectDocumentFile(parsed.projectId, id, receiptFile),
+			storedFile: await storeProjectDocumentFile(
+				parsed.projectId,
+				id,
+				receiptFile,
+			),
 		};
 	}
 
@@ -168,7 +299,9 @@ export async function attachExpenseDocument(
 	file: File,
 	context: FinanceContext,
 ) {
-	const parsed = expenseDocumentInputSchema.parse(rawInput) as ExpenseDocumentInput;
+	const parsed = expenseDocumentInputSchema.parse(
+		rawInput,
+	) as ExpenseDocumentInput;
 	if (!(file instanceof File) || file.size <= 0) {
 		throw new Error("Selecciona la factura o recibo que deseas adjuntar.");
 	}
@@ -197,15 +330,27 @@ export async function attachExpenseDocument(
 		select: { id: true },
 	});
 	if (duplicate) {
-		throw new Error(`Ya existe el comprobante ${documentNumber} para este proveedor.`);
+		throw new Error(
+			`Ya existe el comprobante ${documentNumber} para este proveedor.`,
+		);
 	}
 
 	const categories = await ensureDocumentCategories();
 	const category = categories.find((item) => item.key === "comprobantes");
-	if (!category) throw new Error("No se encontró la categoría de facturas y recibos.");
+	if (!category)
+		throw new Error("No se encontró la categoría de facturas y recibos.");
 	const documentId = randomUUID();
-	const storedFile = await storeProjectDocumentFile(expense.projectId, documentId, file);
-	const label = parsed.documentType === "FACTURA" ? "Factura" : parsed.documentType === "RECIBO" ? "Recibo" : "Comprobante";
+	const storedFile = await storeProjectDocumentFile(
+		expense.projectId,
+		documentId,
+		file,
+	);
+	const label =
+		parsed.documentType === "FACTURA"
+			? "Factura"
+			: parsed.documentType === "RECIBO"
+				? "Recibo"
+				: "Comprobante";
 
 	return prisma.$transaction(async (tx) => {
 		await tx.projectDocument.create({
@@ -217,7 +362,13 @@ export async function attachExpenseDocument(
 				description: `Comprobante de ${expense.description}`,
 				tags: "finanzas, comprobante",
 				authorId: context.userId,
-				versions: { create: { versionNumber: 1, ...storedFile, uploadedById: context.userId } },
+				versions: {
+					create: {
+						versionNumber: 1,
+						...storedFile,
+						uploadedById: context.userId,
+					},
+				},
 			},
 		});
 		const updated = await tx.financialExpense.update({
@@ -234,7 +385,11 @@ export async function attachExpenseDocument(
 				action: "UPDATE",
 				entityType: "FinancialExpense",
 				entityId: expense.id,
-				metadata: { documentId, documentNumber, documentType: parsed.documentType },
+				metadata: {
+					documentId,
+					documentNumber,
+					documentType: parsed.documentType,
+				},
 			},
 		});
 		return updated;

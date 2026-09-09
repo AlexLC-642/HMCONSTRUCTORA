@@ -1,13 +1,21 @@
 import { Prisma } from "@prisma/client";
+import { projectScopeWhere } from "@/modules/auth/application/authorization";
+import type { AuthenticatedUser } from "@/modules/auth/domain/types";
 import { prisma } from "@/shared/lib/prisma";
 import { calculateFinanceSummary } from "./statement";
 
-export async function getFinanceWorkspace(projectId?: string) {
+export async function getFinanceWorkspace(
+	user: Pick<AuthenticatedUser, "id" | "roles">,
+	projectId?: string,
+) {
 	const projects = await prisma.project.findMany({
+		where: projectScopeWhere(user, "finances"),
 		select: { id: true, code: true, name: true, baseBudget: true },
 		orderBy: { updatedAt: "desc" },
 	});
-	const selectedProjectId = projectId ?? projects[0]?.id;
+	const selectedProjectId = projects.some((project) => project.id === projectId)
+		? projectId
+		: projects[0]?.id;
 
 	if (!selectedProjectId) {
 		return {
@@ -16,6 +24,7 @@ export async function getFinanceWorkspace(projectId?: string) {
 			expenses: [],
 			payments: [],
 			payables: [],
+			invoiceOrders: [],
 			budgetSections: [],
 			budgetVersion: null,
 			summary: emptySummary(),
@@ -31,6 +40,17 @@ export async function getFinanceWorkspace(projectId?: string) {
 			prisma.financialExpense.findMany({
 				where: { projectId: selectedProjectId },
 				include: {
+					supplier: { select: { id: true, businessName: true, code: true } },
+					purchaseOrder: {
+						select: {
+							id: true,
+							number: true,
+							status: true,
+							total: true,
+							paymentType: true,
+							paymentDueDate: true,
+						},
+					},
 					createdBy: { select: { name: true, email: true } },
 					supportingDocument: {
 						include: {
@@ -39,7 +59,9 @@ export async function getFinanceWorkspace(projectId?: string) {
 							approvedBy: { select: { id: true, name: true, email: true } },
 							versions: {
 								orderBy: { versionNumber: "desc" },
-								include: { uploadedBy: { select: { id: true, name: true, email: true } } },
+								include: {
+									uploadedBy: { select: { id: true, name: true, email: true } },
+								},
 							},
 						},
 					},
@@ -111,6 +133,40 @@ export async function getFinanceWorkspace(projectId?: string) {
 			lineItemCount: section.lineItems.length,
 		})) ?? [];
 
+	const invoiceOrdersRaw = await prisma.purchaseOrder.findMany({
+		where: {
+			projectId: selectedProjectId,
+			status: { in: ["ISSUED", "PARTIAL", "RECEIVED"] },
+		},
+		include: {
+			supplier: {
+				select: { id: true, businessName: true },
+			},
+			financialExpenses: {
+				where: { status: "VALID" },
+				select: { subtotal: true },
+			},
+		},
+		orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }],
+	});
+	const invoiceOrders = invoiceOrdersRaw.map((order) => {
+		const invoiced = order.financialExpenses.reduce(
+			(sum, expense) => sum + expense.subtotal.toNumber(),
+			0,
+		);
+		return {
+			id: order.id,
+			number: order.number,
+			status: order.status,
+			paymentType: order.paymentType,
+			paymentDueDate: order.paymentDueDate?.toISOString() ?? null,
+			total: order.total.toNumber(),
+			invoiced,
+			available: Math.max(0, order.total.toNumber() - invoiced),
+			supplier: order.supplier,
+		};
+	});
+
 	const payables = expenses
 		.filter((expense) => expense.status === "VALID")
 		.map((expense) => {
@@ -139,6 +195,7 @@ export async function getFinanceWorkspace(projectId?: string) {
 		expenses,
 		payments,
 		payables,
+		invoiceOrders,
 		budgetSections,
 		budgetVersion: approvedBudget?.versionNumber ?? null,
 		summary: calculateFinanceSummary(

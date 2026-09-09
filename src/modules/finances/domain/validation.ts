@@ -28,7 +28,10 @@ export const expenseInputSchema = z.object({
 
 export const expenseDocumentInputSchema = z.object({
 	financialExpenseId: z.string().trim().min(1, "Selecciona el gasto."),
-	documentNumber: z.string().trim().min(1, "El número del comprobante es obligatorio."),
+	documentNumber: z
+		.string()
+		.trim()
+		.min(1, "El número del comprobante es obligatorio."),
 	documentType: z.enum(["FACTURA", "RECIBO", "OTRO"]),
 });
 
@@ -54,8 +57,26 @@ export const supplierPaymentInputSchema = z.object({
 		(value) => value > 0,
 		"El pago debe ser mayor que cero.",
 	),
-	method: z.string().trim().optional(),
-	reference: z.string().trim().optional(),
+	method: z.string().trim().min(1, "Seleccione el medio de pago."),
+	reference: z.string().trim().min(1, "La referencia del pago es obligatoria."),
+	notes: z.string().trim().optional(),
+});
+
+export const purchaseInvoiceInputSchema = z.object({
+	projectId: z.string().trim().min(1, "Seleccione un proyecto."),
+	purchaseOrderId: z.string().trim().min(1, "Seleccione una orden de compra."),
+	expenseDate: z
+		.string()
+		.trim()
+		.min(1, "La fecha de la factura es obligatoria."),
+	documentNumber: z
+		.string()
+		.trim()
+		.min(1, "El numero de factura es obligatorio."),
+	subtotal: decimalInput.refine(
+		(value) => value > 0,
+		"El total de la factura debe ser mayor que cero.",
+	),
 	notes: z.string().trim().optional(),
 });
 
@@ -63,3 +84,4 @@ export type ExpenseInput = z.infer<typeof expenseInputSchema>;
 export type ExpenseDocumentInput = z.infer<typeof expenseDocumentInputSchema>;
 export type PaymentInput = z.infer<typeof paymentInputSchema>;
 export type SupplierPaymentInput = z.infer<typeof supplierPaymentInputSchema>;
+export type PurchaseInvoiceInput = z.infer<typeof purchaseInvoiceInputSchema>;

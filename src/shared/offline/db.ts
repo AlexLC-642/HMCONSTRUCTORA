@@ -2,7 +2,7 @@
 
 import Dexie, { type Table } from "dexie";
 
-export type LocalSyncOperation = {
+type LocalSyncOperation = {
   id: string;
   idempotencyKey: string;
   operationType: string;
@@ -13,7 +13,7 @@ export type LocalSyncOperation = {
   lastError?: string;
 };
 
-export type LocalDailyReportDraft = {
+type LocalDailyReportDraft = {
   id: string;
   projectId: string;
   formData: Record<string, string>;

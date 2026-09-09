@@ -51,12 +51,15 @@ Refleja `prisma/schema.prisma` real (40 modelos). Todas las entidades usan `id` 
 
 - `Requisition`: solicitud de material/compra (numero unico, proyecto, bodega destino, estado, prioridad).
 - `RequisitionItem`: renglon solicitado; puede enlazar a un material de inventario, un renglon de presupuesto y/o una actividad de cronograma.
+- `Supplier`: catalogo maestro de proveedores (codigo, NIT, estado). Distinto de `Client` aunque ambos sean "terceros" — uno cobra, el otro paga.
+- `PurchaseOrder`: orden de compra a un proveedor, opcionalmente originada de una `Requisition` (`requisitionId` es opcional — tambien admite compra directa sin requisicion previa).
+- `PurchaseOrderItem`: renglon de la orden de compra, con `receivedQuantity` para control de recepcion parcial/total; distinto de `RequisitionItem` (uno es lo pedido, otro lo comprado).
 
 ## Finanzas
 
 Tres conceptos distintos, no fusionar:
 
-- `FinancialExpense`: gasto de un proyecto (puede originarse de un `RequisitionItem` y tener un `ProjectDocument` como comprobante de soporte).
+- `FinancialExpense`: gasto de un proyecto (puede originarse de un `RequisitionItem` o de una `PurchaseOrder`, y tener un `ProjectDocument` como comprobante de soporte). El campo `vendor` (texto libre) es anterior al modulo de proveedores y convive con `supplierId` (FK opcional) para gastos sin proveedor formal registrado.
 - `SupplierPayment`: pago hecho **a un proveedor** por un gasto especifico (`FinancialExpense`).
 - `ClientPayment`: pago/abono recibido **del cliente** del proyecto, opcionalmente enlazado a una seccion o renglon de presupuesto.
 

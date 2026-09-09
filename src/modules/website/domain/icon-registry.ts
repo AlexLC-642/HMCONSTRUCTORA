@@ -12,7 +12,7 @@ import {
 	type LucideIcon,
 } from "lucide-react";
 
-export const websiteServiceIcons: Record<string, LucideIcon> = {
+const websiteServiceIcons: Record<string, LucideIcon> = {
 	HardHat,
 	Compass,
 	Map: MapIcon,

@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { canAccessProject } from "@/modules/auth/application/authorization";
 import { getCurrentUser } from "@/modules/auth/application/current-user";
-import { hasPermission } from "@/shared/permissions/has-permission";
 import { prisma } from "@/shared/lib/prisma";
+import { hasPermission } from "@/shared/permissions/has-permission";
 
 /**
  * Documents are stored under public/uploads/... (see
@@ -34,12 +35,19 @@ export async function GET(
 	const { versionId } = await params;
 	const version = await prisma.documentVersion.findUnique({
 		where: { id: versionId },
+		include: { document: { select: { projectId: true } } },
 	});
 
 	if (!version) {
 		return NextResponse.json(
 			{ error: "Documento no encontrado." },
 			{ status: 404 },
+		);
+	}
+	if (!(await canAccessProject(user, version.document.projectId))) {
+		return NextResponse.json(
+			{ error: "Sin acceso al proyecto." },
+			{ status: 403 },
 		);
 	}
 

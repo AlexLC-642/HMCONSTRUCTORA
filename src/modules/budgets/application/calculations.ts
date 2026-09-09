@@ -9,11 +9,11 @@ import { laborUnitUsesJornadas } from "../domain/units";
 const ZERO = new Prisma.Decimal(0);
 const ONE_HUNDRED = new Prisma.Decimal(100);
 
-export type CalculatedLine = BudgetLineItemInput & {
+type CalculatedLine = BudgetLineItemInput & {
 	subtotal: Prisma.Decimal;
 };
 
-export type CalculatedSection = Omit<BudgetSectionInput, "lineItems"> & {
+type CalculatedSection = Omit<BudgetSectionInput, "lineItems"> & {
 	lineItems: CalculatedLine[];
 	materialSubtotal: Prisma.Decimal;
 	laborSubtotal: Prisma.Decimal;

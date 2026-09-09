@@ -7,25 +7,7 @@ import {
 const emptyToUndefined = (value: unknown) =>
 	typeof value === "string" && value.trim() === "" ? undefined : value;
 
-export const userStatusLabels = {
-	ACTIVE: "Activo",
-	INACTIVE: "Inactivo",
-} as const;
-
-export const permissionGroupLabels: Record<string, string> = {
-	proyectos: "Proyectos",
-	presupuesto: "Presupuesto",
-	cronograma: "Cronograma",
-	avance: "Avance diario",
-	inventario: "Inventario",
-	requerimiento: "Requerimientos",
-	finanzas: "Finanzas",
-	documentos: "Documentos",
-	portal: "Portal cliente",
-	usuarios: "Usuarios y roles",
-};
-
-export function normalizeCompanyEmail(value: unknown) {
+function normalizeCompanyEmail(value: unknown) {
 	const raw = typeof value === "string" ? value.trim().toLowerCase() : "";
 	if (!raw) return raw;
 	return raw.includes("@") ? raw : `${raw}@${COMPANY_EMAIL_DOMAIN}`;

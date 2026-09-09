@@ -13,10 +13,6 @@ export async function hashPassword(password: string) {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
 
-export async function verifyPassword(password: string, passwordHash: string) {
-  return bcrypt.compare(password, passwordHash);
-}
-
 export async function verifyPasswordTimingSafe(password: string, passwordHash: string | null | undefined) {
   return bcrypt.compare(password, passwordHash ?? DUMMY_HASH);
 }

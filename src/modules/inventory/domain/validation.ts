@@ -52,11 +52,3 @@ export type InventoryMaterialUpdateInput = z.infer<typeof inventoryMaterialUpdat
 export type WarehouseInput = z.infer<typeof warehouseInputSchema>;
 export type StockMovementInput = z.infer<typeof stockMovementInputSchema>;
 
-export const stockMovementTypeLabels = {
-  IN: "Entrada",
-  OUT: "Salida",
-  RETURN: "Devolucion",
-  WASTE: "Desperdicio",
-  ADJUSTMENT: "Ajuste",
-  TRANSFER: "Traslado"
-} as const;

@@ -9,7 +9,10 @@ import {
 	Search,
 	UserRound,
 } from "lucide-react";
-import { requirePermission } from "@/modules/auth/application/authorization";
+import {
+	hasPortfolioAccess,
+	requirePermission,
+} from "@/modules/auth/application/authorization";
 import { listProjects } from "@/modules/projects/application/queries";
 import {
 	projectStatuses,
@@ -100,6 +103,7 @@ export default async function ProjectsPage({
 	searchParams,
 }: ProjectsPageProps) {
 	const user = await requirePermission("proyectos.ver");
+	const canSeePortfolio = hasPortfolioAccess(user);
 	const params = await searchParams;
 	const status =
 		params.status === "ALL" ||
@@ -107,7 +111,7 @@ export default async function ProjectsPage({
 		projectStatuses.includes(params.status as ProjectStatus)
 			? (params.status as ProjectStatus | "ALL" | "OPERATIVE")
 			: "OPERATIVE";
-	const projects = await listProjects({ search: params.search, status });
+	const projects = await listProjects({ search: params.search, status }, user);
 	const canCreate = user.permissions.includes("proyectos.crear");
 	const activeProjects = projects.filter(
 		(project) => project.status === "ACTIVE",
@@ -139,14 +143,16 @@ export default async function ProjectsPage({
 				<div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-end">
 					<div>
 						<div className="mb-4 flex w-fit items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-							<FolderKanban aria-hidden="true" size={15} /> Cartera operativa
+							<FolderKanban aria-hidden="true" size={15} />{" "}
+							{canSeePortfolio ? "Cartera operativa" : "Proyectos asignados"}
 						</div>
 						<h1 className="text-4xl font-semibold tracking-[-0.06em] text-white">
 							Proyectos
 						</h1>
 						<p className="mt-2 max-w-3xl text-sm leading-6 text-white/70">
-							Seguimiento central de obras, presupuesto base, responsables y
-							accesos de operacion diaria.
+							{canSeePortfolio
+								? "Seguimiento central de obras, presupuesto base, responsables y accesos de operación diaria."
+								: "Obras donde participas como responsable o integrante del equipo."}
 						</p>
 					</div>
 					{canCreate ? (
@@ -351,7 +357,9 @@ export default async function ProjectsPage({
 									size={36}
 								/>
 								<p className="mt-3 font-semibold">
-									No hay proyectos con esos filtros.
+									{canSeePortfolio
+										? "No hay proyectos con esos filtros."
+										: "No tienes proyectos asignados con esos filtros."}
 								</p>
 								<p className="mt-1 text-sm text-[var(--muted)]">
 									Ajusta la busqueda o registra un nuevo proyecto.

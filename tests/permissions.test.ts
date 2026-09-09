@@ -12,6 +12,8 @@ describe("permissions", () => {
 		expect(permissionKeys).toContain("avance.publicar");
 		expect(permissionKeys).toContain("inventario.mover");
 		expect(permissionKeys).toContain("finanzas.registrar");
+		expect(permissionKeys).toContain("compras.ver");
+		expect(permissionKeys).toContain("compras.gestionar");
 	});
 
 	it("checks whether a permission is assigned", () => {
@@ -23,10 +25,12 @@ describe("permissions", () => {
 		expect(rolePermissionPresets.bodega).toEqual([
 			"inventario.mover",
 			"requerimiento.aprobar",
+			"compras.ver",
 		]);
 		expect(rolePermissionPresets.contabilidad).toContain("finanzas.ver");
 		expect(rolePermissionPresets.contabilidad).toContain("finanzas.registrar");
 		expect(rolePermissionPresets.bodega).not.toContain("usuarios.gestionar");
+		expect(rolePermissionPresets.compras).toContain("compras.gestionar");
 	});
 
 	it("allows permissions from multiple roles to be combined", () => {

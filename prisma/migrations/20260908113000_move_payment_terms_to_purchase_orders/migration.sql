@@ -1,0 +1,6 @@
+ALTER TABLE `Supplier`
+  DROP COLUMN `paymentTermsDays`;
+
+ALTER TABLE `PurchaseOrder`
+  ADD COLUMN `paymentType` ENUM('IMMEDIATE', 'ON_DELIVERY', 'CREDIT') NOT NULL DEFAULT 'IMMEDIATE',
+  ADD COLUMN `paymentDueDate` DATETIME(3) NULL;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const budgetLineTypes = ["MATERIAL", "LABOR", "OTHER"] as const;
+const budgetLineTypes = ["MATERIAL", "LABOR", "OTHER"] as const;
 
 export const budgetLineTypeLabels = {
 	MATERIAL: "Material",
@@ -29,7 +29,7 @@ const optionalDecimalInput = z.coerce
 		message: "Debe ser un numero positivo con hasta 2 decimales",
 	});
 
-export const budgetLineItemInputSchema = z
+const budgetLineItemInputSchema = z
 	.object({
 		id: z.string().optional(),
 		type: z.enum(budgetLineTypes),
@@ -67,7 +67,7 @@ export const budgetLineItemInputSchema = z
 		}
 	});
 
-export const budgetSectionInputSchema = z.object({
+const budgetSectionInputSchema = z.object({
 	id: z.string().optional(),
 	code: z.string().trim().min(1, "El renglon es requerido"),
 	name: z.string().trim().min(1, "El nombre del renglon es requerido"),

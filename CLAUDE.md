@@ -37,6 +37,7 @@ Módulos reales en `src/modules/` y su responsabilidad:
 - `progress`: informes diarios de avance, mano de obra, materiales usados, evidencia multimedia, sincronización offline (`SyncOperation`).
 - `inventory`: materiales, bodegas, existencias (`Stock`), movimientos (`StockMovement`).
 - `requisitions`: solicitudes de material/compra y sus renglones.
+- `purchases`: proveedores (`Supplier`) y órdenes de compra (`PurchaseOrder`/`PurchaseOrderItem`), opcionalmente originadas de una `Requisition` (también admite compra directa sin requisición previa). Distinto de `requisitions` (lo pedido) y de `finances` (lo pagado).
 - `finances`: gastos (`FinancialExpense`), pagos a proveedor (`SupplierPayment`) y pagos de cliente (`ClientPayment`) — son tres conceptos distintos, no fusionarlos.
 - `documents`: repositorio documental por proyecto, categorías, versiones, almacenamiento (hoy en `public/uploads/...`, servido vía Route Handler autenticado — ver docs/security-audit.md H1).
 - `reports`: solo `ui/` (plantillas de reporte reutilizan datos de progress/budgets/finances, no tiene modelos propios).
@@ -49,7 +50,7 @@ Rutas (`src/app/`):
 
 - `(public)/` — sitio público sin sesión: `/`, `/servicios`, `/proyectos`, `/contacto`.
 - `login/`, `account/` — autenticación y gestión de la propia cuenta/passkeys.
-- `dashboard/`, `projects/`, `inventory/`, `requisitions/`, `finances/`, `documents/`, `reports/`, `users/`, `website/` — rutas internas autenticadas (protegidas también por `src/proxy.ts` como red de seguridad; cada página valida su propio permiso además).
+- `dashboard/`, `projects/`, `inventory/`, `requisitions/`, `purchases/`, `finances/`, `documents/`, `reports/`, `users/`, `website/` — rutas internas autenticadas (protegidas también por `src/proxy.ts` como red de seguridad; cada página valida su propio permiso además).
 - `portal/[token]/` — vista del cliente por enlace de portal, sin sesión de empleado.
 - `api/` — Route Handlers: `api/auth/*` (login/passkeys), `api/documents/*` (descarga autenticada de documentos), `api/projects/[id]/progress/offline-sync` (sync offline), `api/dev/reset-database` (solo desarrollo, triple-gateado), `api/health`, `api/notifications`.
 - `offline/` — página de fallback del service worker.

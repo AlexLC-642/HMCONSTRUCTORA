@@ -46,6 +46,7 @@ describe("destino y renglones del requerimiento", () => {
 			projectId: "",
 			warehouseId: "warehouse-1",
 			title: "Instalación hidráulica",
+			neededDate: "2026-09-15",
 			items: [item],
 		});
 
@@ -58,10 +59,23 @@ describe("destino y renglones del requerimiento", () => {
 			projectId: "",
 			warehouseId: "warehouse-1",
 			title: "Reposición de existencias",
+			neededDate: "2026-09-15",
 			items: [item, { ...item, description: "Cemento", unit: "saco" }],
 		});
 
 		expect(result.success).toBe(true);
 		if (result.success) expect(result.data.items).toHaveLength(2);
+	});
+
+	it("exige la fecha en que se necesitan los recursos", () => {
+		const result = requisitionInputSchema.safeParse({
+			destinationType: "WAREHOUSE",
+			warehouseId: "warehouse-1",
+			title: "Reposición de existencias",
+			neededDate: "",
+			items: [item],
+		});
+
+		expect(result.success).toBe(false);
 	});
 });

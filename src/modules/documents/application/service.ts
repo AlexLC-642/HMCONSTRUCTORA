@@ -124,47 +124,6 @@ export async function createProjectDocument(projectId: string, formData: FormDat
   return document;
 }
 
-export async function addProjectDocumentVersion(documentId: string, formData: FormData, context: { userId: string }) {
-  const file = formData.get("file");
-  if (!(file instanceof File)) throw new Error("Selecciona un archivo.");
-
-  const document = await prisma.projectDocument.findUniqueOrThrow({
-    where: { id: documentId },
-    include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } }
-  });
-
-  const storedFile = await storeProjectDocumentFile(document.projectId, document.id, file);
-  const versionNumber = (document.versions[0]?.versionNumber ?? 0) + 1;
-
-  await prisma.documentVersion.create({
-    data: {
-      documentId,
-      versionNumber,
-      ...storedFile,
-      notes: stringValue(formData, "versionNotes") || null,
-      uploadedById: context.userId
-    }
-  });
-
-  const updatedDocument = await prisma.projectDocument.update({
-    where: { id: documentId },
-    data: {
-      status: "REVIEW",
-      portalVisible: false
-    }
-  });
-
-  await recordAuditLog({
-    userId: context.userId,
-    action: "UPDATE",
-    entityType: "DocumentVersion",
-    entityId: documentId,
-    metadata: { projectId: document.projectId, title: document.title, versionNumber }
-  });
-
-  return updatedDocument;
-}
-
 export async function updateProjectDocumentReview(documentId: string, formData: FormData, context: { userId: string }) {
   const requestedStatus = statusValue(stringValue(formData, "status"));
   const approved = requestedStatus === "APPROVED";

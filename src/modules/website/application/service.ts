@@ -7,10 +7,8 @@ import {
   websiteInquiryInputSchema,
   websiteInquiryStatusUpdateSchema,
   websitePhotoFromEvidenceInputSchema,
-  websitePhotoReorderSchema,
   websitePhotoUploadInputSchema,
   websiteServiceInputSchema,
-  websiteServiceReorderSchema,
   websiteSettingsInputSchema,
   type WebsiteInquiryInput,
   type WebsiteInquiryStatusUpdateInput,
@@ -136,24 +134,6 @@ export async function updateWebsiteSettings(rawInput: unknown, context: WebsiteC
   return updated;
 }
 
-export async function updateWebsiteHeroImage(imageUrl: string, context: WebsiteContext) {
-  const updated = await prisma.websiteSettings.upsert({
-    where: { id: SETTINGS_ID },
-    update: { heroImageUrl: imageUrl },
-    create: { id: SETTINGS_ID, heroImageUrl: imageUrl }
-  });
-  await prisma.auditLog.create({
-    data: {
-      userId: context.userId,
-      action: "UPDATE",
-      entityType: "WebsiteSettings",
-      entityId: SETTINGS_ID,
-      metadata: { heroImageUrl: imageUrl }
-    }
-  });
-  return updated;
-}
-
 // ---------------------------------------------------------------------------
 // Services
 // ---------------------------------------------------------------------------
@@ -221,22 +201,6 @@ export async function deleteWebsiteService(id: string, context: WebsiteContext) 
     }
   });
   return deleted;
-}
-
-export async function reorderWebsiteServices(rawInput: unknown, context: WebsiteContext) {
-  const { orderedIds } = websiteServiceReorderSchema.parse(rawInput);
-  await prisma.$transaction(
-    orderedIds.map((id, index) => prisma.websiteService.update({ where: { id }, data: { position: index } }))
-  );
-  await prisma.auditLog.create({
-    data: {
-      userId: context.userId,
-      action: "UPDATE",
-      entityType: "WebsiteService",
-      entityId: null,
-      metadata: { reordered: orderedIds.length }
-    }
-  });
 }
 
 export async function moveWebsiteService(id: string, direction: "up" | "down") {
@@ -378,22 +342,6 @@ export async function deleteWebsitePhoto(id: string, context: WebsiteContext) {
   });
 
   return deleted;
-}
-
-export async function reorderWebsitePhotos(rawInput: unknown, context: WebsiteContext) {
-  const { orderedIds } = websitePhotoReorderSchema.parse(rawInput);
-  await prisma.$transaction(
-    orderedIds.map((id, index) => prisma.websiteProjectPhoto.update({ where: { id }, data: { position: index } }))
-  );
-  await prisma.auditLog.create({
-    data: {
-      userId: context.userId,
-      action: "UPDATE",
-      entityType: "WebsiteProjectPhoto",
-      entityId: null,
-      metadata: { reordered: orderedIds.length }
-    }
-  });
 }
 
 export async function moveWebsitePhoto(id: string, direction: "up" | "down") {

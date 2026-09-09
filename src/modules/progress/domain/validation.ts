@@ -30,7 +30,7 @@ const dateInput = z
 		);
 	}, "Debe indicar una fecha valida.");
 
-export const dailyReportActivityInputSchema = z.object({
+const dailyReportActivityInputSchema = z.object({
 	id: z.string().trim().optional(),
 	scheduleActivityId: z.string().trim().optional().default(""),
 	activityCode: z.string().trim().min(1, "La actividad necesita codigo."),
@@ -48,7 +48,7 @@ export const dailyReportActivityInputSchema = z.object({
 	position: z.coerce.number().int().min(1),
 });
 
-export const dailyReportLaborInputSchema = z.object({
+const dailyReportLaborInputSchema = z.object({
 	workerLabel: z.string().trim().optional().default(""),
 	role: z.string().trim().optional().default(""),
 	people: decimalInput,
@@ -58,7 +58,7 @@ export const dailyReportLaborInputSchema = z.object({
 	position: z.coerce.number().int().min(1),
 });
 
-export const dailyReportMaterialInputSchema = z
+const dailyReportMaterialInputSchema = z
 	.object({
 		materialId: z.string().trim().optional().default(""),
 		warehouseId: z.string().trim().optional().default(""),
@@ -112,8 +112,4 @@ export const dailyReportInputSchema = z.object({
 export type DailyReportInput = z.infer<typeof dailyReportInputSchema>;
 export type DailyReportActivityInput = z.infer<
 	typeof dailyReportActivityInputSchema
->;
-export type DailyReportLaborInput = z.infer<typeof dailyReportLaborInputSchema>;
-export type DailyReportMaterialInput = z.infer<
-	typeof dailyReportMaterialInputSchema
 >;

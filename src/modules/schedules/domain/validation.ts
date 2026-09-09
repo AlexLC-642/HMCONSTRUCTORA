@@ -27,7 +27,7 @@ const percentInput = z.coerce
     message: "El avance debe estar entre 0 y 100"
   });
 
-export const scheduleActivityInputSchema = z
+const scheduleActivityInputSchema = z
   .object({
     id: z.string().optional(),
     code: z.string().trim().min(1),

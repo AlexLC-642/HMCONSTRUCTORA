@@ -13,13 +13,20 @@ import {
 	Search,
 	X,
 } from "lucide-react";
-import { requirePermission } from "@/modules/auth/application/authorization";
+import {
+	projectAccessWhere,
+	requirePermission,
+} from "@/modules/auth/application/authorization";
 import { createProjectDocumentGlobalAction } from "@/modules/documents/application/actions";
 import {
 	buildDocumentPreview,
 	getDocumentLibrary,
 } from "@/modules/documents/application/queries";
-import { documentFileUrl, documentStatusLabels, manualDocumentCategoryKeys } from "@/modules/documents/domain/catalog";
+import {
+	documentFileUrl,
+	documentStatusLabels,
+	manualDocumentCategoryKeys,
+} from "@/modules/documents/domain/catalog";
 import { DocumentPreviewModal } from "@/modules/documents/ui/document-preview-modal";
 import {
 	DocumentEmpty,
@@ -114,8 +121,8 @@ export default async function DocumentsPage({
 }: {
 	searchParams?: Promise<DocumentsSearch>;
 }) {
-	await requirePermission("proyectos.ver");
-	const { documents } = await getDocumentLibrary();
+	const user = await requirePermission("proyectos.ver");
+	const { documents } = await getDocumentLibrary(user);
 	const params = searchParams ? await searchParams : {};
 
 	// Form parameters
@@ -130,6 +137,7 @@ export default async function DocumentsPage({
 
 	// Fetch all projects for global card views and dropdown
 	const allProjects = await prisma.project.findMany({
+		where: projectAccessWhere(user),
 		select: { id: true, code: true, name: true },
 		orderBy: { code: "asc" },
 	});
@@ -923,12 +931,14 @@ export default async function DocumentsPage({
 			{showUpload && (
 				<DocumentUploadDrawer
 					action={createProjectDocumentGlobalAction}
-					categories={allCategories.filter((category) => manualDocumentCategoryKeys.has(category.key)).map((category) => ({
-						id: category.id,
-						key: category.key,
-						name: category.name,
-						description: category.description,
-					}))}
+					categories={allCategories
+						.filter((category) => manualDocumentCategoryKeys.has(category.key))
+						.map((category) => ({
+							id: category.id,
+							key: category.key,
+							name: category.name,
+							description: category.description,
+						}))}
 					closeHref={documentsHref(params, { upload: "" })}
 					projects={allProjects}
 				/>

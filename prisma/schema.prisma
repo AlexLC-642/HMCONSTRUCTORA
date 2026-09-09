@@ -152,6 +152,25 @@ enum RequisitionDestinationType {
   WAREHOUSE
 }
 
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ISSUED
+  PARTIAL
+  RECEIVED
+  CANCELED
+}
+
+enum PurchasePaymentType {
+  IMMEDIATE
+  ON_DELIVERY
+  CREDIT
+}
+
 model User {
   id                       String               @id @default(uuid())
   email                    String               @unique
@@ -180,6 +199,9 @@ model User {
   financialExpenses        FinancialExpense[]   @relation("FinancialExpenseCreatedBy")
   clientPayments           ClientPayment[]      @relation("ClientPaymentCreatedBy")
   supplierPayments         SupplierPayment[]    @relation("SupplierPaymentCreatedBy")
+  createdSuppliers         Supplier[]           @relation("SupplierCreatedBy")
+  createdPurchaseOrders    PurchaseOrder[]      @relation("PurchaseOrderCreatedBy")
+  issuedPurchaseOrders     PurchaseOrder[]      @relation("PurchaseOrderIssuedBy")
   createdProjectDocuments  ProjectDocument[]    @relation("ProjectDocumentCreatedBy")
   approvedProjectDocuments ProjectDocument[]    @relation("ProjectDocumentApprovedBy")
   uploadedDocumentVersions DocumentVersion[]    @relation("DocumentVersionUploadedBy")
@@ -313,6 +335,7 @@ model Project {
   clientPayments     ClientPayment[]
   documents          ProjectDocument[]
   portalShares       PortalShare[]
+  purchaseOrders     PurchaseOrder[]
 
   @@index([clientId])
   @@index([responsibleId])
@@ -683,6 +706,7 @@ model InventoryMaterial {
   stockMovements       StockMovement[]
   requisitionItems     RequisitionItem[]
   dailyReportMaterials DailyReportMaterial[]
+  purchaseOrderItems   PurchaseOrderItem[]
 
   @@index([name])
   @@index([active])
@@ -702,6 +726,7 @@ model Warehouse {
   stockMovements       StockMovement[]
   dailyReportMaterials DailyReportMaterial[]
   requisitions         Requisition[]
+  purchaseOrders       PurchaseOrder[]
 
   @@index([name])
   @@index([active])
@@ -754,29 +779,30 @@ model StockMovement {
 }
 
 model Requisition {
-  id            String              @id @default(uuid())
-  projectId     String?
-  warehouseId   String?
-  number        String              @unique
-  title         String
+  id              String                     @id @default(uuid())
+  projectId       String?
+  warehouseId     String?
+  number          String                     @unique
+  title           String
   destinationType RequisitionDestinationType @default(PROJECT)
-  type          RequisitionType     @default(MATERIAL)
-  priority      RequisitionPriority @default(NORMAL)
-  status        RequisitionStatus   @default(DRAFT)
-  requestedDate DateTime            @default(now())
-  neededDate    DateTime?
-  requestedBy   String?
-  notes         String?             @db.Text
-  createdById   String?
-  approvedById  String?
-  approvedAt    DateTime?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  project       Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  warehouse     Warehouse?          @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
-  createdBy     User?               @relation("RequisitionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  approvedBy    User?               @relation("RequisitionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
-  items         RequisitionItem[]
+  type            RequisitionType            @default(MATERIAL)
+  priority        RequisitionPriority        @default(NORMAL)
+  status          RequisitionStatus          @default(DRAFT)
+  requestedDate   DateTime                   @default(now())
+  neededDate      DateTime?
+  requestedBy     String?
+  notes           String?                    @db.Text
+  createdById     String?
+  approvedById    String?
+  approvedAt      DateTime?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  project         Project?                   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  warehouse       Warehouse?                 @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  createdBy       User?                      @relation("RequisitionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy      User?                      @relation("RequisitionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  items           RequisitionItem[]
+  purchaseOrders  PurchaseOrder[]
 
   @@index([projectId])
   @@index([warehouseId])
@@ -785,21 +811,22 @@ model Requisition {
 }
 
 model RequisitionItem {
-  id                 String             @id @default(uuid())
+  id                 String              @id @default(uuid())
   requisitionId      String
   materialId         String?
   budgetLineItemId   String?
   scheduleActivityId String?
   description        String
-  quantity           Decimal            @default(0) @db.Decimal(14, 2)
+  quantity           Decimal             @default(0) @db.Decimal(14, 2)
   unit               String?
-  estimatedCost      Decimal            @default(0) @db.Decimal(14, 2)
-  notes              String?            @db.Text
-  requisition        Requisition        @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
-  material           InventoryMaterial? @relation(fields: [materialId], references: [id], onDelete: SetNull)
-  budgetLineItem     BudgetLineItem?    @relation(fields: [budgetLineItemId], references: [id], onDelete: SetNull)
-  scheduleActivity   ScheduleActivity?  @relation(fields: [scheduleActivityId], references: [id], onDelete: SetNull)
+  estimatedCost      Decimal             @default(0) @db.Decimal(14, 2)
+  notes              String?             @db.Text
+  requisition        Requisition         @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  material           InventoryMaterial?  @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  budgetLineItem     BudgetLineItem?     @relation(fields: [budgetLineItemId], references: [id], onDelete: SetNull)
+  scheduleActivity   ScheduleActivity?   @relation(fields: [scheduleActivityId], references: [id], onDelete: SetNull)
   financialExpense   FinancialExpense?
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([requisitionId])
   @@index([materialId])
@@ -810,6 +837,8 @@ model RequisitionItem {
 model FinancialExpense {
   id                   String                 @id @default(uuid())
   projectId            String
+  supplierId           String?
+  purchaseOrderId      String?
   requisitionItemId    String?                @unique
   supportingDocumentId String?                @unique
   expenseDate          DateTime
@@ -824,7 +853,6 @@ model FinancialExpense {
   activity             String?
   documentNumber       String?
   documentType         String?
-  fileName             String?
   paymentMethod        String?
   status               FinancialExpenseStatus @default(VALID)
   notes                String?                @db.Text
@@ -832,15 +860,104 @@ model FinancialExpense {
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
   project              Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  supplier             Supplier?              @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  purchaseOrder        PurchaseOrder?         @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
   requisitionItem      RequisitionItem?       @relation(fields: [requisitionItemId], references: [id], onDelete: SetNull)
   supportingDocument   ProjectDocument?       @relation("FinancialExpenseSupportingDocument", fields: [supportingDocumentId], references: [id], onDelete: SetNull)
   createdBy            User?                  @relation("FinancialExpenseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   supplierPayments     SupplierPayment[]
 
   @@index([projectId])
+  @@index([supplierId])
+  @@index([purchaseOrderId])
   @@index([expenseDate])
   @@index([status])
   @@index([budgetSectionNo])
+}
+
+model Supplier {
+  id                String             @id @default(uuid())
+  code              String             @unique
+  businessName      String
+  tradeName         String?
+  taxId             String?            @unique
+  contactName       String?
+  email             String?
+  phone             String?            @db.VarChar(8)
+  address           String?            @db.Text
+  notes             String?            @db.Text
+  status            SupplierStatus     @default(ACTIVE)
+  createdById       String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  createdBy         User?              @relation("SupplierCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  purchaseOrders    PurchaseOrder[]
+  financialExpenses FinancialExpense[]
+
+  @@index([businessName])
+  @@index([status])
+}
+
+model PurchaseOrder {
+  id                String              @id @default(uuid())
+  number            String              @unique
+  supplierId        String
+  requisitionId     String?
+  projectId         String?
+  warehouseId       String?
+  status            PurchaseOrderStatus @default(DRAFT)
+  issueDate         DateTime
+  expectedDate      DateTime?
+  paymentType       PurchasePaymentType @default(IMMEDIATE)
+  paymentDueDate    DateTime?
+  issuedAt          DateTime?
+  receivedAt        DateTime?
+  currency          String              @default("GTQ")
+  subtotal          Decimal             @default(0) @db.Decimal(14, 2)
+  taxPercentage     Decimal             @default(0) @db.Decimal(5, 2)
+  taxAmount         Decimal             @default(0) @db.Decimal(14, 2)
+  total             Decimal             @default(0) @db.Decimal(14, 2)
+  notes             String?             @db.Text
+  createdById       String?
+  issuedById        String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  supplier          Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  requisition       Requisition?        @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  project           Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  warehouse         Warehouse?          @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  createdBy         User?               @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  issuedBy          User?               @relation("PurchaseOrderIssuedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+  items             PurchaseOrderItem[]
+  financialExpenses FinancialExpense[]
+
+  @@index([supplierId])
+  @@index([requisitionId])
+  @@index([projectId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([issueDate])
+}
+
+model PurchaseOrderItem {
+  id                String             @id @default(uuid())
+  purchaseOrderId   String
+  requisitionItemId String?
+  materialId        String?
+  description       String
+  quantity          Decimal            @db.Decimal(14, 2)
+  unit              String?
+  unitCost          Decimal            @default(0) @db.Decimal(14, 2)
+  subtotal          Decimal            @default(0) @db.Decimal(14, 2)
+  receivedQuantity  Decimal            @default(0) @db.Decimal(14, 2)
+  notes             String?            @db.Text
+  purchaseOrder     PurchaseOrder      @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  requisitionItem   RequisitionItem?   @relation(fields: [requisitionItemId], references: [id], onDelete: SetNull)
+  material          InventoryMaterial? @relation(fields: [materialId], references: [id], onDelete: SetNull)
+
+  @@index([purchaseOrderId])
+  @@index([requisitionItemId])
+  @@index([materialId])
 }
 
 model SupplierPayment {
@@ -872,7 +989,6 @@ model ClientPayment {
   amount           Decimal         @db.Decimal(14, 2)
   method           String?
   reference        String?
-  receiptFile      String?
   observations     String?         @db.Text
   concept          String?
   budgetSectionId  String?

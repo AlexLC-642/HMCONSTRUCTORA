@@ -3,7 +3,11 @@
 import type { Route } from "next";
 import type { ProjectStatus } from "@prisma/client";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/modules/auth/application/authorization";
+import {
+	hasPortfolioAccess,
+	requirePermission,
+	requireProjectPermission,
+} from "@/modules/auth/application/authorization";
 import {
 	createProject,
 	updateProject,
@@ -47,26 +51,33 @@ function readProjectForm(formData: FormData, portalEnabled: boolean) {
 
 export async function createProjectAction(formData: FormData) {
 	const user = await requirePermission("proyectos.crear");
-	const project = await createProject(readProjectForm(formData, true), {
+	const input = readProjectForm(formData, true);
+	if (!hasPortfolioAccess(user) && !input.memberIds.includes(user.id)) {
+		input.memberIds.push(user.id);
+	}
+	const project = await createProject(input, {
 		userId: user.id,
 	});
 	redirect(`/projects/${project.id}` as Route);
 }
 
 export async function updateProjectAction(id: string, formData: FormData) {
-	const user = await requirePermission("proyectos.editar");
-	const project = await updateProject(
-		id,
-		readProjectForm(formData, formData.get("portalEnabled") === "on"),
-		{
-			userId: user.id,
-		},
+	const user = await requireProjectPermission(id, "proyectos.editar");
+	const input = readProjectForm(
+		formData,
+		formData.get("portalEnabled") === "on",
 	);
+	if (!hasPortfolioAccess(user) && !input.memberIds.includes(user.id)) {
+		input.memberIds.push(user.id);
+	}
+	const project = await updateProject(id, input, {
+		userId: user.id,
+	});
 	redirect(`/projects/${project.id}` as Route);
 }
 
 async function changeProjectLifecycle(id: string, status: ProjectStatus) {
-	const user = await requirePermission("proyectos.editar");
+	const user = await requireProjectPermission(id, "proyectos.editar");
 	const project = await updateProjectLifecycle(id, status, {
 		userId: user.id,
 	});

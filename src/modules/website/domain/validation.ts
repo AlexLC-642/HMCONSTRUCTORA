@@ -105,10 +105,6 @@ export const websiteServiceInputSchema = z.object({
 
 export type WebsiteServiceInput = z.infer<typeof websiteServiceInputSchema>;
 
-export const websiteServiceReorderSchema = z.object({
-	orderedIds: z.array(z.string().trim().min(1)).min(1),
-});
-
 export const websitePhotoUploadInputSchema = z.object({
 	title: z.string().trim().min(2, "Escribe un título.").max(160),
 	altText: z.string().trim().max(200).optional(),
@@ -118,8 +114,4 @@ export const websitePhotoFromEvidenceInputSchema = z.object({
 	dailyReportMediaId: z.string().trim().min(1),
 	title: z.string().trim().min(2, "Escribe un título.").max(160),
 	altText: z.string().trim().max(200).optional(),
-});
-
-export const websitePhotoReorderSchema = z.object({
-	orderedIds: z.array(z.string().trim().min(1)).min(1),
 });

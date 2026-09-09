@@ -129,123 +129,6 @@ async function getRequisitionForTransition(
 	});
 }
 
-function requisitionExpenseDocumentNumber(
-	requisition: LoadedRequisition,
-	itemId: string,
-) {
-	return `${requisition.number}-${itemId.slice(0, 8)}`.toUpperCase();
-}
-
-function requisitionExpenseNotes(
-	requisition: LoadedRequisition,
-	item: LoadedRequisition["items"][number],
-	source: "PURCHASED" | "RECEIVED",
-) {
-	return [
-		`Generado desde requerimiento ${requisition.number}.`,
-		source === "PURCHASED" ? "Etapa: compra." : "Etapa: recepcion.",
-		requisition.warehouse
-			? `Bodega destino: ${requisition.warehouse.code} - ${requisition.warehouse.name}.`
-			: null,
-		item.notes,
-	]
-		.filter(Boolean)
-		.join(" ");
-}
-
-async function ensureFinancialExpensesForRequisition(
-	tx: Prisma.TransactionClient,
-	requisition: LoadedRequisition,
-	context: RequisitionContext,
-	source: "PURCHASED" | "RECEIVED",
-) {
-	const projectId = requisition.projectId;
-	if (!projectId) return;
-
-	for (const item of requisition.items) {
-		const quantity = decimal(item.quantity);
-		const unitCost = decimal(item.estimatedCost);
-		const subtotal = quantity.mul(unitCost).toDecimalPlaces(2);
-		if (subtotal.lte(0)) continue;
-
-		const sourceReference = requisitionExpenseDocumentNumber(
-			requisition,
-			item.id,
-		);
-		// requisitionItemId is unique on FinancialExpense: a requisition line can
-		// originate only one purchase, and this check-then-create is backstopped
-		// by a caught P2002 below in case of a concurrent double submit.
-		const existing = await tx.financialExpense.findUnique({
-			where: { requisitionItemId: item.id },
-			select: { id: true },
-		});
-		if (existing) continue;
-
-		let expense: { id: string };
-		try {
-			expense = await tx.financialExpense.create({
-				data: {
-					projectId,
-					requisitionItemId: item.id,
-					expenseDate: new Date(),
-					description: item.description,
-					vendor: null,
-					quantity,
-					unit: item.unit,
-					subtotal,
-					type: "Requerimiento",
-					phase: item.budgetLineItem
-						? `${item.budgetLineItem.section.code} - ${item.budgetLineItem.section.name}`
-						: [
-								item.scheduleActivity?.budgetSectionCode,
-								item.scheduleActivity?.budgetSectionName,
-							]
-								.filter(Boolean)
-								.join(" - ") || null,
-					budgetSectionNo:
-						item.budgetLineItem?.section.code ??
-						item.scheduleActivity?.budgetSectionCode ??
-						null,
-					activity: requisition.title,
-					// La requisición identifica el origen de la compra, pero no es una
-					// factura emitida por el proveedor. El folio se captura al adjuntar
-					// el comprobante real desde Finanzas.
-					documentNumber: null,
-					paymentMethod: null,
-					notes: requisitionExpenseNotes(requisition, item, source),
-					createdById: context.userId,
-				},
-			});
-		} catch (error) {
-			if (
-				error instanceof Prisma.PrismaClientKnownRequestError &&
-				error.code === "P2002"
-			) {
-				continue;
-			}
-			throw error;
-		}
-
-		await tx.auditLog.create({
-			data: {
-				userId: context.userId,
-				action: "CREATE",
-				entityType: "FinancialExpense",
-				entityId: expense.id,
-				metadata: {
-					projectId,
-					requisitionId: requisition.id,
-					requisitionNumber: requisition.number,
-					itemId: item.id,
-					sourceReference,
-					source,
-					subtotal: subtotal.toNumber(),
-				},
-			},
-		});
-	}
-}
-
 export async function createRequisition(
 	rawInput: unknown,
 	context: RequisitionContext,
@@ -506,7 +389,7 @@ export async function approveRequisition(
 	});
 }
 
-export async function reviewRequisition(
+export async function fulfillRequisitionFromStock(
 	requisitionId: string,
 	context: RequisitionContext,
 ) {
@@ -514,16 +397,66 @@ export async function reviewRequisition(
 		const requisition = await getRequisitionForTransition(tx, requisitionId);
 		ensureStatus(
 			requisition,
-			["REQUESTED"],
-			"Solo se pueden revisar requerimientos solicitados.",
+			["APPROVED"],
+			"Solo se pueden atender desde inventario las solicitudes autorizadas.",
 		);
+		if (requisition.destinationType !== "PROJECT" || !requisition.projectId) {
+			throw new Error(
+				"La entrega desde inventario necesita un proyecto de destino.",
+			);
+		}
+		if (!requisition.warehouseId) {
+			throw new Error("La solicitud necesita una bodega de salida.");
+		}
+		if (requisition.items.some((item) => !item.materialId)) {
+			throw new Error(
+				"Vincule todos los recursos al catálogo antes de entregarlos.",
+			);
+		}
 
-		const reviewed = await tx.requisition.update({
+		for (const item of requisition.items) {
+			const stock = await tx.stock.findUnique({
+				where: {
+					materialId_warehouseId: {
+						materialId: item.materialId as string,
+						warehouseId: requisition.warehouseId,
+					},
+				},
+				select: { quantity: true },
+			});
+			if (!stock || stock.quantity.lt(item.quantity)) {
+				throw new Error(
+					`La existencia de ${item.description} no cubre la cantidad solicitada. Envíe el faltante a Compras.`,
+				);
+			}
+		}
+
+		for (const item of requisition.items) {
+			await recordStockMovementInTransaction(
+				tx,
+				{
+					materialId: item.materialId as string,
+					warehouseId: requisition.warehouseId,
+					projectId: requisition.projectId,
+					type: "OUT",
+					quantity: item.quantity.toNumber(),
+					unitCost: item.estimatedCost.toNumber(),
+					reference: `Entrega ${requisition.number}`,
+					notes:
+						item.notes ??
+						`Entrega directa desde inventario para ${requisition.number}`,
+					idempotencyKey: `requisition:${requisition.id}:item:${item.id}:stock-fulfilled`,
+				},
+				context,
+			);
+		}
+
+		const completed = await tx.requisition.update({
 			where: { id: requisitionId },
-			data: { status: "REVIEWED" },
+			data: { status: "CLOSED" },
 		});
-		await auditStatus(tx, reviewed, context);
-		return reviewed;
+		await auditStatus(tx, completed, context);
+		return completed;
 	});
 }
 
@@ -545,81 +478,6 @@ export async function rejectRequisition(
 		});
 		await auditStatus(tx, rejected, context);
 		return rejected;
-	});
-}
-
-export async function markRequisitionPurchased(
-	requisitionId: string,
-	context: RequisitionContext,
-) {
-	return prisma.$transaction(async (tx) => {
-		const requisition = await getRequisitionForTransition(tx, requisitionId);
-		ensureStatus(
-			requisition,
-			["APPROVED"],
-			"Solo se pueden marcar como comprados los requerimientos aprobados.",
-		);
-		await ensureFinancialExpensesForRequisition(
-			tx,
-			requisition,
-			context,
-			"PURCHASED",
-		);
-
-		const purchased = await tx.requisition.update({
-			where: { id: requisitionId },
-			data: { status: "PURCHASED" },
-		});
-		await auditStatus(tx, purchased, context);
-		return purchased;
-	});
-}
-
-export async function receiveRequisition(
-	requisitionId: string,
-	context: RequisitionContext,
-) {
-	return prisma.$transaction(async (tx) => {
-		const requisition = await getRequisitionForTransition(tx, requisitionId);
-		ensureStatus(
-			requisition,
-			["PURCHASED"],
-			"Registre primero la compra antes de recibir el requerimiento.",
-		);
-		if (!requisition.warehouseId)
-			throw new Error(
-				"Seleccione una bodega destino antes de recibir el requerimiento.",
-			);
-		if (requisition.items.some((item) => !item.materialId)) {
-			throw new Error(
-				"Vincule todos los materiales al catálogo antes de recibirlos en bodega.",
-			);
-		}
-		for (const item of requisition.items) {
-			await recordStockMovementInTransaction(
-				tx,
-				{
-					materialId: item.materialId as string,
-					warehouseId: requisition.warehouseId,
-					projectId: requisition.projectId ?? undefined,
-					type: "IN",
-					quantity: item.quantity.toNumber(),
-					unitCost: item.estimatedCost.toNumber(),
-					reference: `Recepcion ${requisition.number}`,
-					notes:
-						item.notes ?? `Entrada desde requerimiento ${requisition.number}`,
-					idempotencyKey: `requisition:${requisition.id}:item:${item.id}:received`,
-				},
-				context,
-			);
-		}
-
-		const received = await tx.requisition.update({
-			where: { id: requisitionId },
-			data: { status: "RECEIVED" },
-		});
-		await auditStatus(tx, received, context);
-		return received;
 	});
 }
 
@@ -669,7 +527,7 @@ export async function deliverRequisition(
 
 		const delivered = await tx.requisition.update({
 			where: { id: requisitionId },
-			data: { status: "DELIVERED" },
+			data: { status: "CLOSED" },
 		});
 		await auditStatus(tx, delivered, context);
 		return delivered;

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
+import { cookies } from "next/headers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,17 +13,17 @@ export const viewport: Viewport = {
 	viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
 	children,
 }: Readonly<{
 	children: React.ReactNode;
 }>) {
+	const savedTheme = (await cookies()).get("hm-theme")?.value;
+	const theme = savedTheme === "dark" ? "dark" : "light";
+
 	return (
-		<html lang="es" suppressHydrationWarning>
-			<body suppressHydrationWarning>
-				{children}
-				<Script src="/theme-init.js" strategy="beforeInteractive" />
-			</body>
+		<html data-theme={theme} lang="es">
+			<body>{children}</body>
 		</html>
 	);
 }

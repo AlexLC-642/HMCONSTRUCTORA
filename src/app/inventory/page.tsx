@@ -25,7 +25,7 @@ export default async function InventoryPage({
 }: {
 	searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-	await requirePermission("inventario.mover");
+	const user = await requirePermission("inventario.mover");
 	const params = searchParams ? await searchParams : {};
 	const rawView = first(params.view);
 	const view =
@@ -49,14 +49,17 @@ export default async function InventoryPage({
 	}
 
 	if (view === "movement") {
-		const data = await getMovementHistory({
-			query: first(params.q),
-			type: first(params.type),
-			warehouseId: first(params.warehouseId),
-			projectId: first(params.projectId),
-			page: Number(first(params.page) ?? "1"),
-			pageSize: Number(first(params.pageSize) ?? "25"),
-		});
+		const data = await getMovementHistory(
+			{
+				query: first(params.q),
+				type: first(params.type),
+				warehouseId: first(params.warehouseId),
+				projectId: first(params.projectId),
+				page: Number(first(params.page) ?? "1"),
+				pageSize: Number(first(params.pageSize) ?? "25"),
+			},
+			user,
+		);
 		return (
 			<main className="mx-auto max-w-[1520px] space-y-5 px-3 pb-10 md:px-6">
 				<InventoryWorkspaceHeader view="movement" />

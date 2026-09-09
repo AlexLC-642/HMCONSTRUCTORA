@@ -3,17 +3,22 @@
 import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requirePermission } from "@/modules/auth/application/authorization";
+import {
+	canAccessProject,
+	hasProjectScopePortfolioAccess,
+	requirePermission,
+	requireProjectScopePortfolioPermission,
+	requireScopedProjectPermission,
+} from "@/modules/auth/application/authorization";
+import { prisma } from "@/shared/lib/prisma";
 import {
 	approveRequisition,
 	closeRequisition,
 	createRequisition,
 	deliverRequisition,
+	fulfillRequisitionFromStock,
 	linkRequisitionItemMaterial,
-	markRequisitionPurchased,
-	receiveRequisition,
 	rejectRequisition,
-	reviewRequisition,
 } from "./service";
 
 function value(formData: FormData, key: string) {
@@ -42,12 +47,53 @@ function refresh() {
 	redirect("/requisitions" as Route);
 }
 
+async function requireRequisitionAccess(
+	requisitionId: string,
+	permission: string,
+) {
+	const user = await requirePermission(permission);
+	if (hasProjectScopePortfolioAccess(user, "requisitions")) return user;
+	const requisition = await prisma.requisition.findUnique({
+		where: { id: requisitionId },
+		select: { projectId: true },
+	});
+	if (
+		!requisition?.projectId ||
+		!(await canAccessProject(user, requisition.projectId))
+	) {
+		throw new Error("Este requerimiento no pertenece a uno de tus proyectos.");
+	}
+	return user;
+}
+
+async function requireRequisitionItemAccess(
+	requisitionItemId: string,
+	permission: string,
+) {
+	const item = await prisma.requisitionItem.findUnique({
+		where: { id: requisitionItemId },
+		select: { requisitionId: true },
+	});
+	if (!item) throw new Error("No se encontró el recurso solicitado.");
+	return requireRequisitionAccess(item.requisitionId, permission);
+}
+
 export async function createRequisitionAction(formData: FormData) {
-	const user = await requirePermission("inventario.mover");
+	const projectId = value(formData, "projectId");
+	const user = projectId
+		? await requireScopedProjectPermission(
+				projectId,
+				"inventario.mover",
+				"requisitions",
+			)
+		: await requireProjectScopePortfolioPermission(
+				"inventario.mover",
+				"requisitions",
+			);
 	await createRequisition(
 		{
 			destinationType: value(formData, "destinationType"),
-			projectId: value(formData, "projectId"),
+			projectId,
 			warehouseId: value(formData, "warehouseId"),
 			title: value(formData, "title"),
 			priority: value(formData, "priority"),
@@ -62,10 +108,14 @@ export async function createRequisitionAction(formData: FormData) {
 }
 
 export async function linkRequisitionItemMaterialAction(formData: FormData) {
-	const user = await requirePermission("requerimiento.aprobar");
+	const requisitionItemId = value(formData, "requisitionItemId");
+	const user = await requireRequisitionItemAccess(
+		requisitionItemId,
+		"requerimiento.aprobar",
+	);
 	await linkRequisitionItemMaterial(
 		{
-			requisitionItemId: value(formData, "requisitionItemId"),
+			requisitionItemId,
 			mode: value(formData, "mode"),
 			materialId: value(formData, "materialId"),
 			name: value(formData, "name"),
@@ -84,55 +134,57 @@ export async function linkRequisitionItemMaterialAction(formData: FormData) {
 }
 
 export async function approveRequisitionAction(formData: FormData) {
-	const user = await requirePermission("requerimiento.aprobar");
-	await approveRequisition(value(formData, "requisitionId"), {
+	const requisitionId = value(formData, "requisitionId");
+	const user = await requireRequisitionAccess(
+		requisitionId,
+		"requerimiento.aprobar",
+	);
+	await approveRequisition(requisitionId, {
 		userId: user.id,
 	});
 	refresh();
 }
 
-export async function reviewRequisitionAction(formData: FormData) {
-	const user = await requirePermission("requerimiento.aprobar");
-	await reviewRequisition(value(formData, "requisitionId"), {
-		userId: user.id,
-	});
+export async function fulfillRequisitionFromStockAction(formData: FormData) {
+	const requisitionId = value(formData, "requisitionId");
+	const user = await requireRequisitionAccess(
+		requisitionId,
+		"requerimiento.aprobar",
+	);
+	await fulfillRequisitionFromStock(requisitionId, { userId: user.id });
 	refresh();
 }
 
 export async function rejectRequisitionAction(formData: FormData) {
-	const user = await requirePermission("requerimiento.aprobar");
-	await rejectRequisition(value(formData, "requisitionId"), {
-		userId: user.id,
-	});
-	refresh();
-}
-
-export async function markRequisitionPurchasedAction(formData: FormData) {
-	const user = await requirePermission("requerimiento.aprobar");
-	await markRequisitionPurchased(value(formData, "requisitionId"), {
-		userId: user.id,
-	});
-	refresh();
-}
-
-export async function receiveRequisitionAction(formData: FormData) {
-	const user = await requirePermission("requerimiento.aprobar");
-	await receiveRequisition(value(formData, "requisitionId"), {
+	const requisitionId = value(formData, "requisitionId");
+	const user = await requireRequisitionAccess(
+		requisitionId,
+		"requerimiento.aprobar",
+	);
+	await rejectRequisition(requisitionId, {
 		userId: user.id,
 	});
 	refresh();
 }
 
 export async function deliverRequisitionAction(formData: FormData) {
-	const user = await requirePermission("requerimiento.aprobar");
-	await deliverRequisition(value(formData, "requisitionId"), {
+	const requisitionId = value(formData, "requisitionId");
+	const user = await requireRequisitionAccess(
+		requisitionId,
+		"requerimiento.aprobar",
+	);
+	await deliverRequisition(requisitionId, {
 		userId: user.id,
 	});
 	refresh();
 }
 
 export async function closeRequisitionAction(formData: FormData) {
-	const user = await requirePermission("requerimiento.aprobar");
-	await closeRequisition(value(formData, "requisitionId"), { userId: user.id });
+	const requisitionId = value(formData, "requisitionId");
+	const user = await requireRequisitionAccess(
+		requisitionId,
+		"requerimiento.aprobar",
+	);
+	await closeRequisition(requisitionId, { userId: user.id });
 	refresh();
 }

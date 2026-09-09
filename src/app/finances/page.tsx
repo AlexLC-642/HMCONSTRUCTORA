@@ -13,13 +13,13 @@ import type { ReactNode } from "react";
 import { requirePermission } from "@/modules/auth/application/authorization";
 import { buildDocumentPreview } from "@/modules/documents/application/queries";
 import { getFinanceWorkspace } from "@/modules/finances/application/queries";
-import { AccountStatement } from "@/modules/finances/ui/account-statement";
-import { FinanceEntryDialogs } from "@/modules/finances/ui/finance-entry-dialogs";
-import { FinanceStatementSummary } from "@/modules/finances/ui/finance-statement-summary";
 import {
 	classifiedExpenseTotal,
 	expenseGroupLabel,
 } from "@/modules/finances/application/statement";
+import { AccountStatement } from "@/modules/finances/ui/account-statement";
+import { FinanceEntryDialogs } from "@/modules/finances/ui/finance-entry-dialogs";
+import { FinanceStatementSummary } from "@/modules/finances/ui/finance-statement-summary";
 import { FinanceWorkspaceTabs } from "@/modules/finances/ui/finance-workspace-tabs";
 import { SupplierPaymentDialog } from "@/modules/finances/ui/supplier-payment-dialog";
 import { AutoFilterForm } from "@/shared/ui/auto-filter-form";
@@ -91,7 +91,9 @@ function MoneyMetric({
 	return (
 		<div className="group relative overflow-hidden rounded-xl bg-white/80 p-4 shadow-[0_14px_34px_rgba(22,27,29,0.1)] backdrop-blur-xl backdrop-saturate-150 transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_22px_44px_rgba(22,27,29,0.15)]">
 			<span className={`absolute inset-x-0 top-0 h-1 ${styles.bar}`} />
-			<span className={`pointer-events-none absolute -bottom-10 -right-8 size-24 rounded-full ${styles.glow} transition duration-300 group-hover:scale-125`} />
+			<span
+				className={`pointer-events-none absolute -bottom-10 -right-8 size-24 rounded-full ${styles.glow} transition duration-300 group-hover:scale-125`}
+			/>
 			<div className="relative flex items-start justify-between gap-3">
 				<div className="min-w-0">
 					<p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#58635f]">
@@ -133,10 +135,11 @@ export default async function FinancesPage({
 		expenses,
 		payments,
 		payables,
+		invoiceOrders,
 		budgetSections,
 		budgetVersion,
 		summary,
-	} = await getFinanceWorkspace(params.projectId);
+	} = await getFinanceWorkspace(user, params.projectId);
 	const selectedProjectId = selectedProject?.id ?? "";
 	const totalBudget = summary.totalBudget.toNumber();
 	const totalExpenses = summary.totalExpenses.toNumber();
@@ -179,11 +182,16 @@ export default async function FinancesPage({
 	const expenseDocumentPreviews = Object.fromEntries(
 		expenses.flatMap((expense) =>
 			expense.supportingDocument
-				? [[expense.id, buildDocumentPreview(
-						expense.supportingDocument,
-						selectedProject,
-						expense.supportingDocument.category,
-					)]]
+				? [
+						[
+							expense.id,
+							buildDocumentPreview(
+								expense.supportingDocument,
+								selectedProject,
+								expense.supportingDocument.category,
+							),
+						],
+					]
 				: [],
 		),
 	);
@@ -194,8 +202,11 @@ export default async function FinancesPage({
 			return groups;
 		}, new Map<string, number>()),
 	).map(([name, total]) => ({ name, total }));
-	const statementDate = [...validExpenses.map((expense) => expense.expenseDate), ...payments.map((payment) => payment.paymentDate)]
-		.sort((left, right) => right.getTime() - left.getTime())[0] ?? new Date();
+	const statementDate =
+		[
+			...validExpenses.map((expense) => expense.expenseDate),
+			...payments.map((payment) => payment.paymentDate),
+		].sort((left, right) => right.getTime() - left.getTime())[0] ?? new Date();
 
 	return (
 		<main className="mx-auto max-w-[1520px] space-y-6 pb-10">
@@ -204,7 +215,20 @@ export default async function FinancesPage({
 				<div className="pointer-events-none absolute inset-y-0 left-[48%] w-px rotate-[28deg] bg-white/[0.06] shadow-[70px_0_0_rgba(255,255,255,0.04),140px_0_0_rgba(255,255,255,0.025)]" />
 				<div className="relative grid gap-5 p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_460px] xl:items-center">
 					<div>
-						<div className="flex items-center gap-4"><span className="grid size-12 place-items-center rounded-xl bg-[var(--brand-red)] text-white shadow-[0_12px_28px_rgba(200,32,47,0.34)]"><Landmark aria-hidden="true" size={21} /></span><div><h1 className="text-3xl font-semibold tracking-tight text-white">Finanzas</h1><p className="mt-1 max-w-xl text-sm text-white/75">Controla presupuesto, ingresos, compras y pagos desde un solo espacio.</p></div></div>
+						<div className="flex items-center gap-4">
+							<span className="grid size-12 place-items-center rounded-xl bg-[var(--brand-red)] text-white shadow-[0_12px_28px_rgba(200,32,47,0.34)]">
+								<Landmark aria-hidden="true" size={21} />
+							</span>
+							<div>
+								<h1 className="text-3xl font-semibold tracking-tight text-white">
+									Finanzas
+								</h1>
+								<p className="mt-1 max-w-xl text-sm text-white/75">
+									Controla presupuesto, ingresos, compras y pagos desde un solo
+									espacio.
+								</p>
+							</div>
+						</div>
 					</div>
 					<AutoFilterForm
 						action="/finances"
@@ -359,6 +383,7 @@ export default async function FinancesPage({
 
 			{selectedProject && canRegister ? (
 				<FinanceEntryDialogs
+					invoiceOrders={invoiceOrders}
 					projectId={selectedProjectId}
 					sections={budgetSections.map((section) => ({
 						id: section.id,
@@ -371,294 +396,413 @@ export default async function FinancesPage({
 			) : null}
 
 			<FinanceWorkspaceTabs
-				counts={[allocations.length, validExpenses.length, payables.length, payments.length]}
+				counts={[
+					allocations.length,
+					validExpenses.length,
+					payables.length,
+					payments.length,
+				]}
 			>
-			<section className={`${panelClass} overflow-hidden`} key="budget-allocations">
-				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cfd5ce] px-5 py-4">
-					<div>
-						<h2 className="text-xl font-semibold">
-							Aplicación de abonos por renglón
-						</h2>
-						<p className="text-sm text-[var(--muted)]">
-							Presupuesto aprobado{budgetVersion ? ` v${budgetVersion}` : ""}.
-							Los abonos generales permanecen en la caja del proyecto.
-						</p>
-					</div>
-				</div>
-				<div className="overflow-x-auto">
-					<table className="w-full min-w-[760px] border-collapse text-sm">
-						<thead className="bg-[#f3f5f1] text-left text-xs uppercase tracking-[0.06em] text-[#58635f]">
-							<tr>
-								<th className="px-5 py-3">Renglón</th>
-								<th className="px-5 py-3">Descripción</th>
-								<th className="px-5 py-3 text-right">Valor</th>
-								<th className="px-5 py-3 text-right">Abonado</th>
-								<th className="px-5 py-3 text-right">Pendiente</th>
-							</tr>
-						</thead>
-						<tbody>
-							{allocations.map((line) => (
-								<tr className="border-t border-[#e1e5df]" key={line.id}>
-									<td className="px-5 py-4 font-semibold">
-										{line.code}
-									</td>
-									<td className="px-5 py-4">
-										{line.name}
-										<small className="mt-1 block text-[var(--muted)]">
-											{line.lineItemCount} conceptos presupuestados
-										</small>
-										<div className="mt-2 flex max-w-sm items-center gap-2">
-											<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e5e9e4]"><div className="h-full rounded-full bg-[var(--success)]" style={{ width: `${line.coverage}%` }} /></div>
-											<small className="w-11 text-right font-semibold tabular-nums text-[#52605b]">{line.coverage.toFixed(0)}%</small>
-										</div>
-									</td>
-									<td className="px-5 py-4 text-right tabular-nums">
-										{currencyFormatter.format(line.total.toNumber())}
-									</td>
-									<td className="px-5 py-4 text-right font-semibold tabular-nums text-[var(--success)]">
-										{currencyFormatter.format(line.paid)}
-									</td>
-									<td className="px-5 py-4 text-right font-semibold tabular-nums">
-										{currencyFormatter.format(line.pending)}
-									</td>
-								</tr>
-							))}
-							{allocations.length === 0 ? (
-								<tr>
-									<td
-										className="px-5 py-10 text-center text-[var(--muted)]"
-										colSpan={5}
-									>
-										Aprueba una versión del presupuesto para aplicar abonos por
-										renglón.
-									</td>
-								</tr>
-							) : null}
-						</tbody>
-					</table>
-				</div>
-			</section>
-
-			<section className={`${panelClass} overflow-hidden`} key="account-statement">
-				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cfd5ce] px-5 py-4">
-					<div className="flex items-center gap-3">
-						<span className="grid size-10 place-items-center rounded-md bg-[#f2f4f0] text-[var(--steel)]">
-							<FileText aria-hidden="true" size={18} />
-						</span>
-						<div>
-							<h2 className="text-xl font-semibold">Estado de cuenta</h2>
-						</div>
-					</div>
-				</div>
-				<FinanceStatementSummary
-					additionalWork={classifiedExpenseTotal(validExpenses, ["adicional"])}
-					asOf={statementDate}
-					budget={totalBudget}
-					budgetRemaining={budgetDifference}
-					cashBalance={availableBalance}
-					customerPayments={payments.filter((payment) => payment.status === "REGISTERED").map((payment) => ({
-						id: payment.id,
-						paymentNumber: payment.paymentNumber,
-						paymentDate: payment.paymentDate,
-						amount: payment.amount.toNumber(),
-						method: payment.method,
-						reference: payment.reference,
-					}))}
-					externalExpenses={classifiedExpenseTotal(validExpenses, ["externo", "distinto de obra"])}
-					phaseTotals={phaseTotals}
-					supervision={classifiedExpenseTotal(validExpenses, ["supervisión", "supervision"])}
-					supplierPaid={totalPaidToSuppliers}
-					supplierPending={totalPayable}
-					totalSpent={totalExpenses}
-				/>
-				<div className="border-t border-[#dfe4df] bg-white p-5">
-					<div className="mb-4">
-						<h3 className="font-semibold text-[#172023]">Detalle de compras y comprobantes</h3>
-						<p className="mt-1 text-sm text-[var(--muted)]">Consulta cada gasto y abre su factura o recibo desde el folio.</p>
-					</div>
-					<div className="overflow-x-auto">
-						<AccountStatement
-							canRegister={canRegister}
-							documentPreviews={expenseDocumentPreviews}
-							projectName={selectedProject?.name ?? "PROYECTO"}
-							projectId={selectedProjectId}
-							expenses={expenses}
-						/>
-					</div>
-				</div>
-			</section>
-
-			<section className={`${panelClass} overflow-hidden`} key="supplier-payables">
-				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cfd5ce] px-5 py-4">
-					<div className="flex items-center gap-3">
-						<span className="grid size-10 place-items-center rounded-md bg-[#f2f4f0] text-[var(--steel)]">
-							<CreditCard aria-hidden="true" size={18} />
-						</span>
+				<section
+					className={`${panelClass} overflow-hidden`}
+					key="budget-allocations"
+				>
+					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cfd5ce] px-5 py-4">
 						<div>
 							<h2 className="text-xl font-semibold">
-								Cuentas por pagar a proveedor
+								Aplicación de abonos por renglón
 							</h2>
 							<p className="text-sm text-[var(--muted)]">
-								Pagado {currencyFormatter.format(totalPaidToSuppliers)} de{" "}
-								{currencyFormatter.format(totalPaidToSuppliers + totalPayable)}{" "}
-								comprado &middot; pendiente{" "}
-								{currencyFormatter.format(totalPayable)}
+								Presupuesto aprobado{budgetVersion ? ` v${budgetVersion}` : ""}.
+								Los abonos generales permanecen en la caja del proyecto.
 							</p>
 						</div>
 					</div>
-				</div>
-				<div className="overflow-x-auto">
-					<table className="w-full min-w-[900px] border-collapse text-sm">
-						<thead className="bg-[#f3f5f1] text-left text-xs uppercase tracking-[0.06em] text-[#58635f]">
-							<tr>
-								<th className="px-5 py-3">Compra</th>
-								<th className="px-5 py-3">Proveedor</th>
-								<th className="px-5 py-3 text-right">Comprado</th>
-								<th className="px-5 py-3 text-right">Pagado</th>
-								<th className="px-5 py-3 text-right">Pendiente</th>
-								{canRegister ? (
-									<th className="px-5 py-3">Registrar pago</th>
-								) : null}
-							</tr>
-						</thead>
-						<tbody>
-							{payables.map(({ expense, paid, pending, estimatedTotal }) => (
-								<tr
-									className="border-t border-[#e1e5df] align-top transition hover:bg-[#fbfaf6]"
-									key={expense.id}
-								>
-									<td className="px-5 py-4">
-										<p className="font-medium">{expense.description}</p>
-										<p className="text-xs text-[var(--muted)]">
-											{expense.documentNumber ?? "Sin documento"}
-										</p>
-										{estimatedTotal !== null ? (
-											<p className="mt-1 text-xs text-[var(--muted)]">
-												Estimado{" "}
-												{currencyFormatter.format(estimatedTotal.toNumber())}{" "}
-												&middot; variacion{" "}
-												<span
-													className={
-														expense.subtotal.gt(estimatedTotal)
-															? "font-semibold text-[var(--danger)]"
-															: "font-semibold text-[var(--success)]"
-													}
-												>
-													{currencyFormatter.format(
-														expense.subtotal.sub(estimatedTotal).toNumber(),
-													)}
-												</span>
-											</p>
-										) : null}
-									</td>
-									<td className="px-5 py-4">{expense.vendor ?? "-"}</td>
-									<td className="px-5 py-4 text-right font-semibold tabular-nums">
-										{currencyFormatter.format(expense.subtotal.toNumber())}
-									</td>
-									<td className="px-5 py-4 text-right tabular-nums">
-										{currencyFormatter.format(paid.toNumber())}
-									</td>
-									<td className="px-5 py-4 text-right font-semibold tabular-nums">
-										{pending.gt(0) ? (
-											currencyFormatter.format(pending.toNumber())
-										) : (
-											<span className="rounded-full bg-[#e5f5ed] px-2.5 py-1 text-xs font-semibold text-[#126348]">
-												Pagado
-											</span>
-										)}
-									</td>
-									{canRegister ? (
+					<div className="overflow-x-auto">
+						<table className="w-full min-w-[760px] border-collapse text-sm">
+							<thead className="bg-[#f3f5f1] text-left text-xs uppercase tracking-[0.06em] text-[#58635f]">
+								<tr>
+									<th className="px-5 py-3">Renglón</th>
+									<th className="px-5 py-3">Descripción</th>
+									<th className="px-5 py-3 text-right">Valor</th>
+									<th className="px-5 py-3 text-right">Abonado</th>
+									<th className="px-5 py-3 text-right">Pendiente</th>
+								</tr>
+							</thead>
+							<tbody>
+								{allocations.map((line) => (
+									<tr className="border-t border-[#e1e5df]" key={line.id}>
+										<td className="px-5 py-4 font-semibold">{line.code}</td>
 										<td className="px-5 py-4">
-											{pending.gt(0) ? (
-												<SupplierPaymentDialog
-													description={expense.description}
-													expenseId={expense.id}
-													pending={pending.toFixed(2)}
-													projectId={selectedProjectId}
-													provider={expense.vendor ?? "Proveedor no indicado"}
-													today={today}
-												/>
-											) : null}
+											{line.name}
+											<small className="mt-1 block text-[var(--muted)]">
+												{line.lineItemCount} conceptos presupuestados
+											</small>
+											<div className="mt-2 flex max-w-sm items-center gap-2">
+												<div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e5e9e4]">
+													<div
+														className="h-full rounded-full bg-[var(--success)]"
+														style={{ width: `${line.coverage}%` }}
+													/>
+												</div>
+												<small className="w-11 text-right font-semibold tabular-nums text-[#52605b]">
+													{line.coverage.toFixed(0)}%
+												</small>
+											</div>
 										</td>
+										<td className="px-5 py-4 text-right tabular-nums">
+											{currencyFormatter.format(line.total.toNumber())}
+										</td>
+										<td className="px-5 py-4 text-right font-semibold tabular-nums text-[var(--success)]">
+											{currencyFormatter.format(line.paid)}
+										</td>
+										<td className="px-5 py-4 text-right font-semibold tabular-nums">
+											{currencyFormatter.format(line.pending)}
+										</td>
+									</tr>
+								))}
+								{allocations.length === 0 ? (
+									<tr>
+										<td
+											className="px-5 py-10 text-center text-[var(--muted)]"
+											colSpan={5}
+										>
+											Aprueba una versión del presupuesto para aplicar abonos
+											por renglón.
+										</td>
+									</tr>
+								) : null}
+							</tbody>
+						</table>
+					</div>
+				</section>
+
+				<section
+					className={`${panelClass} overflow-hidden`}
+					key="account-statement"
+				>
+					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cfd5ce] px-5 py-4">
+						<div className="flex items-center gap-3">
+							<span className="grid size-10 place-items-center rounded-md bg-[#f2f4f0] text-[var(--steel)]">
+								<FileText aria-hidden="true" size={18} />
+							</span>
+							<div>
+								<h2 className="text-xl font-semibold">Estado de cuenta</h2>
+							</div>
+						</div>
+					</div>
+					<FinanceStatementSummary
+						additionalWork={classifiedExpenseTotal(validExpenses, [
+							"adicional",
+						])}
+						asOf={statementDate}
+						budget={totalBudget}
+						budgetRemaining={budgetDifference}
+						cashBalance={availableBalance}
+						customerPayments={payments
+							.filter((payment) => payment.status === "REGISTERED")
+							.map((payment) => ({
+								id: payment.id,
+								paymentNumber: payment.paymentNumber,
+								paymentDate: payment.paymentDate,
+								amount: payment.amount.toNumber(),
+								method: payment.method,
+								reference: payment.reference,
+							}))}
+						externalExpenses={classifiedExpenseTotal(validExpenses, [
+							"externo",
+							"distinto de obra",
+						])}
+						phaseTotals={phaseTotals}
+						supervision={classifiedExpenseTotal(validExpenses, [
+							"supervisión",
+							"supervision",
+						])}
+						supplierPaid={totalPaidToSuppliers}
+						supplierPending={totalPayable}
+						totalSpent={totalExpenses}
+					/>
+					<div className="border-t border-[#dfe4df] bg-white p-5">
+						<div className="mb-4">
+							<h3 className="font-semibold text-[#172023]">
+								Detalle de compras y comprobantes
+							</h3>
+							<p className="mt-1 text-sm text-[var(--muted)]">
+								Consulta cada gasto y abre su factura o recibo desde el folio.
+							</p>
+						</div>
+						<div className="overflow-x-auto">
+							<AccountStatement
+								canRegister={canRegister}
+								documentPreviews={expenseDocumentPreviews}
+								projectName={selectedProject?.name ?? "PROYECTO"}
+								projectId={selectedProjectId}
+								expenses={expenses}
+							/>
+						</div>
+					</div>
+				</section>
+
+				<section
+					className={`${panelClass} overflow-hidden`}
+					key="supplier-payables"
+				>
+					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#cfd5ce] px-5 py-4">
+						<div className="flex items-center gap-3">
+							<span className="grid size-10 place-items-center rounded-md bg-[#f2f4f0] text-[var(--steel)]">
+								<CreditCard aria-hidden="true" size={18} />
+							</span>
+							<div>
+								<h2 className="text-xl font-semibold">
+									Cuentas por pagar a proveedor
+								</h2>
+								<p className="text-sm text-[var(--muted)]">
+									Pagado {currencyFormatter.format(totalPaidToSuppliers)} de{" "}
+									{currencyFormatter.format(
+										totalPaidToSuppliers + totalPayable,
+									)}{" "}
+									comprado &middot; pendiente{" "}
+									{currencyFormatter.format(totalPayable)}
+								</p>
+							</div>
+						</div>
+					</div>
+					<div className="overflow-x-auto">
+						<table className="w-full min-w-[1020px] border-collapse text-sm">
+							<thead className="bg-[#f3f5f1] text-left text-xs uppercase tracking-[0.06em] text-[#58635f]">
+								<tr>
+									<th className="px-5 py-3">Compra</th>
+									<th className="px-5 py-3">Proveedor</th>
+									<th className="px-5 py-3">Vencimiento</th>
+									<th className="px-5 py-3 text-right">Comprado</th>
+									<th className="px-5 py-3 text-right">Pagado</th>
+									<th className="px-5 py-3 text-right">Pendiente</th>
+									{canRegister ? (
+										<th className="px-5 py-3">Registrar pago</th>
 									) : null}
 								</tr>
-							))}
-							{payables.length === 0 ? (
-								<tr>
-									<td
-										className="px-5 py-12 text-center text-[var(--muted)]"
-										colSpan={canRegister ? 6 : 5}
+							</thead>
+							<tbody>
+								{payables.map(({ expense, paid, pending, estimatedTotal }) => (
+									<tr
+										className="border-t border-[#e1e5df] align-top transition hover:bg-[#fbfaf6]"
+										key={expense.id}
 									>
-										Sin compras registradas.
-									</td>
-								</tr>
-							) : null}
-						</tbody>
-					</table>
-				</div>
-			</section>
-
-			<section className={`${panelClass} overflow-hidden`} key="client-payments">
-				<div className="border-b border-[#cfd5ce] px-5 py-4">
-					<h2 className="text-xl font-semibold">
-						Abonos del cliente (ingresos)
-					</h2>
-				</div>
-				<div className="overflow-x-auto">
-					<table className="w-full min-w-[760px] border-collapse text-sm">
-						<thead className="bg-[#f3f5f1] text-left text-xs uppercase tracking-[0.06em] text-[#58635f]">
-							<tr>
-								<th className="px-5 py-3">No.</th>
-								<th className="px-5 py-3">Fecha</th>
-								<th className="px-5 py-3">Medio</th>
-								<th className="px-5 py-3">Aplicación</th>
-								<th className="px-5 py-3">Referencia</th>
-								<th className="px-5 py-3 text-right">Monto</th>
-							</tr>
-						</thead>
-						<tbody>
-							{payments.map((payment) => (
-								<tr
-									className="border-t border-[#e1e5df] transition hover:bg-[#fbfaf6]"
-									key={payment.id}
-								>
-									<td className="px-5 py-4 font-semibold">
-										{payment.paymentNumber}
-									</td>
-									<td className="px-5 py-4">
-										{dateFormatter.format(payment.paymentDate)}
-									</td>
-									<td className="px-5 py-4">{payment.method ?? "-"}</td>
-									<td className="px-5 py-4">
-										{payment.budgetSection
-											? `Renglón ${payment.budgetSection.code} · ${payment.budgetSection.name}`
-											: "General"}
-										{payment.concept ? (
-											<small className="mt-1 block text-[var(--muted)]">
-												{payment.concept}
-											</small>
+										<td className="px-5 py-4">
+											<p className="font-medium">{expense.description}</p>
+											<p className="text-xs text-[var(--muted)]">
+												{expense.purchaseOrder
+													? `${expense.purchaseOrder.number} · `
+													: ""}
+												{expense.documentNumber ?? "Sin documento"}
+											</p>
+											{estimatedTotal !== null ? (
+												<p className="mt-1 text-xs text-[var(--muted)]">
+													Estimado{" "}
+													{currencyFormatter.format(estimatedTotal.toNumber())}{" "}
+													&middot; variacion{" "}
+													<span
+														className={
+															expense.subtotal.gt(estimatedTotal)
+																? "font-semibold text-[var(--danger)]"
+																: "font-semibold text-[var(--success)]"
+														}
+													>
+														{currencyFormatter.format(
+															expense.subtotal.sub(estimatedTotal).toNumber(),
+														)}
+													</span>
+												</p>
+											) : null}
+											{expense.supplierPayments.some(
+												(payment) => payment.status === "REGISTERED",
+											) ? (
+												<details className="mt-2 rounded-lg border border-[#dfe4df] bg-[#f7f9f6] px-2.5 py-2 text-xs">
+													<summary className="cursor-pointer font-semibold text-[#43504c]">
+														Registro de pagos (
+														{
+															expense.supplierPayments.filter(
+																(payment) => payment.status === "REGISTERED",
+															).length
+														}
+														)
+													</summary>
+													<div className="mt-2 grid gap-1.5">
+														{expense.supplierPayments
+															.filter(
+																(payment) => payment.status === "REGISTERED",
+															)
+															.map((payment) => (
+																<div
+																	className="flex items-center justify-between gap-3 border-t border-[#e2e7e2] pt-1.5"
+																	key={payment.id}
+																>
+																	<span>
+																		{payment.paymentNumber} ·{" "}
+																		{dateFormatter.format(payment.paymentDate)}
+																	</span>
+																	<strong className="tabular-nums text-[var(--success)]">
+																		{currencyFormatter.format(
+																			payment.amount.toNumber(),
+																		)}
+																	</strong>
+																</div>
+															))}
+													</div>
+												</details>
+											) : null}
+										</td>
+										<td className="px-5 py-4">
+											{expense.supplier?.businessName ?? expense.vendor ?? "-"}
+										</td>
+										<td className="px-5 py-4">
+											{expense.purchaseOrder?.paymentType === "CREDIT" &&
+											expense.purchaseOrder.paymentDueDate ? (
+												<div className="grid gap-1">
+													<span className="font-medium">
+														{dateFormatter.format(
+															expense.purchaseOrder.paymentDueDate,
+														)}
+													</span>
+													{pending.gt(0) &&
+													new Date(expense.purchaseOrder.paymentDueDate) <
+														new Date(`${today}T00:00:00.000Z`) ? (
+														<span className="w-fit rounded-full bg-[#fdebed] px-2 py-0.5 text-[11px] font-semibold text-[#a81929]">
+															Vencida
+														</span>
+													) : pending.gt(0) ? (
+														<span className="text-xs text-[var(--muted)]">
+															Por pagar
+														</span>
+													) : (
+														<span className="text-xs font-semibold text-[var(--success)]">
+															Pagada
+														</span>
+													)}
+												</div>
+											) : (
+												<span className="text-[var(--muted)]">No aplica</span>
+											)}
+										</td>
+										<td className="px-5 py-4 text-right font-semibold tabular-nums">
+											{currencyFormatter.format(expense.subtotal.toNumber())}
+										</td>
+										<td className="px-5 py-4 text-right tabular-nums">
+											{currencyFormatter.format(paid.toNumber())}
+										</td>
+										<td className="px-5 py-4 text-right font-semibold tabular-nums">
+											{pending.gt(0) ? (
+												<span
+													className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${paid.gt(0) ? "bg-[#fff0cf] text-[#825600]" : "bg-[#fdebed] text-[#a81929]"}`}
+												>
+													{paid.gt(0) ? "Parcial · " : "Pendiente · "}
+													{currencyFormatter.format(pending.toNumber())}
+												</span>
+											) : (
+												<span className="rounded-full bg-[#e5f5ed] px-2.5 py-1 text-xs font-semibold text-[#126348]">
+													Pagado
+												</span>
+											)}
+										</td>
+										{canRegister ? (
+											<td className="px-5 py-4">
+												{pending.gt(0) ? (
+													<SupplierPaymentDialog
+														description={expense.description}
+														expenseId={expense.id}
+														pending={pending.toFixed(2)}
+														projectId={selectedProjectId}
+														provider={
+															expense.supplier?.businessName ??
+															expense.vendor ??
+															"Proveedor no indicado"
+														}
+														today={today}
+													/>
+												) : null}
+											</td>
 										) : null}
-									</td>
-									<td className="px-5 py-4">{payment.reference ?? "-"}</td>
-									<td className="px-5 py-4 text-right font-semibold tabular-nums">
-										{currencyFormatter.format(payment.amount.toNumber())}
-									</td>
-								</tr>
-							))}
-							{payments.length === 0 ? (
+									</tr>
+								))}
+								{payables.length === 0 ? (
+									<tr>
+										<td
+											className="px-5 py-12 text-center text-[var(--muted)]"
+											colSpan={canRegister ? 7 : 6}
+										>
+											Sin compras registradas.
+										</td>
+									</tr>
+								) : null}
+							</tbody>
+						</table>
+					</div>
+				</section>
+
+				<section
+					className={`${panelClass} overflow-hidden`}
+					key="client-payments"
+				>
+					<div className="border-b border-[#cfd5ce] px-5 py-4">
+						<h2 className="text-xl font-semibold">
+							Abonos del cliente (ingresos)
+						</h2>
+					</div>
+					<div className="overflow-x-auto">
+						<table className="w-full min-w-[760px] border-collapse text-sm">
+							<thead className="bg-[#f3f5f1] text-left text-xs uppercase tracking-[0.06em] text-[#58635f]">
 								<tr>
-									<td
-										className="px-5 py-12 text-center text-[var(--muted)]"
-										colSpan={6}
-									>
-										Sin abonos registrados.
-									</td>
+									<th className="px-5 py-3">No.</th>
+									<th className="px-5 py-3">Fecha</th>
+									<th className="px-5 py-3">Medio</th>
+									<th className="px-5 py-3">Aplicación</th>
+									<th className="px-5 py-3">Referencia</th>
+									<th className="px-5 py-3 text-right">Monto</th>
 								</tr>
-							) : null}
-						</tbody>
-					</table>
-				</div>
-			</section>
+							</thead>
+							<tbody>
+								{payments.map((payment) => (
+									<tr
+										className="border-t border-[#e1e5df] transition hover:bg-[#fbfaf6]"
+										key={payment.id}
+									>
+										<td className="px-5 py-4 font-semibold">
+											{payment.paymentNumber}
+										</td>
+										<td className="px-5 py-4">
+											{dateFormatter.format(payment.paymentDate)}
+										</td>
+										<td className="px-5 py-4">{payment.method ?? "-"}</td>
+										<td className="px-5 py-4">
+											{payment.budgetSection
+												? `Renglón ${payment.budgetSection.code} · ${payment.budgetSection.name}`
+												: "General"}
+											{payment.concept ? (
+												<small className="mt-1 block text-[var(--muted)]">
+													{payment.concept}
+												</small>
+											) : null}
+										</td>
+										<td className="px-5 py-4">{payment.reference ?? "-"}</td>
+										<td className="px-5 py-4 text-right font-semibold tabular-nums">
+											{currencyFormatter.format(payment.amount.toNumber())}
+										</td>
+									</tr>
+								))}
+								{payments.length === 0 ? (
+									<tr>
+										<td
+											className="px-5 py-12 text-center text-[var(--muted)]"
+											colSpan={6}
+										>
+											Sin abonos registrados.
+										</td>
+									</tr>
+								) : null}
+							</tbody>
+						</table>
+					</div>
+				</section>
 			</FinanceWorkspaceTabs>
 		</main>
 	);

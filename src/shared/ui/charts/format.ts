@@ -1,4 +1,4 @@
-export const currencyFullFormatter = new Intl.NumberFormat("es-GT", {
+const currencyFullFormatter = new Intl.NumberFormat("es-GT", {
   style: "currency",
   currency: "GTQ",
   minimumFractionDigits: 2,

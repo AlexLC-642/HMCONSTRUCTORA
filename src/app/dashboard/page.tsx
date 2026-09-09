@@ -3,8 +3,8 @@ import { getDashboardMetrics } from "@/modules/projects/application/dashboard";
 import { DashboardWorkspace } from "@/modules/projects/ui/dashboard/dashboard-workspace";
 
 export default async function DashboardPage() {
-  await requirePermission("proyectos.ver");
-  const metrics = await getDashboardMetrics();
+	const user = await requirePermission("proyectos.ver");
+	const metrics = await getDashboardMetrics(user);
 
-  return <DashboardWorkspace metrics={metrics} />;
+	return <DashboardWorkspace metrics={metrics} />;
 }

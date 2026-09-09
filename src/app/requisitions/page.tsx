@@ -21,14 +21,13 @@ import {
 	approveRequisitionAction,
 	closeRequisitionAction,
 	deliverRequisitionAction,
-	markRequisitionPurchasedAction,
-	receiveRequisitionAction,
+	fulfillRequisitionFromStockAction,
 	rejectRequisitionAction,
-	reviewRequisitionAction,
 } from "@/modules/requisitions/application/actions";
 import { getRequisitionWorkspace } from "@/modules/requisitions/application/queries";
 import {
 	requisitionPriorityLabels,
+	requisitionStatusFilters,
 	requisitionStatusLabels,
 } from "@/modules/requisitions/domain/validation";
 import { RequisitionCreateDialog } from "@/modules/requisitions/ui/requisition-create-dialog";
@@ -47,12 +46,12 @@ const numberFormatter = new Intl.NumberFormat("es-GT", {
 const statusTone = {
 	DRAFT: "neutral",
 	REQUESTED: "warning",
-	REVIEWED: "info",
+	REVIEWED: "warning",
 	APPROVED: "success",
 	PURCHASED: "violet",
 	RECEIVED: "success",
-	DELIVERED: "neutral",
-	CLOSED: "neutral",
+	DELIVERED: "success",
+	CLOSED: "success",
 	REJECTED: "danger",
 } as const;
 const priorityTone = {
@@ -165,7 +164,7 @@ export default async function RequisitionsPage({
 		projects,
 		materialPlans,
 		scheduleActivities,
-	} = await getRequisitionWorkspace(filters);
+	} = await getRequisitionWorkspace(filters, user);
 	const linkRequisition = requisitions.find((requisition) =>
 		requisition.items.some((item) => item.id === linkItemId),
 	);
@@ -181,11 +180,14 @@ export default async function RequisitionsPage({
 	const pending = requisitions.filter(
 		(item) => item.status === "REQUESTED" || item.status === "REVIEWED",
 	).length;
-	const inPurchase = requisitions.filter(
-		(item) => item.status === "APPROVED" || item.status === "PURCHASED",
+	const inAttention = requisitions.filter(
+		(item) =>
+			item.status === "APPROVED" ||
+			item.status === "PURCHASED" ||
+			item.status === "RECEIVED",
 	).length;
-	const received = requisitions.filter(
-		(item) => item.status === "RECEIVED" || item.status === "DELIVERED",
+	const completed = requisitions.filter(
+		(item) => item.status === "DELIVERED" || item.status === "CLOSED",
 	).length;
 	const totalOpen = requisitions
 		.filter((item) => item.status !== "CLOSED" && item.status !== "REJECTED")
@@ -217,15 +219,12 @@ export default async function RequisitionsPage({
 							<ClipboardCheck aria-hidden="true" size={22} />
 						</span>
 						<div>
-							<p className="text-xs font-bold uppercase tracking-[0.22em] text-[#ef9ba3]">
-								Abastecimiento de obra
-							</p>
-							<h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-white sm:text-4xl">
-								Requerimientos
+							<h1 className="text-3xl font-extrabold tracking-[-0.04em] text-white sm:text-4xl">
+								Requerimientos de recursos
 							</h1>
 							<p className="mt-2 max-w-2xl text-sm leading-6 text-[#c9d0ce]">
-								Solicita recursos para una obra o para existencia de bodega y
-								controla cada etapa sin registrar facturas fuera de Finanzas.
+								Indica qué necesita una obra o bodega. Si hay existencia se
+								entrega desde Inventario; si falta, continúa en Compras.
 							</p>
 						</div>
 					</div>
@@ -254,25 +253,25 @@ export default async function RequisitionsPage({
 				className="kpi-grid grid gap-3 md:grid-cols-2 xl:grid-cols-4"
 			>
 				<Metric
-					detail="Solicitados o en revisión"
+					detail="Esperan una decisión"
 					icon={Clock3}
-					label="Por revisar"
+					label="Pendientes"
 					tone="amber"
 					value={String(pending)}
 				/>
 				<Metric
-					detail="Aprobados o comprados"
+					detail="Inventario, compra o recepción"
 					icon={ShoppingCart}
-					label="En compra"
+					label="En atención"
 					tone="steel"
-					value={String(inPurchase)}
+					value={String(inAttention)}
 				/>
 				<Metric
-					detail="En bodega o entregados"
+					detail="Recursos ya entregados"
 					icon={Truck}
-					label="Recepción"
+					label="Completados"
 					tone="green"
-					value={String(received)}
+					value={String(completed)}
 				/>
 				<Metric
 					detail="Suma de solicitudes abiertas"
@@ -404,10 +403,10 @@ export default async function RequisitionsPage({
 							defaultValue={filters.status}
 						>
 							<option value="">Todos los estados</option>
-							{Object.entries(requisitionStatusLabels).map(
-								([status, label]) => (
+							{Object.entries(requisitionStatusFilters).map(
+								([status, group]) => (
 									<option key={status} value={status}>
-										{label}
+										{group.label}
 									</option>
 								),
 							)}
@@ -426,6 +425,15 @@ export default async function RequisitionsPage({
 						);
 						const allInventoryItemsLinked =
 							requisition.items.length > 0 && !missingInventoryItem;
+						const inventoryShortage = requisition.items.find(
+							(item) =>
+								!item.materialId ||
+								item.availableStock < item.quantity.toNumber(),
+						);
+						const canFulfillFromStock =
+							requisition.destinationType === "PROJECT" &&
+							allInventoryItemsLinked &&
+							!inventoryShortage;
 						return (
 							<article className="requisitions-card" key={requisition.id}>
 								<div className="requisitions-card__top">
@@ -482,10 +490,34 @@ export default async function RequisitionsPage({
 															</small>
 														) : null}
 													</div>
-													<span className="requisitions-item__qty">
-														{numberFormatter.format(item.quantity.toNumber())}{" "}
-														{item.unit ?? item.material?.unit ?? ""}
-													</span>
+													<div className="requisitions-item__availability">
+														<span className="requisitions-item__qty">
+															Solicitado{" "}
+															{numberFormatter.format(item.quantity.toNumber())}{" "}
+															{item.unit ?? item.material?.unit ?? ""}
+														</span>
+														{item.materialId ? (
+															<small
+																className="requisitions-stock"
+																data-state={
+																	item.availableStock >=
+																	item.quantity.toNumber()
+																		? "available"
+																		: "shortage"
+																}
+															>
+																Existencia{" "}
+																{numberFormatter.format(item.availableStock)}
+															</small>
+														) : (
+															<small
+																className="requisitions-stock"
+																data-state="unlinked"
+															>
+																Sin vincular
+															</small>
+														)}
+													</div>
 												</div>
 											))}
 										</div>
@@ -527,31 +559,31 @@ export default async function RequisitionsPage({
 									<div className="requisitions-next-step">
 										<CheckCircle2 aria-hidden="true" size={15} />
 										<span>
-											{requisition.status === "RECEIVED"
-												? requisition.destinationType === "WAREHOUSE"
-													? "Existencia recibida; listo para cerrar"
-													: "Listo para entregar a obra"
-												: requisition.status === "DELIVERED"
-													? "Listo para cerrar"
-													: requisition.status === "CLOSED"
-														? "Proceso finalizado"
-														: "Continúa con la siguiente etapa"}
+											{requisition.status === "REQUESTED" ||
+											requisition.status === "REVIEWED"
+												? "Autoriza o rechaza la solicitud"
+												: requisition.status === "APPROVED"
+													? canFulfillFromStock
+														? "Hay existencia suficiente para entregar"
+														: "Debe continuar en Compras"
+													: requisition.status === "RECEIVED"
+														? requisition.destinationType === "WAREHOUSE"
+															? "Existencia recibida"
+															: "Listo para entregar a obra"
+														: requisition.status === "DELIVERED"
+															? "Proceso completado"
+															: requisition.status === "CLOSED"
+																? "Proceso finalizado"
+																: "La solicitud está en atención"}
 										</span>
 									</div>
 									<div className="flex flex-wrap justify-end gap-2">
-										{canApprove && requisition.status === "REQUESTED" ? (
-											<ActionButton
-												action={reviewRequisitionAction}
-												id={requisition.id}
-												label="Marcar revisado"
-												primary
-											/>
-										) : null}
-										{canApprove && requisition.status === "REVIEWED" ? (
+										{canApprove &&
+										["REQUESTED", "REVIEWED"].includes(requisition.status) ? (
 											<ActionButton
 												action={approveRequisitionAction}
 												id={requisition.id}
-												label="Aprobar"
+												label="Autorizar"
 												primary
 											/>
 										) : null}
@@ -565,23 +597,37 @@ export default async function RequisitionsPage({
 												label="Rechazar"
 											/>
 										) : null}
-										{canApprove && requisition.status === "APPROVED" ? (
+										{canApprove &&
+										requisition.status === "APPROVED" &&
+										canFulfillFromStock ? (
 											<ActionButton
-												action={markRequisitionPurchasedAction}
+												action={fulfillRequisitionFromStockAction}
 												id={requisition.id}
-												label="Confirmar compra"
+												label="Entregar desde inventario"
 												primary
 											/>
 										) : null}
 										{canApprove &&
+										requisition.status === "APPROVED" &&
+										!canFulfillFromStock ? (
+											<Link
+												className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#cf1f32] px-4 text-sm font-bold text-white shadow-[0_8px_20px_rgba(207,31,50,0.2)] transition hover:bg-[#b7192a] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#cf1f32]"
+												href={
+													`/purchases?view=requisitions&requisitionId=${requisition.id}` as Route
+												}
+											>
+												Enviar a Compras
+											</Link>
+										) : null}
+										{canApprove &&
 										requisition.status === "PURCHASED" &&
 										allInventoryItemsLinked ? (
-											<ActionButton
-												action={receiveRequisitionAction}
-												id={requisition.id}
-												label="Recibir en bodega"
-												primary
-											/>
+											<Link
+												className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#172023] px-4 text-sm font-bold text-white shadow-[0_8px_20px_rgba(23,32,35,0.18)] transition hover:-translate-y-0.5"
+												href={"/purchases?view=orders" as Route}
+											>
+												Registrar recepción en Compras
+											</Link>
 										) : null}
 										{canApprove &&
 										requisition.status === "RECEIVED" &&

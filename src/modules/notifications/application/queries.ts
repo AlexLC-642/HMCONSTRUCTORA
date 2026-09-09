@@ -1,12 +1,37 @@
 import type { Route } from "next";
+import {
+	hasPortfolioAccess,
+	hasProjectScopePortfolioAccess,
+	projectAccessWhere,
+	projectScopeWhere,
+} from "@/modules/auth/application/authorization";
 import type { AuthenticatedUser } from "@/modules/auth/domain/types";
-import type { SystemNotification } from "../domain/types";
 import { prisma } from "@/shared/lib/prisma";
+import type { SystemNotification } from "../domain/types";
 
 export async function getSystemNotifications(
 	user: AuthenticatedUser,
 ): Promise<SystemNotification[]> {
 	const permissions = new Set(user.permissions);
+	const projectRelationWhere = hasPortfolioAccess(user)
+		? undefined
+		: projectAccessWhere(user);
+	const canSeePurchasePortfolio = hasProjectScopePortfolioAccess(
+		user,
+		"purchases",
+	);
+	const purchaseProjectWhere = projectScopeWhere(user, "purchases");
+	const financeProjectWhere = projectScopeWhere(user, "finances");
+	const canSeeFinancePortfolio = hasProjectScopePortfolioAccess(
+		user,
+		"finances",
+	);
+	const now = new Date();
+	const today = new Date(
+		Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
+	);
+	const creditWindowEnd = new Date(today);
+	creditWindowEnd.setUTCDate(creditWindowEnd.getUTCDate() + 7);
 
 	const [
 		newInquiries,
@@ -18,6 +43,10 @@ export async function getSystemNotifications(
 		overdueProjects,
 		blockedActivities,
 		stockLevels,
+		approvedPurchases,
+		overdueOrders,
+		receivedWithoutInvoice,
+		creditOrders,
 	] = await Promise.all([
 		permissions.has("sitio.editar")
 			? prisma.websiteInquiry.count({ where: { status: "NEW" } })
@@ -28,22 +57,43 @@ export async function getSystemNotifications(
 				})
 			: Promise.resolve(0),
 		permissions.has("presupuesto.aprobar")
-			? prisma.budgetVersion.count({ where: { status: "DRAFT" } })
+			? prisma.budgetVersion.count({
+					where: {
+						status: "DRAFT",
+						...(projectRelationWhere
+							? { budget: { project: projectRelationWhere } }
+							: {}),
+					},
+				})
 			: Promise.resolve(0),
 		permissions.has("avance.revisar")
 			? prisma.dailyReport.count({
-					where: { status: { in: ["SUBMITTED", "REVIEWED"] } },
+					where: {
+						status: { in: ["SUBMITTED", "REVIEWED"] },
+						...(projectRelationWhere ? { project: projectRelationWhere } : {}),
+					},
 				})
 			: Promise.resolve(0),
 		permissions.has("documentos.compartir")
-			? prisma.projectDocument.count({ where: { status: "REVIEW" } })
+			? prisma.projectDocument.count({
+					where: {
+						status: "REVIEW",
+						...(projectRelationWhere ? { project: projectRelationWhere } : {}),
+					},
+				})
 			: Promise.resolve(0),
 		permissions.has("proyectos.ver")
-			? prisma.syncOperation.count({ where: { status: "FAILED" } })
+			? prisma.syncOperation.count({
+					where: {
+						status: "FAILED",
+						...(projectRelationWhere ? { project: projectRelationWhere } : {}),
+					},
+				})
 			: Promise.resolve(0),
 		permissions.has("proyectos.ver")
 			? prisma.project.count({
 					where: {
+						...(projectRelationWhere ?? {}),
 						status: { in: ["PLANNING", "ACTIVE"] },
 						expectedEndDate: { lt: new Date() },
 						actualEndDate: null,
@@ -51,7 +101,14 @@ export async function getSystemNotifications(
 				})
 			: Promise.resolve(0),
 		permissions.has("cronograma.ver")
-			? prisma.scheduleActivity.count({ where: { status: "BLOCKED" } })
+			? prisma.scheduleActivity.count({
+					where: {
+						status: "BLOCKED",
+						...(projectRelationWhere
+							? { schedule: { project: projectRelationWhere } }
+							: {}),
+					},
+				})
 			: Promise.resolve(0),
 		permissions.has("inventario.mover")
 			? prisma.stock.findMany({
@@ -62,11 +119,84 @@ export async function getSystemNotifications(
 					},
 				})
 			: Promise.resolve([]),
+		permissions.has("compras.ver")
+			? prisma.requisition.count({
+					where: {
+						status: "APPROVED",
+						purchaseOrders: { none: { status: { not: "CANCELED" } } },
+						...(!canSeePurchasePortfolio
+							? { project: purchaseProjectWhere }
+							: {}),
+					},
+				})
+			: Promise.resolve(0),
+		permissions.has("compras.ver")
+			? prisma.purchaseOrder.count({
+					where: {
+						status: { in: ["ISSUED", "PARTIAL"] },
+						expectedDate: { lt: new Date() },
+						...(!canSeePurchasePortfolio
+							? { project: purchaseProjectWhere }
+							: {}),
+					},
+				})
+			: Promise.resolve(0),
+		permissions.has("finanzas.ver")
+			? prisma.purchaseOrder.count({
+					where: {
+						status: "RECEIVED",
+						financialExpenses: { none: { status: "VALID" } },
+						...(!canSeeFinancePortfolio
+							? { project: financeProjectWhere }
+							: {}),
+					},
+				})
+			: Promise.resolve(0),
+		permissions.has("finanzas.ver")
+			? prisma.purchaseOrder.findMany({
+					where: {
+						paymentType: "CREDIT",
+						paymentDueDate: { not: null },
+						status: { not: "CANCELED" },
+						...(!canSeeFinancePortfolio
+							? { project: financeProjectWhere }
+							: {}),
+					},
+					select: {
+						total: true,
+						paymentDueDate: true,
+						financialExpenses: {
+							where: { status: "VALID" },
+							select: {
+								supplierPayments: {
+									where: { status: "REGISTERED" },
+									select: { amount: true },
+								},
+							},
+						},
+					},
+				})
+			: Promise.resolve([]),
 	]);
 	const lowStock = stockLevels.filter(
 		(stock) =>
 			stock.material.minimumStock.gt(0) &&
 			stock.quantity.lte(stock.material.minimumStock),
+	).length;
+	const pendingCreditOrders = creditOrders.filter((order) => {
+		const paid = order.financialExpenses
+			.flatMap((expense) => expense.supplierPayments)
+			.reduce((sum, payment) => sum + payment.amount.toNumber(), 0);
+		return paid < order.total.toNumber();
+	});
+	const overdueCreditOrders = pendingCreditOrders.filter(
+		(order) => order.paymentDueDate && order.paymentDueDate < today,
+	).length;
+	const dueSoonCreditOrders = pendingCreditOrders.filter(
+		(order) =>
+			order.paymentDueDate &&
+			order.paymentDueDate >= today &&
+			order.paymentDueDate <= creditWindowEnd,
 	).length;
 
 	const alerts: SystemNotification[] = [];
@@ -91,6 +221,61 @@ export async function getSystemNotifications(
 			actionLabel,
 		});
 	};
+	addAlert(
+		"overdue-credit-purchases",
+		overdueCreditOrders,
+		"Créditos de proveedor vencidos",
+		overdueCreditOrders === 1
+			? "compra a crédito conserva saldo después de su vencimiento."
+			: "compras a crédito conservan saldo después de su vencimiento.",
+		"/purchases?view=orders" as Route,
+		"Compras",
+		"Revisar créditos",
+	);
+	addAlert(
+		"credit-purchases-due-soon",
+		dueSoonCreditOrders,
+		"Créditos próximos a vencer",
+		dueSoonCreditOrders === 1
+			? "compra a crédito vence durante los próximos 7 días."
+			: "compras a crédito vencen durante los próximos 7 días.",
+		"/purchases?view=orders" as Route,
+		"Compras",
+		"Programar pagos",
+	);
+	addAlert(
+		"received-without-invoice",
+		receivedWithoutInvoice,
+		"Recepciones pendientes de factura",
+		receivedWithoutInvoice === 1
+			? "orden recibida debe registrarse en cuentas por pagar."
+			: "ordenes recibidas deben registrarse en cuentas por pagar.",
+		"/finances" as Route,
+		"Finanzas",
+		"Registrar facturas",
+	);
+	addAlert(
+		"overdue-purchase-orders",
+		overdueOrders,
+		"Órdenes con entrega vencida",
+		overdueOrders === 1
+			? "orden necesita seguimiento con el proveedor."
+			: "órdenes necesitan seguimiento con el proveedor.",
+		"/purchases?status=ISSUED" as Route,
+		"Compras",
+		"Revisar órdenes",
+	);
+	addAlert(
+		"approved-purchases",
+		approvedPurchases,
+		"Compras listas para preparar",
+		approvedPurchases === 1
+			? "requerimiento aprobado aún no tiene orden."
+			: "requerimientos aprobados aún no tienen orden.",
+		"/purchases?view=requisitions" as Route,
+		"Compras",
+		"Preparar órdenes",
+	);
 	addAlert(
 		"overdue-projects",
 		overdueProjects,

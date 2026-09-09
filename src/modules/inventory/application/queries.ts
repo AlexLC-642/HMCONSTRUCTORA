@@ -1,15 +1,14 @@
+import {
+	hasProjectScopePortfolioAccess,
+	projectScopeWhere,
+} from "@/modules/auth/application/authorization";
+import type { AuthenticatedUser } from "@/modules/auth/domain/types";
 import { prisma } from "@/shared/lib/prisma";
 import {
 	serializeMaterial,
 	serializeMovement,
 	serializeWarehouse,
 } from "./serializers";
-
-type InventoryWorkspaceFilters = {
-	materialId?: string;
-	warehouseId?: string;
-	projectId?: string;
-};
 
 type InventoryCatalogFilters = {
 	query?: string;
@@ -34,56 +33,6 @@ export type InventoryListFilters = {
 function clean(value?: string) {
 	const trimmed = value?.trim();
 	return trimmed ? trimmed : undefined;
-}
-
-export async function getInventoryWorkspace(
-	filters: InventoryWorkspaceFilters = {},
-) {
-	const materialId = clean(filters.materialId);
-	const warehouseId = clean(filters.warehouseId);
-	const projectId = clean(filters.projectId);
-
-	const [materials, warehouses, stocks, movements, projects] =
-		await Promise.all([
-			prisma.inventoryMaterial.findMany({
-				orderBy: [{ active: "desc" }, { name: "asc" }],
-			}),
-			prisma.warehouse.findMany({
-				orderBy: [{ active: "desc" }, { name: "asc" }],
-			}),
-			prisma.stock.findMany({
-				where: {
-					...(materialId ? { materialId } : {}),
-					...(warehouseId ? { warehouseId } : {}),
-				},
-				include: { material: true, warehouse: true },
-				orderBy: [
-					{ material: { name: "asc" } },
-					{ warehouse: { name: "asc" } },
-				],
-			}),
-			prisma.stockMovement.findMany({
-				where: {
-					...(materialId ? { materialId } : {}),
-					...(warehouseId ? { warehouseId } : {}),
-					...(projectId ? { projectId } : {}),
-				},
-				take: 500,
-				include: {
-					material: true,
-					warehouse: true,
-					project: { select: { id: true, code: true, name: true } },
-				},
-				orderBy: { createdAt: "desc" },
-			}),
-			prisma.project.findMany({
-				select: { id: true, code: true, name: true },
-				orderBy: { updatedAt: "desc" },
-				take: 50,
-			}),
-		]);
-
-	return { materials, warehouses, stocks, movements, projects };
 }
 
 export async function getInventoryCatalog(
@@ -370,13 +319,19 @@ export async function getStockDashboard(filters: InventoryListFilters = {}) {
 	};
 }
 
-export async function getMovementHistory(filters: InventoryListFilters = {}) {
+export async function getMovementHistory(
+	filters: InventoryListFilters = {},
+	user: Pick<AuthenticatedUser, "id" | "roles">,
+) {
 	const pageSize = [25, 50, 100].includes(filters.pageSize ?? 25)
 		? (filters.pageSize ?? 25)
 		: 25;
 	const page = Math.max(1, filters.page ?? 1);
 	const query = clean(filters.query);
+	const canSeePortfolio = hasProjectScopePortfolioAccess(user, "inventory");
+	const allowedProjectWhere = projectScopeWhere(user, "inventory");
 	const where = {
+		...(!canSeePortfolio ? { project: allowedProjectWhere } : {}),
 		...(filters.materialId ? { materialId: filters.materialId } : {}),
 		...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
 		...(filters.projectId ? { projectId: filters.projectId } : {}),
@@ -434,6 +389,7 @@ export async function getMovementHistory(filters: InventoryListFilters = {}) {
 				orderBy: { name: "asc" },
 			}),
 			prisma.project.findMany({
+				where: allowedProjectWhere,
 				select: { id: true, code: true, name: true },
 				orderBy: { updatedAt: "desc" },
 				take: 50,

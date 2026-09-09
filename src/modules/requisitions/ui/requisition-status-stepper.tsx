@@ -1,23 +1,12 @@
 import type { RequisitionStatus } from "@prisma/client";
 import { Check, Clock3, XCircle } from "lucide-react";
 
-const projectSteps: Array<{
-	status: RequisitionStatus;
-	title: string;
-	detail: string;
-}> = [
-	{
-		status: "REQUESTED",
-		title: "Solicitud enviada",
-		detail: "Pendiente de revisión",
-	},
-	{ status: "REVIEWED", title: "Revisión", detail: "Información verificada" },
-	{ status: "APPROVED", title: "Aprobación", detail: "Compra autorizada" },
-	{ status: "PURCHASED", title: "Compra", detail: "Comprobante en Finanzas" },
-	{ status: "RECEIVED", title: "Recepción", detail: "Ingreso a la bodega" },
-	{ status: "DELIVERED", title: "Entrega", detail: "Salida hacia la obra" },
-	{ status: "CLOSED", title: "Cierre", detail: "Proceso finalizado" },
-];
+const visibleSteps = [
+	{ id: "request", title: "Solicitud", detail: "Necesidad registrada" },
+	{ id: "authorized", title: "Autorizado", detail: "Puede atenderse" },
+	{ id: "fulfillment", title: "En atención", detail: "Inventario o compra" },
+	{ id: "completed", title: "Completado", detail: "Recursos entregados" },
+] as const;
 
 export function RequisitionStatusStepper({
 	status,
@@ -34,28 +23,29 @@ export function RequisitionStatusStepper({
 				</div>
 				<div>
 					<strong>Solicitud rechazada</strong>
-					<p>El proceso se detuvo antes de la recepción.</p>
+					<p>La solicitud no continuará.</p>
 				</div>
 			</div>
 		);
 	}
 
-	const steps = warehouseOnly
-		? projectSteps.filter((step) => step.status !== "DELIVERED")
-		: projectSteps;
-	const currentIndex = Math.max(
-		steps.findIndex((step) => step.status === status),
-		0,
-	);
+	const currentIndex =
+		status === "APPROVED"
+			? 1
+			: status === "PURCHASED" || (status === "RECEIVED" && !warehouseOnly)
+				? 2
+				: ["RECEIVED", "DELIVERED", "CLOSED"].includes(status)
+					? 3
+					: 0;
 
 	return (
 		<section
-			aria-label="Progreso del requerimiento"
+			aria-label="Progreso de la solicitud"
 			className="requisition-progress"
 		>
-			<p className="requisition-progress__title">Estado del requerimiento</p>
+			<p className="requisition-progress__title">Estado de la solicitud</p>
 			<ol>
-				{steps.map((step, index) => {
+				{visibleSteps.map((step, index) => {
 					const state =
 						index < currentIndex
 							? "completed"
@@ -66,7 +56,7 @@ export function RequisitionStatusStepper({
 						<li
 							aria-current={state === "active" ? "step" : undefined}
 							data-state={state}
-							key={step.status}
+							key={step.id}
 						>
 							<span className="requisition-progress__rail" aria-hidden="true" />
 							<span className="requisition-progress__circle" aria-hidden="true">
@@ -81,7 +71,7 @@ export function RequisitionStatusStepper({
 							<div>
 								<strong>{step.title}</strong>
 								<small>
-									{state === "active" ? "Etapa actual" : step.detail}
+									{state === "active" ? "Estado actual" : step.detail}
 								</small>
 							</div>
 						</li>
