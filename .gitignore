@@ -13,3 +13,8 @@ repomix-output.xml
 Dockerfile.local
 .logs
 tmp/
+
+# Herramientas locales del asistente de IA (Claude Code / Codex) - no son
+# parte de la aplicacion, se quedan en el disco de cada quien.
+.agents/
+.codex/
