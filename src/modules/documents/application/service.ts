@@ -102,7 +102,7 @@ export async function createProjectDocument(projectId: string, formData: FormDat
     }
   });
 
-  const storedFile = await storeProjectDocumentFile(projectId, document.id, file);
+  const storedFile = await storeProjectDocumentFile(projectId, document.id, file, category.key);
   await prisma.documentVersion.create({
     data: {
       documentId: document.id,

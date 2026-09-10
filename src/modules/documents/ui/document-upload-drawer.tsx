@@ -15,6 +15,7 @@ import {
 	X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { videoDurationLimitSeconds } from "../domain/catalog";
 import { documentInputClass } from "./document-ui";
 
 type UploadAction = (formData: FormData) => Promise<void>;
@@ -38,15 +39,30 @@ export function DocumentUploadDrawer({
 	const [fileName, setFileName] = useState("");
 	const [pending, setPending] = useState(false);
 	const [videoPreview, setVideoPreview] = useState("");
+	const [videoDurationSeconds, setVideoDurationSeconds] = useState<
+		number | null
+	>(null);
 	const [selectedCategory, setSelectedCategory] = useState("");
 	const categoryIcons = {
 		contratos: ClipboardSignature,
 		planos: FileText,
+		renders: FileVideo,
 		comprobantes: ReceiptText,
 		permisos: ShieldCheck,
 		evidencias: FileImage,
 		otros: FolderKanban,
 	};
+
+	const selectedCategoryKey = categories.find(
+		(category) => category.id === selectedCategory,
+	)?.key;
+	const durationLimit = selectedCategoryKey
+		? videoDurationLimitSeconds[selectedCategoryKey]
+		: undefined;
+	const durationExceeded =
+		durationLimit !== undefined &&
+		videoDurationSeconds !== null &&
+		videoDurationSeconds > durationLimit;
 
 	useEffect(
 		() => () => {
@@ -99,7 +115,13 @@ export function DocumentUploadDrawer({
 				<form
 					action={action}
 					className="flex min-h-0 flex-1 flex-col"
-					onSubmit={() => setPending(true)}
+					onSubmit={(event) => {
+						if (durationExceeded) {
+							event.preventDefault();
+							return;
+						}
+						setPending(true);
+					}}
 				>
 					<div className="documents-upload-body documents-scrollbar">
 						<label
@@ -120,6 +142,7 @@ export function DocumentUploadDrawer({
 								onChange={(event) => {
 									const file = event.target.files?.[0];
 									setFileName(file?.name ?? "");
+									setVideoDurationSeconds(null);
 									setVideoPreview((current) => {
 										if (current) URL.revokeObjectURL(current);
 										return file?.type.startsWith("video/")
@@ -136,14 +159,29 @@ export function DocumentUploadDrawer({
 							<div className="overflow-hidden rounded-2xl bg-[#101719] p-3 shadow-[0_16px_36px_rgba(16,23,25,0.2)]">
 								<div className="mb-2 flex items-center gap-2 text-xs font-semibold text-white">
 									<FileVideo size={15} /> Vista previa del video
+									{videoDurationSeconds !== null ? (
+										<span className="ml-auto font-normal text-[#9fb0aa]">
+											{Math.ceil(videoDurationSeconds)} s
+										</span>
+									) : null}
 								</div>
 								<video
 									className="max-h-72 w-full rounded-xl bg-black object-contain"
 									controls
+									onLoadedMetadata={(event) =>
+										setVideoDurationSeconds(event.currentTarget.duration)
+									}
 									src={videoPreview}
 								>
 									<track kind="captions" />
 								</video>
+								{durationExceeded ? (
+									<p className="mt-2 rounded-lg bg-[#4a1c1f] px-3 py-2 text-xs text-[#ffd1d1]">
+										Este video dura {Math.ceil(videoDurationSeconds ?? 0)}{" "}
+										segundos; la categoría seleccionada admite hasta{" "}
+										{durationLimit} segundos.
+									</p>
+								) : null}
 							</div>
 						) : null}
 
@@ -243,7 +281,7 @@ export function DocumentUploadDrawer({
 						</a>
 						<button
 							className="documents-primary-action focus-ring"
-							disabled={pending}
+							disabled={pending || durationExceeded}
 							type="submit"
 						>
 							<FileUp size={16} /> {pending ? "Subiendo..." : "Subir documento"}

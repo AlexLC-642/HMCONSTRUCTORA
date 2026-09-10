@@ -5,6 +5,7 @@ import {
 } from "@/modules/auth/application/authorization";
 import type { AuthenticatedUser } from "@/modules/auth/domain/types";
 import { prisma } from "@/shared/lib/prisma";
+import { classifyProgressGap } from "../domain/risk";
 
 type StatusCount<T extends string> = {
 	status: T;
@@ -73,10 +74,7 @@ function riskLabel(
 	plannedProgress: number,
 	overdueActivities: number,
 ) {
-	if (overdueActivities > 0 || plannedProgress - realProgress >= 15)
-		return "Riesgo";
-	if (plannedProgress - realProgress >= 5) return "Atencion";
-	return "En ritmo";
+	return classifyProgressGap(realProgress - plannedProgress, overdueActivities);
 }
 
 function timelineDates(start: Date, end: Date) {
@@ -339,14 +337,23 @@ export async function getDashboardMetrics(
 	]);
 
 	const spentByProject = new Map(
-		expenseSumsByProject.map((row) => [row.projectId, toNumber(row._sum.subtotal)]),
+		expenseSumsByProject.map((row) => [
+			row.projectId,
+			toNumber(row._sum.subtotal),
+		]),
 	);
 	const paidByProject = new Map(
-		paymentSumsByProject.map((row) => [row.projectId, toNumber(row._sum.amount)]),
+		paymentSumsByProject.map((row) => [
+			row.projectId,
+			toNumber(row._sum.amount),
+		]),
 	);
 	const pendingRequirementsByProject = new Map(
 		requisitionCountsByProject
-			.filter((row): row is typeof row & { projectId: string } => row.projectId !== null)
+			.filter(
+				(row): row is typeof row & { projectId: string } =>
+					row.projectId !== null,
+			)
 			.map((row) => [row.projectId, row._count._all]),
 	);
 	const pendingReportsByProject = new Map(

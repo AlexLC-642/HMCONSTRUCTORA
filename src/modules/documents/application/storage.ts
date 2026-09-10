@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { videoDurationLimitSeconds } from "../domain/catalog";
+import { readVideoDurationSeconds } from "./video-duration";
 
 const MAX_DOCUMENT_SIZE = 80 * 1024 * 1024;
 
@@ -70,8 +72,30 @@ async function writeStoredFile(storageKeyPrefix: string, buffer: Buffer, extensi
   return { fileName, storageKey, publicUrl: `/${storageKey.replaceAll("\\", "/")}` };
 }
 
-export async function storeProjectDocumentFile(projectId: string, documentId: string, file: File) {
+export async function storeProjectDocumentFile(
+  projectId: string,
+  documentId: string,
+  file: File,
+  categoryKey?: string
+) {
   const { buffer, extension, mimeType, checksum } = await validateAndReadFile(file, extensionMime, MAX_DOCUMENT_SIZE);
+
+  const durationLimit = categoryKey ? videoDurationLimitSeconds[categoryKey] : undefined;
+  if (durationLimit && mimeType.startsWith("video/")) {
+    const duration = readVideoDurationSeconds(buffer);
+    // A video whose duration we can't determine is not silently accepted -
+    // for this category the limit is the point, so an unparseable/unusual
+    // container is rejected rather than trusted.
+    if (duration === null) {
+      throw new Error("No se pudo verificar la duracion del video. Sube un archivo MP4 o MOV estandar.");
+    }
+    if (duration > durationLimit) {
+      throw new Error(
+        `El video dura ${Math.ceil(duration)} segundos; esta categoria admite hasta ${durationLimit} segundos.`
+      );
+    }
+  }
+
   const { fileName, storageKey, publicUrl } = await writeStoredFile(
     `uploads/documents/${projectId}/${documentId}`,
     buffer,
