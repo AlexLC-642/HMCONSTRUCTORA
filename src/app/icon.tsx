@@ -20,38 +20,51 @@ export default function Icon() {
 		<div
 			style={{
 				alignItems: "center",
-				background: "#172023",
-				border: "1px solid rgba(255,255,255,0.14)",
+				background: "#c8202f",
 				borderRadius: 14,
 				display: "flex",
 				height: "100%",
 				justifyContent: "center",
-				overflow: "hidden",
 				width: "100%",
 			}}
 		>
 			<div
 				style={{
+					alignItems: "center",
+					background: "#ffffff",
+					border: "1px solid rgba(23,32,35,0.1)",
+					borderRadius: 11,
 					display: "flex",
-					height: 30,
-					overflow: "hidden",
-					position: "relative",
-					width: 54,
+					height: 48,
+					justifyContent: "center",
+					boxShadow: "0 5px 12px rgba(23,32,35,0.22)",
+					width: 48,
 				}}
 			>
-				<img
-					alt=""
-					height="57"
-					src={logoSrc}
+				<div
 					style={{
-						height: 57,
-						left: -4,
-						position: "absolute",
-						top: -8,
-						width: 62,
+						display: "flex",
+						height: 22,
+						overflow: "hidden",
+						position: "relative",
+						width: 40,
 					}}
-					width="62"
-				/>
+				>
+					{/** biome-ignore lint/performance/noImgElement: ImageResponse (Satori) requires a plain image element. */}
+					<img
+						alt=""
+						height="42"
+						src={logoSrc}
+						style={{
+							height: 42,
+							left: -3,
+							position: "absolute",
+							top: -6,
+							width: 46,
+						}}
+						width="46"
+					/>
+				</div>
 			</div>
 		</div>,
 		{

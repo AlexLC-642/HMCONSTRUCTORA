@@ -19,7 +19,7 @@ export async function GET() {
 		<div
 			style={{
 				alignItems: "center",
-				background: "#172023",
+				background: "#c8202f",
 				display: "flex",
 				height: "100%",
 				justifyContent: "center",
@@ -29,27 +29,41 @@ export async function GET() {
 		>
 			<div
 				style={{
+					alignItems: "center",
+					background: "#ffffff",
+					border: "2px solid rgba(23,32,35,0.1)",
+					borderRadius: 34,
+					boxShadow: "0 16px 34px rgba(23,32,35,0.24)",
 					display: "flex",
-					height: 89,
-					overflow: "hidden",
-					position: "relative",
-					width: 161,
+					height: 142,
+					justifyContent: "center",
+					width: 142,
 				}}
 			>
-				{/** biome-ignore lint/performance/noImgElement: ImageResponse (Satori) only accepts a plain <img>, not next/image. */}
-				<img
-					alt=""
-					height="169"
-					src={logoSrc}
+				<div
 					style={{
-						height: 169,
-						left: -12,
-						position: "absolute",
-						top: -24,
-						width: 184,
+						display: "flex",
+						height: 66,
+						overflow: "hidden",
+						position: "relative",
+						width: 120,
 					}}
-					width="184"
-				/>
+				>
+					{/** biome-ignore lint/performance/noImgElement: ImageResponse (Satori) only accepts a plain <img>, not next/image. */}
+					<img
+						alt=""
+						height="126"
+						src={logoSrc}
+						style={{
+							height: 126,
+							left: -9,
+							position: "absolute",
+							top: -18,
+							width: 138,
+						}}
+						width="138"
+					/>
+				</div>
 			</div>
 		</div>,
 		{ width: 192, height: 192 },

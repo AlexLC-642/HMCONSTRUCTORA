@@ -1,12 +1,12 @@
 {
-	"name": "HM Constructora",
-	"short_name": "HM Constructora",
-	"description": "Sistema interno de gestion de proyectos de construccion",
+	"name": "Control de obra HM",
+	"short_name": "Control HM",
+	"description": "Control de obra: proyectos, presupuestos, inventario, avances y documentos de HM Constructora, con acceso sin conexión en el sitio.",
 	"start_url": "/dashboard",
 	"scope": "/",
 	"display": "standalone",
 	"background_color": "#f7f8f5",
-	"theme_color": "#1f6b4f",
+	"theme_color": "#c8202f",
 	"icons": [
 		{
 			"src": "/icon-192",
