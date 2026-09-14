@@ -17,6 +17,7 @@ const adminName =
 	process.env.ADMIN_NAME?.trim() || "Administrador HM Constructora";
 const adminPassword =
 	process.env.ADMIN_PASSWORD ?? (isProduction ? undefined : "Admin12345!");
+const resetAdminPassword = process.env.ADMIN_RESET_PASSWORD === "true";
 const seedDemoData = process.env.SEED_DEMO_DATA === "true" || !isProduction;
 const legacyAdminEmails = [
 	"admin@constructorahm.local",
@@ -101,6 +102,9 @@ async function main() {
 				data: {
 					name: adminName,
 					status: "ACTIVE",
+					...(resetAdminPassword
+						? { passwordHash: await hashPassword(adminPassword) }
+						: {}),
 				},
 			})
 		: legacyAdmins[0]

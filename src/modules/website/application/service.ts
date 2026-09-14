@@ -120,11 +120,11 @@ export async function updateWebsiteInquiryStatus(
 // ---------------------------------------------------------------------------
 
 export async function getWebsiteSettings() {
-	const existing = await prisma.websiteSettings.findUnique({
+	return prisma.websiteSettings.upsert({
 		where: { id: SETTINGS_ID },
+		update: {},
+		create: { id: SETTINGS_ID },
 	});
-	if (existing) return existing;
-	return prisma.websiteSettings.create({ data: { id: SETTINGS_ID } });
 }
 
 export async function updateWebsiteSettings(
