@@ -400,6 +400,11 @@ function SupplierForm({
 		>
 			<form action={formAction} className="purchases-form">
 				<input name="id" type="hidden" value={supplier?.id ?? ""} />
+				<input
+					defaultValue={supplier?.tradeName ?? ""}
+					name="tradeName"
+					type="hidden"
+				/>
 				<div className="purchases-form__context">
 					<div>
 						<ShoppingCart aria-hidden="true" size={19} />
@@ -432,9 +437,9 @@ function SupplierForm({
 							</p>
 						</div>
 					</div>
-					<div className="purchases-form__grid purchases-form__grid--three">
+					<div className="purchases-form__grid">
 						<label>
-							<span>Razón social</span>
+							<span>Proveedor o empresa</span>
 							<input
 								aria-describedby={
 									errorFor("businessName")
@@ -446,7 +451,7 @@ function SupplierForm({
 								id={fieldId("businessName")}
 								maxLength={160}
 								name="businessName"
-								placeholder="Nombre legal del proveedor"
+								placeholder="Nombre que aparece en la factura"
 								required
 							/>
 							{errorFor("businessName") ? (
@@ -455,29 +460,6 @@ function SupplierForm({
 									id={`${fieldId("businessName")}-error`}
 								>
 									{errorFor("businessName")}
-								</small>
-							) : null}
-						</label>
-						<label>
-							<span>Nombre comercial (opcional)</span>
-							<input
-								aria-describedby={
-									errorFor("tradeName")
-										? `${fieldId("tradeName")}-error`
-										: undefined
-								}
-								aria-invalid={Boolean(errorFor("tradeName"))}
-								defaultValue={supplier?.tradeName ?? ""}
-								maxLength={160}
-								name="tradeName"
-								placeholder="Nombre conocido, si es distinto"
-							/>
-							{errorFor("tradeName") ? (
-								<small
-									className="purchases-field-error"
-									id={`${fieldId("tradeName")}-error`}
-								>
-									{errorFor("tradeName")}
 								</small>
 							) : null}
 						</label>
@@ -509,13 +491,16 @@ function SupplierForm({
 					<div className="purchases-form__section-title">
 						<UserRound aria-hidden="true" size={18} />
 						<div>
-							<h3>Contacto</h3>
-							<p>Ingrese teléfono o correo; no es necesario completar ambos.</p>
+							<h3>Contacto del proveedor</h3>
+							<p>
+								Teléfono o correo para comunicarse; el nombre de quien atiende
+								es opcional.
+							</p>
 						</div>
 					</div>
 					<div className="purchases-form__grid purchases-form__grid--three">
 						<label>
-							<span>Persona de contacto (opcional)</span>
+							<span>Quién atiende (opcional)</span>
 							<input
 								aria-describedby={
 									errorFor("contactName")
@@ -526,7 +511,7 @@ function SupplierForm({
 								defaultValue={supplier?.contactName ?? ""}
 								maxLength={120}
 								name="contactName"
-								placeholder="Nombre del contacto principal"
+								placeholder="Ej. Juan Pérez"
 							/>
 							{errorFor("contactName") ? (
 								<small
@@ -2131,7 +2116,9 @@ export function PurchasesWorkspace({
 											<div>
 												<span>{supplier.code}</span>
 												<h3>{supplier.businessName}</h3>
-												<p>{supplier.tradeName ?? "Sin nombre comercial"}</p>
+												{supplier.tradeName ? (
+													<p>{supplier.tradeName}</p>
+												) : null}
 											</div>
 											<span className="purchases-supplier__state">
 												{supplier.status === "ACTIVE" ? "Activo" : "Inactivo"}

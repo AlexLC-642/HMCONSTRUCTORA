@@ -14,8 +14,8 @@ export const supplierInputSchema = z
 		businessName: z
 			.string()
 			.trim()
-			.min(2, "La razón social es obligatoria.")
-			.max(160, "La razón social es demasiado larga."),
+			.min(2, "El proveedor o empresa es obligatorio.")
+			.max(160, "El nombre del proveedor o empresa es demasiado largo."),
 		tradeName: z
 			.string()
 			.trim()
