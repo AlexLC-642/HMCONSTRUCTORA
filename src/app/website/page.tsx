@@ -129,22 +129,22 @@ export default async function WebsitePage({
 
 	return (
 		<main className="website-admin mx-auto max-w-[1400px] space-y-5">
-			<section className="overflow-hidden rounded-2xl bg-[#172123] text-white shadow-[0_26px_65px_rgba(17,28,27,0.24)]">
-				<div className="flex flex-wrap items-center justify-between gap-5 p-6 sm:p-7">
+			<section className="website-admin-hero overflow-hidden rounded-2xl bg-[#172123] text-white shadow-[0_26px_65px_rgba(17,28,27,0.24)]">
+				<div className="website-admin-hero__layout flex flex-wrap items-center justify-between gap-5 p-6 sm:p-7">
 					<div className="flex items-center gap-3">
 						<span className="grid size-14 shrink-0 place-items-center rounded-xl bg-white/10 text-white">
 							<Globe aria-hidden="true" size={24} />
 						</span>
 						<h1 className="sr-only">Sitio web</h1>
 					</div>
-					<div className="flex flex-wrap items-center gap-2">
+					<div className="website-admin-hero__actions flex flex-wrap items-center gap-2">
 						<span
 							className={`rounded-full border px-4 py-2 text-xs font-semibold ${settings.published ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-100" : "border-amber-400/40 bg-amber-400/10 text-amber-100"}`}
 						>
 							{settings.published ? "Sitio publicado" : "Sitio oculto"}
 						</span>
 						<a
-							className="focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-[#172123] shadow-[0_10px_26px_rgba(0,0,0,0.18)] transition hover:bg-[#edf2ee]"
+							className="website-public-link focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-[#172123] shadow-[0_10px_26px_rgba(0,0,0,0.18)] transition hover:bg-[#edf2ee]"
 							href="/"
 							target="_blank"
 							rel="noreferrer"
@@ -188,7 +188,7 @@ export default async function WebsitePage({
 
 			<nav
 				aria-label="Secciones del sitio web"
-				className="flex flex-wrap gap-2 rounded-xl bg-white p-1.5 shadow-[0_12px_34px_rgba(22,27,29,0.1)]"
+				className="website-admin-tabs flex flex-wrap gap-2 rounded-xl bg-white p-1.5 shadow-[0_12px_34px_rgba(22,27,29,0.1)]"
 			>
 				{tabs.map((tab) => (
 					<a

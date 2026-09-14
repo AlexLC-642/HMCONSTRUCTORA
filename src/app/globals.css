@@ -7824,6 +7824,30 @@ textarea.focus-ring:focus-visible {
 }
 
 @media (max-width: 639px) {
+	.dashboard-command-hero {
+		border-radius: 14px;
+	}
+	.dashboard-command-hero__layout {
+		padding: 0.85rem;
+	}
+	.dashboard-command-controls {
+		gap: 0.6rem;
+	}
+	.dashboard-quick-filters {
+		gap: 0.35rem;
+		padding: 0.35rem;
+	}
+	.dashboard-quick-select,
+	.dashboard-quick-search {
+		min-height: 3rem;
+	}
+	:root .app-shell:not(:has(.print-surface)) .dashboard-quick-search input {
+		width: 100%;
+		min-width: 0;
+		border: 0;
+		background: transparent;
+		box-shadow: none;
+	}
 	.dashboard-advanced-filters {
 		width: min(31rem, calc(100vw - 2rem));
 	}
@@ -7839,7 +7863,7 @@ textarea.focus-ring:focus-visible {
 		overflow-y: auto;
 	}
 	.executive-dashboard .kpi-grid {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
+		grid-template-columns: 1fr;
 	}
 	.executive-kpi {
 		min-height: 0;
@@ -11075,6 +11099,49 @@ input[id^="tab-seguridad-"]:checked
 }
 
 @media (max-width: 720px) {
+	.website-admin {
+		width: 100%;
+		min-width: 0;
+		overflow: clip;
+	}
+	.website-admin-hero__layout {
+		align-items: stretch;
+		padding: 1rem;
+	}
+	.website-admin-hero__actions {
+		display: grid;
+		width: 100%;
+		grid-template-columns: 1fr;
+	}
+	.website-admin-hero__actions > * {
+		width: 100%;
+		min-height: 2.75rem;
+		justify-content: center;
+	}
+	:root .app-shell:not(:has(.print-surface)) .website-public-link {
+		color: #172123;
+	}
+	.website-admin-tabs {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		scrollbar-width: thin;
+	}
+	.website-admin-tabs a {
+		display: inline-flex;
+		min-height: 2.75rem;
+		flex: 0 0 auto;
+		align-items: center;
+	}
+	.website-metric {
+		min-height: 7.5rem;
+	}
+	.website-content-layout,
+	.website-content-layout--gallery,
+	.website-editor-shell,
+	.website-editor-workspace {
+		width: 100%;
+		min-width: 0;
+	}
 	.website-gallery-library__grid {
 		grid-template-columns: 1fr;
 	}
