@@ -1,8 +1,7 @@
 "use client";
 
-import { HardHat, PackageCheck, Plus, Trash2 } from "lucide-react";
-import { motion } from "motion/react";
-import { useState } from "react";
+import { HardHat, PackageCheck, PackageOpen, Plus, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
 
 export type LaborFieldRow = {
 	rowKey: string;
@@ -31,21 +30,28 @@ export type MaterialFieldRow = {
 type ResourcesUsedFieldsProps = {
 	initialLabor: LaborFieldRow[];
 	initialMaterials: MaterialFieldRow[];
-	resources: Array<{ id: string; code: string; name: string; unit: string }>;
-	warehouses: Array<{ id: string; code: string; name: string }>;
+	resources: Array<{
+		id: string;
+		code: string;
+		name: string;
+		unit: string;
+		warehouseId: string;
+		warehouseCode: string;
+		warehouseName: string;
+		delivered: number;
+		available: number;
+	}>;
 	activities: Array<{ value: string; label: string }>;
 };
 
-const inputClass =
-	"focus-ring h-10 w-full rounded-lg border border-[var(--border)] bg-white px-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]";
+const inputClass = "progress-resource-input focus-ring";
 const numberInputClass = `${inputClass} text-right tabular-nums`;
-const labelClass = "grid gap-1 text-sm";
-const labelTextClass =
-	"text-[11px] font-semibold uppercase text-[var(--muted)]";
+const labelClass = "grid min-w-0 content-start gap-1.5 text-sm";
+const labelTextClass = "progress-resource-label";
 
 function blankLaborRow(index: number): LaborFieldRow {
 	return {
-		rowKey: `new-labor-${Date.now()}-${index}`,
+		rowKey: `new-labor-${index}`,
 		workerLabel: "",
 		role: "",
 		people: "",
@@ -57,7 +63,7 @@ function blankLaborRow(index: number): LaborFieldRow {
 
 function blankMaterialRow(index: number): MaterialFieldRow {
 	return {
-		rowKey: `new-material-${Date.now()}-${index}`,
+		rowKey: `new-material-${index}`,
 		materialId: "",
 		warehouseId: "",
 		materialName: "",
@@ -104,7 +110,6 @@ export function ResourcesUsedFields({
 	initialLabor,
 	initialMaterials,
 	resources,
-	warehouses,
 	activities,
 }: ResourcesUsedFieldsProps) {
 	const [laborRows, setLaborRows] = useState(() =>
@@ -113,6 +118,8 @@ export function ResourcesUsedFields({
 	const [materialRows, setMaterialRows] = useState(() =>
 		usefulMaterialRows(initialMaterials),
 	);
+	const nextLaborKey = useRef(1000);
+	const nextMaterialKey = useRef(1000);
 
 	function updateMaterialRow(
 		index: number,
@@ -126,290 +133,350 @@ export function ResourcesUsedFields({
 	}
 
 	return (
-		<section className="grid gap-5 p-5 xl:grid-cols-[0.82fr_1.18fr]">
+		<section className="progress-resources-layout">
 			<input name="laborCount" type="hidden" value={laborRows.length} />
 			<input name="materialCount" type="hidden" value={materialRows.length} />
 
-			<div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_16px_38px_rgba(31,42,45,0.08)]">
-				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[#fbfbf8] px-5 py-4">
-					<div className="flex items-center gap-3">
-						<span className="grid size-10 place-items-center rounded-xl bg-[#edf9f2] text-[var(--success)]">
-							<HardHat aria-hidden="true" size={19} />
+			<section
+				className="progress-resource-section"
+				aria-labelledby="labor-heading"
+			>
+				<header className="progress-resource-section__header">
+					<div className="progress-resource-section__heading">
+						<span className="progress-resource-section__icon progress-resource-section__icon--labor">
+							<HardHat aria-hidden="true" size={20} />
 						</span>
 						<div>
-							<h2 className="text-lg font-semibold">Personal</h2>
-							<p className="text-sm text-[var(--muted)]">
-								Registra cuadrilla solo cuando aplique.
-							</p>
+							<h2 id="labor-heading">Personal de la jornada</h2>
+							<p>Registra únicamente la cuadrilla que trabajó hoy.</p>
 						</div>
 					</div>
 					<button
-						className="focus-ring inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+						className="progress-resource-add focus-ring"
 						type="button"
 						onClick={() =>
-							setLaborRows((rows) => [...rows, blankLaborRow(rows.length)])
+							setLaborRows((rows) => [
+								...rows,
+								blankLaborRow(nextLaborKey.current++),
+							])
 						}
 					>
-						<Plus aria-hidden="true" size={15} />
-						Agregar
+						<Plus aria-hidden="true" size={16} />
+						Agregar personal
 					</button>
-				</div>
-				<div className="space-y-3 p-5">
+				</header>
+
+				<div className="progress-resource-entries">
 					{laborRows.map((row, index) => (
-						<motion.div
-							animate={{ opacity: 1, y: 0 }}
-							className="grid gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 lg:grid-cols-12"
-							initial={{ opacity: 0, y: 8 }}
-							key={row.rowKey}
-							transition={{ duration: 0.18 }}
-						>
-							<label className={`${labelClass} lg:col-span-4`}>
-								<span className={labelTextClass}>Cuadrilla o responsable</span>
+						<div className="progress-resource-entry" key={row.rowKey}>
+							<div className="progress-labor-grid">
+								<label className={labelClass}>
+									<span className={labelTextClass}>
+										Cuadrilla o responsable
+									</span>
+									<input
+										className={inputClass}
+										name={`laborEntries.${index}.workerLabel`}
+										defaultValue={row.workerLabel}
+										placeholder="Ej. Cuadrilla de albañilería"
+									/>
+								</label>
+								<label className={labelClass}>
+									<span className={labelTextClass}>Trabajo realizado</span>
+									<input
+										className={inputClass}
+										name={`laborEntries.${index}.role`}
+										defaultValue={row.role}
+										placeholder="Ej. Albañilería, apoyo"
+									/>
+								</label>
+								<label className={labelClass}>
+									<span className={labelTextClass}>Personas</span>
+									<input
+										className={numberInputClass}
+										min="0"
+										name={`laborEntries.${index}.people`}
+										defaultValue={row.people}
+										inputMode="decimal"
+										placeholder="0"
+										step="0.01"
+										type="number"
+									/>
+								</label>
+								<label className={labelClass}>
+									<span className={labelTextClass}>Horas</span>
+									<input
+										className={numberInputClass}
+										min="0"
+										name={`laborEntries.${index}.hours`}
+										defaultValue={row.hours}
+										inputMode="decimal"
+										placeholder="0"
+										step="0.01"
+										type="number"
+									/>
+								</label>
+								<button
+									aria-label="Quitar registro de personal"
+									className="progress-resource-remove focus-ring"
+									disabled={laborRows.length === 1}
+									type="button"
+									onClick={() =>
+										setLaborRows((rows) =>
+											rows.filter((_, rowIndex) => rowIndex !== index),
+										)
+									}
+								>
+									<Trash2 aria-hidden="true" size={16} />
+								</button>
 								<input
-									className={inputClass}
-									name={`laborEntries.${index}.workerLabel`}
-									defaultValue={row.workerLabel}
-									placeholder="Ej. Cuadrilla albañiles"
+									name={`laborEntries.${index}.rate`}
+									type="hidden"
+									value={row.rate}
 								/>
-							</label>
-							<label className={`${labelClass} lg:col-span-3`}>
-								<span className={labelTextClass}>Puesto</span>
-								<input
-									className={inputClass}
-									name={`laborEntries.${index}.role`}
-									defaultValue={row.role}
-									placeholder="Albañil, ayudante"
-								/>
-							</label>
-							<label className={`${labelClass} lg:col-span-2`}>
-								<span className={labelTextClass}>Personas</span>
-								<input
-									className={numberInputClass}
-									min="0"
-									name={`laborEntries.${index}.people`}
-									defaultValue={row.people}
-									inputMode="decimal"
-									placeholder="0"
-									step="0.01"
-									type="number"
-								/>
-							</label>
-							<label className={`${labelClass} lg:col-span-2`}>
-								<span className={labelTextClass}>Horas</span>
-								<input
-									className={numberInputClass}
-									min="0"
-									name={`laborEntries.${index}.hours`}
-									defaultValue={row.hours}
-									inputMode="decimal"
-									placeholder="0"
-									step="0.01"
-									type="number"
-								/>
-							</label>
-							<button
-								aria-label="Quitar personal"
-								className="focus-ring mt-5 grid size-10 place-items-center rounded-lg border border-[var(--border)] bg-white text-[var(--muted)] transition hover:border-[#f1b6ba] hover:bg-[#fff1f1] hover:text-[var(--brand-red)] lg:col-span-1"
-								type="button"
-								onClick={() =>
-									setLaborRows((rows) =>
-										rows.length > 1
-											? rows.filter((_, rowIndex) => rowIndex !== index)
-											: rows,
-									)
-								}
-							>
-								<Trash2 aria-hidden="true" size={16} />
-							</button>
-							<input
-								name={`laborEntries.${index}.rate`}
-								type="hidden"
-								value={row.rate}
-							/>
-							<label className={`${labelClass} lg:col-span-12`}>
-								<span className={labelTextClass}>Nota</span>
-								<input
-									className={inputClass}
-									name={`laborEntries.${index}.notes`}
-									defaultValue={row.notes}
-									placeholder="Trabajo asignado o comentario breve."
-								/>
-							</label>
-						</motion.div>
+								<label className={`${labelClass} progress-labor-note`}>
+									<span className={labelTextClass}>Nota de trabajo</span>
+									<input
+										className={inputClass}
+										name={`laborEntries.${index}.notes`}
+										defaultValue={row.notes}
+										placeholder="Actividad asignada, rendimiento o incidencia breve"
+									/>
+								</label>
+							</div>
+						</div>
 					))}
 				</div>
-			</div>
+			</section>
 
-			<div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_16px_38px_rgba(31,42,45,0.08)]">
-				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] bg-[#fbfbf8] px-5 py-4">
-					<div className="flex items-center gap-3">
-						<span className="grid size-10 place-items-center rounded-xl bg-[#fff8e8] text-[#9b6800]">
-							<PackageCheck aria-hidden="true" size={19} />
+			<section
+				className="progress-resource-section"
+				aria-labelledby="materials-heading"
+			>
+				<header className="progress-resource-section__header">
+					<div className="progress-resource-section__heading">
+						<span className="progress-resource-section__icon progress-resource-section__icon--material">
+							<PackageCheck aria-hidden="true" size={20} />
 						</span>
 						<div>
-							<h2 className="text-lg font-semibold">Materiales usados</h2>
-							<p className="text-sm text-[var(--muted)]">
-								Material, cantidad y origen usado en la jornada.
+							<h2 id="materials-heading">Movimiento de materiales</h2>
+							<p>
+								Declara lo usado, desperdiciado o devuelto de lo entregado a la
+								obra.
 							</p>
 						</div>
 					</div>
 					<button
-						className="focus-ring inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+						className="progress-resource-add focus-ring"
+						disabled={resources.length === 0}
 						type="button"
 						onClick={() =>
 							setMaterialRows((rows) => [
 								...rows,
-								blankMaterialRow(rows.length),
+								blankMaterialRow(nextMaterialKey.current++),
 							])
 						}
 					>
-						<Plus aria-hidden="true" size={15} />
-						Agregar
+						<Plus aria-hidden="true" size={16} />
+						Agregar material
 					</button>
-				</div>
-				<div className="space-y-3 p-5">
-					{materialRows.map((row, index) => (
-						<motion.div
-							animate={{ opacity: 1, y: 0 }}
-							className="grid gap-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 lg:grid-cols-12"
-							initial={{ opacity: 0, y: 8 }}
-							key={row.rowKey}
-							transition={{ duration: 0.18 }}
-						>
-							<label className={`${labelClass} lg:col-span-4`}>
-								<span className={labelTextClass}>Material del inventario</span>
-								<select
-									className={inputClass}
-									name={`materialEntries.${index}.materialId`}
-									value={row.materialId}
-									onChange={(event) => {
-										const resource = resources.find(
-											(item) => item.id === event.target.value,
-										);
-										updateMaterialRow(index, {
-											materialId: event.target.value,
-											materialName: resource?.name ?? "",
-											unit: resource?.unit ?? "",
-										});
-									}}
-								>
-									<option value="">Seleccionar material</option>
-									{resources.map((resource) => (
-										<option key={resource.id} value={resource.id}>
-											{resource.code} · {resource.name}
-										</option>
-									))}
-								</select>
-								<input
-									name={`materialEntries.${index}.materialName`}
-									type="hidden"
-									value={row.materialName}
-								/>
-							</label>
-							<label className={`${labelClass} lg:col-span-2`}>
-								<span className={labelTextClass}>Cantidad</span>
-								<input
-									className={numberInputClass}
-									min="0"
-									name={`materialEntries.${index}.quantityUsed`}
-									defaultValue={row.quantityUsed}
-									inputMode="decimal"
-									placeholder="0"
-									step="0.01"
-									type="number"
-								/>
-							</label>
-							<label className={`${labelClass} lg:col-span-2`}>
-								<span className={labelTextClass}>Unidad</span>
-								<input
-									className={inputClass}
-									name={`materialEntries.${index}.unit`}
-									placeholder="Se completa con el material"
-									readOnly
-									value={row.unit}
-								/>
-							</label>
-							<label className={`${labelClass} lg:col-span-3`}>
-								<span className={labelTextClass}>Bodega de salida</span>
-								<select
-									className={inputClass}
-									name={`materialEntries.${index}.warehouseId`}
-									value={row.warehouseId}
-									onChange={(event) => {
-										const warehouse = warehouses.find(
-											(item) => item.id === event.target.value,
-										);
-										updateMaterialRow(index, {
-											warehouseId: event.target.value,
-											warehouse: warehouse?.name ?? "",
-										});
-									}}
-								>
-									<option value="">Seleccionar bodega</option>
-									{warehouses.map((warehouse) => (
-										<option key={warehouse.id} value={warehouse.id}>
-											{warehouse.code} · {warehouse.name}
-										</option>
-									))}
-								</select>
-								<input
-									name={`materialEntries.${index}.warehouse`}
-									type="hidden"
-									value={row.warehouse}
-								/>
-							</label>
-							<button
-								aria-label="Quitar material"
-								className="focus-ring mt-5 grid size-10 place-items-center rounded-lg border border-[var(--border)] bg-white text-[var(--muted)] transition hover:border-[#f1b6ba] hover:bg-[#fff1f1] hover:text-[var(--brand-red)] lg:col-span-1"
-								type="button"
-								onClick={() =>
-									setMaterialRows((rows) =>
-										rows.length > 1
-											? rows.filter((_, rowIndex) => rowIndex !== index)
-											: rows,
-									)
-								}
-							>
-								<Trash2 aria-hidden="true" size={16} />
-							</button>
-							<input
-								name={`materialEntries.${index}.wasteQuantity`}
-								type="hidden"
-								value={row.wasteQuantity}
-							/>
-							<input
-								name={`materialEntries.${index}.returnedQuantity`}
-								type="hidden"
-								value={row.returnedQuantity}
-							/>
-							<label className={`${labelClass} lg:col-span-3`}>
-								<span className={labelTextClass}>Actividad</span>
-								<select
-									className={inputClass}
-									name={`materialEntries.${index}.activityCode`}
-									defaultValue={row.activityCode}
-								>
-									<option value="">Uso general</option>
-									{activities.map((activity) => (
-										<option key={activity.value} value={activity.value}>
-											{activity.label}
-										</option>
-									))}
-								</select>
-							</label>
-							<label className={`${labelClass} lg:col-span-9`}>
-								<span className={labelTextClass}>Nota</span>
-								<input
-									className={inputClass}
-									name={`materialEntries.${index}.notes`}
-									defaultValue={row.notes}
-									placeholder="Uso especifico, factura, recibo o comentario breve."
-								/>
-							</label>
-						</motion.div>
-					))}
-				</div>
-			</div>
+				</header>
+
+				{resources.length === 0 ? (
+					<div className="progress-resource-empty">
+						<PackageOpen aria-hidden="true" size={24} />
+						<div>
+							<strong>No hay materiales entregados a esta obra</strong>
+							<p>
+								Cuando bodega registre una entrega, aparecerá aquí para reportar
+								su uso.
+							</p>
+						</div>
+					</div>
+				) : (
+					<div className="progress-resource-entries">
+						{materialRows.map((row, index) => {
+							const selectedResource = resources.find(
+								(resource) =>
+									resource.id === row.materialId &&
+									resource.warehouseId === row.warehouseId,
+							);
+
+							return (
+								<div className="progress-resource-entry" key={row.rowKey}>
+									<div className="progress-material-primary-grid">
+										<label className={labelClass}>
+											<span className={labelTextClass}>
+												Material disponible en obra
+											</span>
+											<select
+												className={inputClass}
+												value={
+													row.materialId && row.warehouseId
+														? `${row.materialId}:${row.warehouseId}`
+														: ""
+												}
+												onChange={(event) => {
+													const resource = resources.find(
+														(item) =>
+															`${item.id}:${item.warehouseId}` ===
+															event.target.value,
+													);
+													updateMaterialRow(index, {
+														materialId: resource?.id ?? "",
+														warehouseId: resource?.warehouseId ?? "",
+														materialName: resource?.name ?? "",
+														warehouse: resource?.warehouseName ?? "",
+														unit: resource?.unit ?? "",
+													});
+												}}
+											>
+												<option value="">Seleccionar material entregado</option>
+												{resources.map((resource) => (
+													<option
+														key={`${resource.id}:${resource.warehouseId}`}
+														value={`${resource.id}:${resource.warehouseId}`}
+													>
+														{resource.code} · {resource.name} ·{" "}
+														{resource.available.toFixed(2)} {resource.unit}
+													</option>
+												))}
+											</select>
+											{selectedResource ? (
+												<small className="progress-resource-availability">
+													Disponible:{" "}
+													<strong>
+														{selectedResource.available.toFixed(2)}{" "}
+														{selectedResource.unit}
+													</strong>
+												</small>
+											) : null}
+											<input
+												name={`materialEntries.${index}.materialId`}
+												type="hidden"
+												value={row.materialId}
+											/>
+											<input
+												name={`materialEntries.${index}.materialName`}
+												type="hidden"
+												value={row.materialName}
+											/>
+										</label>
+										<label className={labelClass}>
+											<span className={labelTextClass}>Usado hoy</span>
+											<input
+												className={numberInputClass}
+												max={selectedResource?.available}
+												min="0"
+												name={`materialEntries.${index}.quantityUsed`}
+												defaultValue={row.quantityUsed}
+												inputMode="decimal"
+												placeholder="0"
+												step="0.01"
+												type="number"
+											/>
+										</label>
+										<div className={labelClass}>
+											<span className={labelTextClass}>Unidad</span>
+											<div className="progress-resource-readonly">
+												{row.unit || "—"}
+											</div>
+											<input
+												name={`materialEntries.${index}.unit`}
+												type="hidden"
+												value={row.unit}
+											/>
+										</div>
+										<div className={labelClass}>
+											<span className={labelTextClass}>Bodega de origen</span>
+											<div
+												className="progress-resource-readonly"
+												title={row.warehouse}
+											>
+												{row.warehouse || "Se completa al elegir"}
+											</div>
+											<input
+												name={`materialEntries.${index}.warehouseId`}
+												type="hidden"
+												value={row.warehouseId}
+											/>
+											<input
+												name={`materialEntries.${index}.warehouse`}
+												type="hidden"
+												value={row.warehouse}
+											/>
+										</div>
+										<button
+											aria-label="Quitar registro de material"
+											className="progress-resource-remove focus-ring"
+											disabled={materialRows.length === 1}
+											type="button"
+											onClick={() =>
+												setMaterialRows((rows) =>
+													rows.filter((_, rowIndex) => rowIndex !== index),
+												)
+											}
+										>
+											<Trash2 aria-hidden="true" size={16} />
+										</button>
+									</div>
+
+									<div className="progress-material-secondary-grid">
+										<label className={labelClass}>
+											<span className={labelTextClass}>Desperdicio</span>
+											<input
+												className={numberInputClass}
+												min="0"
+												name={`materialEntries.${index}.wasteQuantity`}
+												defaultValue={row.wasteQuantity}
+												step="0.01"
+												type="number"
+											/>
+										</label>
+										<label className={labelClass}>
+											<span className={labelTextClass}>Devuelto a bodega</span>
+											<input
+												className={numberInputClass}
+												min="0"
+												name={`materialEntries.${index}.returnedQuantity`}
+												defaultValue={row.returnedQuantity}
+												step="0.01"
+												type="number"
+											/>
+										</label>
+										<label className={labelClass}>
+											<span className={labelTextClass}>
+												Actividad relacionada
+											</span>
+											<select
+												className={inputClass}
+												name={`materialEntries.${index}.activityCode`}
+												defaultValue={row.activityCode}
+											>
+												<option value="">Uso general</option>
+												{activities.map((activity) => (
+													<option key={activity.value} value={activity.value}>
+														{activity.label}
+													</option>
+												))}
+											</select>
+										</label>
+										<label className={labelClass}>
+											<span className={labelTextClass}>Nota de uso</span>
+											<input
+												className={inputClass}
+												name={`materialEntries.${index}.notes`}
+												defaultValue={row.notes}
+												placeholder="Destino exacto, incidencia o comentario breve"
+											/>
+										</label>
+									</div>
+								</div>
+							);
+						})}
+					</div>
+				)}
+			</section>
 		</section>
 	);
 }

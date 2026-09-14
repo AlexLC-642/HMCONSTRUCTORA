@@ -8,6 +8,8 @@ const decimalInput = z.coerce
 const requisitionItemInputSchema = z.object({
 	resourceType: z.enum(["MATERIAL", "TOOL", "EQUIPMENT"]).default("MATERIAL"),
 	budgetLineItemId: z.string().trim().optional(),
+	outsideBudget: z.boolean().default(false),
+	outsideBudgetReason: z.string().trim().optional(),
 	scheduleActivityId: z.string().trim().optional(),
 	materialId: z.string().trim().optional(),
 	description: z.string().trim().min(2, "Indique el recurso solicitado."),
@@ -40,7 +42,6 @@ export const requisitionInputSchema = z
 			.string()
 			.trim()
 			.regex(/^\d{4}-\d{2}-\d{2}$/, "Debe indicar una fecha válida."),
-		requestedBy: z.string().trim().optional(),
 		notes: z.string().trim().optional(),
 		items: z
 			.array(requisitionItemInputSchema)
@@ -52,6 +53,29 @@ export const requisitionInputSchema = z
 				code: "custom",
 				path: ["projectId"],
 				message: "Seleccione el proyecto donde se utilizaran los recursos.",
+			});
+		}
+		if (input.destinationType === "PROJECT") {
+			input.items.forEach((item, index) => {
+				if (!item.budgetLineItemId && !item.outsideBudget) {
+					context.addIssue({
+						code: "custom",
+						path: ["items", index, "budgetLineItemId"],
+						message:
+							"Vincule el recurso al presupuesto o declare que está fuera de presupuesto.",
+					});
+				}
+				if (
+					item.outsideBudget &&
+					(!item.outsideBudgetReason || item.outsideBudgetReason.length < 10)
+				) {
+					context.addIssue({
+						code: "custom",
+						path: ["items", index, "outsideBudgetReason"],
+						message:
+							"Explique por qué este recurso no estaba incluido en el presupuesto.",
+					});
+				}
 			});
 		}
 	});

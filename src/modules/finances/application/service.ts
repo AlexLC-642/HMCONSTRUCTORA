@@ -99,6 +99,8 @@ export async function createPurchaseInvoice(
 		order.projectId,
 		documentId,
 		file,
+		undefined,
+		context.userId,
 	);
 
 	return prisma.$transaction(async (tx) => {
@@ -208,6 +210,8 @@ export async function createExpense(
 				parsed.projectId,
 				id,
 				receiptFile,
+				undefined,
+				context.userId,
 			),
 		};
 	}
@@ -344,6 +348,8 @@ export async function attachExpenseDocument(
 		expense.projectId,
 		documentId,
 		file,
+		undefined,
+		context.userId,
 	);
 	const label =
 		parsed.documentType === "FACTURA"

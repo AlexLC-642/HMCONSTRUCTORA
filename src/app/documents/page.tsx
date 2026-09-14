@@ -229,20 +229,12 @@ export default async function DocumentsPage({
 	return (
 		<main className="mx-auto max-w-[1480px] space-y-5">
 			<section className="documents-hero">
-				<div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-					<div className="flex max-w-2xl items-start gap-4">
+				<div className="relative z-10 flex flex-wrap items-center justify-between gap-6">
+					<div className="flex items-center gap-4">
 						<span className="documents-hero__icon">
 							<Files aria-hidden="true" size={22} />
 						</span>
-						<div>
-							<h1 className="text-3xl font-extrabold tracking-[-0.035em] text-white sm:text-4xl">
-								Documentos
-							</h1>
-							<p className="mt-2 max-w-xl text-sm leading-6 text-[#c4ceca]">
-								Consulta expedientes, versiones y archivos de todos los
-								proyectos.
-							</p>
-						</div>
+						<h1 className="sr-only">Documentos</h1>
 					</div>
 					<a
 						className="documents-primary-action focus-ring"
@@ -459,73 +451,119 @@ export default async function DocumentsPage({
 						<Clock3 className="text-[#68756f]" size={19} />
 					</div>
 					{recentDocuments.length ? (
-						<div className="documents-scrollbar overflow-x-auto">
-							<table className="documents-table min-w-[800px]">
-								<thead>
-									<tr>
-										<th className="px-4 py-3">Documento</th>
-										<th className="px-4 py-3">Proyecto</th>
-										<th className="px-4 py-3">Categoría</th>
-										<th className="px-4 py-3">Modificado</th>
-										<th className="px-4 py-3">Versión</th>
-										<th className="px-4 py-3 text-right">Acciones</th>
-									</tr>
-								</thead>
-								<tbody>
-									{recentDocuments.map((doc) => {
-										const latest = doc.versions[0];
-										const modDate = latest
-											? new Date(latest.createdAt)
-											: new Date(doc.updatedAt);
-										return (
-											<tr key={doc.id}>
-												<td>
-													<p className="font-semibold text-[var(--foreground)]">
+						<>
+							<div className="documents-scrollbar hidden overflow-x-auto md:block">
+								<table className="documents-table min-w-[800px]">
+									<thead>
+										<tr>
+											<th className="px-4 py-3">Documento</th>
+											<th className="px-4 py-3">Proyecto</th>
+											<th className="px-4 py-3">Categoría</th>
+											<th className="px-4 py-3">Modificado</th>
+											<th className="px-4 py-3">Versión</th>
+											<th className="px-4 py-3 text-right">Acciones</th>
+										</tr>
+									</thead>
+									<tbody>
+										{recentDocuments.map((doc) => {
+											const latest = doc.versions[0];
+											const modDate = latest
+												? new Date(latest.createdAt)
+												: new Date(doc.updatedAt);
+											return (
+												<tr key={doc.id}>
+													<td>
+														<p className="font-semibold text-[var(--foreground)]">
+															{doc.title}
+														</p>
+														{doc.description && (
+															<p className="mt-0.5 text-xs text-[var(--muted)] truncate max-w-[320px]">
+																{doc.description}
+															</p>
+														)}
+													</td>
+													<td>
+														<p className="font-medium text-[var(--foreground)]">
+															{doc.project.code}
+														</p>
+														<p className="text-xs text-[var(--muted)] truncate max-w-[200px]">
+															{doc.project.name}
+														</p>
+													</td>
+													<td>
+														<span className="documents-category">
+															<FileText size={13} />
+															{doc.category.name}
+														</span>
+													</td>
+													<td className="text-xs text-[var(--muted)]">
+														{formatRelativeTime(modDate)}
+													</td>
+													<td>
+														<span className="documents-version">
+															v{latest?.versionNumber ?? 1}
+														</span>
+													</td>
+													<td className="text-right">
+														<a
+															className="documents-row-action focus-ring"
+															href={documentsHref(params, { preview: doc.id })}
+														>
+															<Eye size={14} />
+															Ver
+														</a>
+													</td>
+												</tr>
+											);
+										})}
+									</tbody>
+								</table>
+							</div>
+							<div className="grid gap-3 p-3 md:hidden">
+								{recentDocuments.map((doc) => {
+									const latest = doc.versions[0];
+									const modDate = latest
+										? new Date(latest.createdAt)
+										: new Date(doc.updatedAt);
+									return (
+										<div
+											className="rounded-2xl border border-[#e5e8e3] bg-[#f9faf8] p-4"
+											key={doc.id}
+										>
+											<div className="flex items-start justify-between gap-3">
+												<div className="min-w-0">
+													<p className="truncate font-semibold text-[var(--foreground)]">
 														{doc.title}
 													</p>
-													{doc.description && (
-														<p className="mt-0.5 text-xs text-[var(--muted)] truncate max-w-[320px]">
-															{doc.description}
-														</p>
-													)}
-												</td>
-												<td>
-													<p className="font-medium text-[var(--foreground)]">
-														{doc.project.code}
+													<p className="mt-0.5 truncate text-xs text-[var(--muted)]">
+														{doc.project.code} · {doc.project.name}
 													</p>
-													<p className="text-xs text-[var(--muted)] truncate max-w-[200px]">
-														{doc.project.name}
-													</p>
-												</td>
-												<td>
-													<span className="documents-category">
-														<FileText size={13} />
-														{doc.category.name}
-													</span>
-												</td>
-												<td className="text-xs text-[var(--muted)]">
+												</div>
+												<span className="documents-version shrink-0">
+													v{latest?.versionNumber ?? 1}
+												</span>
+											</div>
+											<div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+												<span className="documents-category">
+													<FileText size={13} />
+													{doc.category.name}
+												</span>
+												<span className="text-xs text-[var(--muted)]">
 													{formatRelativeTime(modDate)}
-												</td>
-												<td>
-													<span className="documents-version">
-														v{latest?.versionNumber ?? 1}
-													</span>
-												</td>
-												<td className="text-right">
-													<a
-														className="documents-row-action focus-ring"
-														href={documentsHref(params, { preview: doc.id })}
-													>
-														<Eye size={14} />
-														Ver
-													</a>
-												</td>
-											</tr>
-										);
-									})}
-								</tbody>
-							</table>
-						</div>
+												</span>
+											</div>
+											<a
+												className="documents-row-action focus-ring mt-3 w-full justify-center"
+												href={documentsHref(params, { preview: doc.id })}
+											>
+												<Eye size={14} />
+												Ver
+											</a>
+										</div>
+									);
+								})}
+							</div>
+						</>
 					) : (
 						<DocumentEmpty
 							detail="Cuando se cargue o actualice un archivo, aparecerá en esta vista."
@@ -611,121 +649,193 @@ export default async function DocumentsPage({
 					{/* Documents Table */}
 					<article className="documents-panel">
 						{paginatedDocuments.length ? (
-							<div className="documents-scrollbar overflow-x-auto">
-								<table className="documents-table min-w-[1040px]">
-									<thead>
-										<tr>
-											<th className="px-4 py-3">Documento</th>
-											<th className="px-4 py-3">Proyecto</th>
-											<th className="px-4 py-3">Categoría</th>
-											<th className="px-4 py-3">Estado</th>
-											<th className="px-4 py-3">Versión</th>
-											<th className="px-4 py-3">Archivo</th>
-											<th className="px-4 py-3">Fecha</th>
-											<th className="px-4 py-3 text-right">Acciones</th>
-										</tr>
-									</thead>
-									<tbody>
-										{paginatedDocuments.map((document) => {
-											const latest = document.versions[0];
-											return (
-												<tr key={document.id}>
-													<td>
-														<p className="font-semibold text-[var(--foreground)]">
+							<>
+								<div className="documents-scrollbar hidden overflow-x-auto md:block">
+									<table className="documents-table min-w-[1040px]">
+										<thead>
+											<tr>
+												<th className="px-4 py-3">Documento</th>
+												<th className="px-4 py-3">Proyecto</th>
+												<th className="px-4 py-3">Categoría</th>
+												<th className="px-4 py-3">Estado</th>
+												<th className="px-4 py-3">Versión</th>
+												<th className="px-4 py-3">Archivo</th>
+												<th className="px-4 py-3">Fecha</th>
+												<th className="px-4 py-3 text-right">Acciones</th>
+											</tr>
+										</thead>
+										<tbody>
+											{paginatedDocuments.map((document) => {
+												const latest = document.versions[0];
+												return (
+													<tr key={document.id}>
+														<td>
+															<p className="font-semibold text-[var(--foreground)]">
+																{document.title}
+															</p>
+															{(document.description ?? document.tags) ? (
+																<p className="mt-1 max-w-[300px] truncate text-xs text-[var(--muted)]">
+																	{document.description ?? document.tags}
+																</p>
+															) : null}
+														</td>
+														<td>
+															<p className="font-medium text-[var(--foreground)]">
+																{document.project.code}
+															</p>
+															<p className="max-w-[220px] truncate text-xs text-[var(--muted)]">
+																{document.project.name}
+															</p>
+														</td>
+														<td>
+															<span className="documents-category">
+																<FileText size={13} />
+																{document.category.name}
+															</span>
+														</td>
+														<td>
+															<DocumentStatus
+																label={
+																	documentStatusLabels[
+																		document.status as keyof typeof documentStatusLabels
+																	] || document.status
+																}
+																status={document.status}
+															/>
+														</td>
+														<td>
+															{latest ? (
+																<span className="documents-version">
+																	v{latest.versionNumber}
+																</span>
+															) : (
+																"-"
+															)}
+														</td>
+														<td>
+															{latest ? (
+																<>
+																	<p className="text-xs">
+																		{formatBytes(latest.fileSize)}
+																	</p>
+																	<p
+																		className="max-w-[180px] truncate text-[11px] text-[var(--muted)]"
+																		title={latest.originalName}
+																	>
+																		{latest.originalName}
+																	</p>
+																</>
+															) : (
+																"-"
+															)}
+														</td>
+														<td className="text-xs text-[var(--muted)]">
+															{latest
+																? dateFormatter.format(
+																		new Date(latest.createdAt),
+																	)
+																: "-"}
+														</td>
+														<td className="text-right">
+															<div className="inline-flex gap-2">
+																{latest ? (
+																	<a
+																		className="documents-row-action focus-ring"
+																		href={documentsHref(params, {
+																			preview: document.id,
+																		})}
+																	>
+																		<Eye size={14} />
+																		Ver
+																	</a>
+																) : null}
+																{latest ? (
+																	<a
+																		className="documents-row-action documents-row-action--dark focus-ring"
+																		download
+																		href={documentFileUrl(latest.id)}
+																	>
+																		<Download size={14} />
+																		Descargar
+																	</a>
+																) : null}
+															</div>
+														</td>
+													</tr>
+												);
+											})}
+										</tbody>
+									</table>
+								</div>
+								<div className="grid gap-3 p-3 md:hidden">
+									{paginatedDocuments.map((document) => {
+										const latest = document.versions[0];
+										return (
+											<div
+												className="rounded-2xl border border-[#e5e8e3] bg-[#f9faf8] p-4"
+												key={document.id}
+											>
+												<div className="flex items-start justify-between gap-3">
+													<div className="min-w-0">
+														<p className="truncate font-semibold text-[var(--foreground)]">
 															{document.title}
 														</p>
-														{(document.description ?? document.tags) ? (
-															<p className="mt-1 max-w-[300px] truncate text-xs text-[var(--muted)]">
-																{document.description ?? document.tags}
-															</p>
-														) : null}
-													</td>
-													<td>
-														<p className="font-medium text-[var(--foreground)]">
-															{document.project.code}
+														<p className="mt-0.5 truncate text-xs text-[var(--muted)]">
+															{document.project.code} · {document.project.name}
 														</p>
-														<p className="max-w-[220px] truncate text-xs text-[var(--muted)]">
-															{document.project.name}
-														</p>
-													</td>
-													<td>
-														<span className="documents-category">
-															<FileText size={13} />
-															{document.category.name}
+													</div>
+													<DocumentStatus
+														label={
+															documentStatusLabels[
+																document.status as keyof typeof documentStatusLabels
+															] || document.status
+														}
+														status={document.status}
+													/>
+												</div>
+												<div className="mt-3 flex flex-wrap items-center gap-2">
+													<span className="documents-category">
+														<FileText size={13} />
+														{document.category.name}
+													</span>
+													{latest ? (
+														<span className="documents-version">
+															v{latest.versionNumber}
 														</span>
-													</td>
-													<td>
-														<DocumentStatus
-															label={
-																documentStatusLabels[
-																	document.status as keyof typeof documentStatusLabels
-																] || document.status
-															}
-															status={document.status}
-														/>
-													</td>
-													<td>
-														{latest ? (
-															<span className="documents-version">
-																v{latest.versionNumber}
-															</span>
-														) : (
-															"-"
-														)}
-													</td>
-													<td>
-														{latest ? (
-															<>
-																<p className="text-xs">
-																	{formatBytes(latest.fileSize)}
-																</p>
-																<p
-																	className="max-w-[180px] truncate text-[11px] text-[var(--muted)]"
-																	title={latest.originalName}
-																>
-																	{latest.originalName}
-																</p>
-															</>
-														) : (
-															"-"
-														)}
-													</td>
-													<td className="text-xs text-[var(--muted)]">
-														{latest
-															? dateFormatter.format(new Date(latest.createdAt))
-															: "-"}
-													</td>
-													<td className="text-right">
-														<div className="inline-flex gap-2">
-															{latest ? (
-																<a
-																	className="documents-row-action focus-ring"
-																	href={documentsHref(params, {
-																		preview: document.id,
-																	})}
-																>
-																	<Eye size={14} />
-																	Ver
-																</a>
-															) : null}
-															{latest ? (
-																<a
-																	className="documents-row-action documents-row-action--dark focus-ring"
-																	download
-																	href={documentFileUrl(latest.id)}
-																>
-																	<Download size={14} />
-																	Descargar
-																</a>
-															) : null}
-														</div>
-													</td>
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							</div>
+													) : null}
+												</div>
+												{latest ? (
+													<p className="mt-2 text-xs text-[var(--muted)]">
+														{formatBytes(latest.fileSize)} ·{" "}
+														{dateFormatter.format(new Date(latest.createdAt))}
+													</p>
+												) : null}
+												{latest ? (
+													<div className="mt-3 flex gap-2">
+														<a
+															className="documents-row-action focus-ring flex-1 justify-center"
+															href={documentsHref(params, {
+																preview: document.id,
+															})}
+														>
+															<Eye size={14} />
+															Ver
+														</a>
+														<a
+															className="documents-row-action documents-row-action--dark focus-ring flex-1 justify-center"
+															download
+															href={documentFileUrl(latest.id)}
+														>
+															<Download size={14} />
+															Descargar
+														</a>
+													</div>
+												) : null}
+											</div>
+										);
+									})}
+								</div>
+							</>
 						) : (
 							<DocumentEmpty
 								detail="Cambia los filtros o sube el primer archivo para comenzar el expediente."

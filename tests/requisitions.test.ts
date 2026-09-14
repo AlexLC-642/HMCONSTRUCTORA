@@ -67,6 +67,38 @@ describe("destino y renglones del requerimiento", () => {
 		if (result.success) expect(result.data.items).toHaveLength(2);
 	});
 
+	it("exige partida o excepción para una solicitud de proyecto", () => {
+		const result = requisitionInputSchema.safeParse({
+			destinationType: "PROJECT",
+			projectId: "project-1",
+			warehouseId: "warehouse-1",
+			title: "Instalación hidráulica",
+			neededDate: "2026-09-15",
+			items: [item],
+		});
+
+		expect(result.success).toBe(false);
+	});
+
+	it("acepta una excepción justificada fuera de presupuesto", () => {
+		const result = requisitionInputSchema.safeParse({
+			destinationType: "PROJECT",
+			projectId: "project-1",
+			warehouseId: "warehouse-1",
+			title: "Corrección no prevista",
+			neededDate: "2026-09-15",
+			items: [
+				{
+					...item,
+					outsideBudget: true,
+					outsideBudgetReason: "Cambio solicitado después de aprobar el alcance.",
+				},
+			],
+		});
+
+		expect(result.success).toBe(true);
+	});
+
 	it("exige la fecha en que se necesitan los recursos", () => {
 		const result = requisitionInputSchema.safeParse({
 			destinationType: "WAREHOUSE",

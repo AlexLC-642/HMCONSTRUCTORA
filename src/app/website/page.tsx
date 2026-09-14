@@ -131,17 +131,11 @@ export default async function WebsitePage({
 		<main className="website-admin mx-auto max-w-[1400px] space-y-5">
 			<section className="overflow-hidden rounded-2xl bg-[#172123] text-white shadow-[0_26px_65px_rgba(17,28,27,0.24)]">
 				<div className="flex flex-wrap items-center justify-between gap-5 p-6 sm:p-7">
-					<div>
-						<h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight">
-							<span className="grid size-11 place-items-center rounded-xl bg-white/10 text-white">
-								<Globe aria-hidden="true" size={21} />
-							</span>
-							Sitio web
-						</h1>
-						<p className="mt-3 max-w-2xl text-sm leading-6 text-[#c8d1ce]">
-							Administra el contenido que ven tus clientes y comprueba cada
-							cambio antes de compartirlo.
-						</p>
+					<div className="flex items-center gap-3">
+						<span className="grid size-14 shrink-0 place-items-center rounded-xl bg-white/10 text-white">
+							<Globe aria-hidden="true" size={24} />
+						</span>
+						<h1 className="sr-only">Sitio web</h1>
 					</div>
 					<div className="flex flex-wrap items-center gap-2">
 						<span

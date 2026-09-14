@@ -7,9 +7,12 @@ import {
 	createInitialBudgetAction,
 	saveBudgetVersionAction,
 } from "@/modules/budgets/application/actions";
-import { getProjectBudget } from "@/modules/budgets/application/queries";
-import type { BudgetVersionInput } from "@/modules/budgets/domain/validation";
+import {
+	getApprovedBudgetChanges,
+	getProjectBudget,
+} from "@/modules/budgets/application/queries";
 import { normalizeLaborUnit } from "@/modules/budgets/domain/units";
+import type { BudgetVersionInput } from "@/modules/budgets/domain/validation";
 import { BudgetForm } from "@/modules/budgets/ui/budget-form";
 import { getProjectById } from "@/modules/projects/application/queries";
 
@@ -26,6 +29,29 @@ function optionalDecimalToString(
 	value: { toString(): string } | null | undefined,
 ) {
 	return value?.toString() ?? "";
+}
+
+function BudgetKpi({
+	label,
+	value,
+	valueClassName = "text-[var(--foreground)]",
+}: {
+	label: string;
+	value: string;
+	valueClassName?: string;
+}) {
+	return (
+		<div className="budget-kpi relative overflow-hidden rounded-xl p-3.5 transition duration-200 hover:-translate-y-0.5">
+			<p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]">
+				{label}
+			</p>
+			<strong
+				className={`mt-1.5 block truncate text-lg font-bold tabular-nums ${valueClassName}`}
+			>
+				{value}
+			</strong>
+		</div>
+	);
 }
 
 function budgetStatusLabel(status: string) {
@@ -81,9 +107,10 @@ export default async function ProjectBudgetPage({
 }) {
 	const user = await requirePermission("presupuesto.ver");
 	const { id } = await params;
-	const [project, budget] = await Promise.all([
+	const [project, budget, budgetChanges] = await Promise.all([
 		getProjectById(id),
 		getProjectBudget(id),
+		getApprovedBudgetChanges(id),
 	]);
 
 	if (!project) notFound();
@@ -100,6 +127,8 @@ export default async function ProjectBudgetPage({
 	const approvedVersion = budget?.versions.find(
 		(version) => version.status === "APPROVED",
 	);
+	const baseTotal = approvedVersion?.grandTotal ?? currentVersion?.grandTotal;
+	const currentTotal = baseTotal?.add(budgetChanges.total);
 
 	return (
 		<main className="space-y-6">
@@ -159,30 +188,67 @@ export default async function ProjectBudgetPage({
 				</section>
 			) : (
 				<>
-					<section className="grid gap-3 rounded-lg border border-[var(--border)] bg-white p-4 text-sm shadow-sm md:grid-cols-4">
-						<div>
-							<span className="text-[var(--muted)]">Version</span>
-							<strong className="block">v{currentVersion.versionNumber}</strong>
-						</div>
-						<div>
-							<span className="text-[var(--muted)]">Estado</span>
-							<strong className="block">
-								{budgetStatusLabel(currentVersion.status)}
-							</strong>
-						</div>
-						<div>
-							<span className="text-[var(--muted)]">Total general</span>
-							<strong className="block">
-								{currencyFormatter.format(currentVersion.grandTotal.toNumber())}
-							</strong>
-						</div>
-						<div>
-							<span className="text-[var(--muted)]">Aprobado por</span>
-							<strong className="block">
-								{currentVersion.approvedBy?.name ?? "Pendiente"}
-							</strong>
-						</div>
+					<section className="kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+						<BudgetKpi
+							label="Version"
+							value={`v${currentVersion.versionNumber}`}
+						/>
+						<BudgetKpi
+							label="Estado"
+							value={budgetStatusLabel(currentVersion.status)}
+						/>
+						<BudgetKpi
+							label="Presupuesto base"
+							value={currencyFormatter.format(baseTotal?.toNumber() ?? 0)}
+						/>
+						<BudgetKpi
+							label="Variaciones aprobadas"
+							value={currencyFormatter.format(budgetChanges.total.toNumber())}
+							valueClassName="text-[#a36b00]"
+						/>
+						<BudgetKpi
+							label="Presupuesto vigente"
+							value={currencyFormatter.format(currentTotal?.toNumber() ?? 0)}
+							valueClassName="text-[#176f54]"
+						/>
+						<BudgetKpi
+							label="Aprobado por"
+							value={currentVersion.approvedBy?.name ?? "Pendiente"}
+						/>
 					</section>
+
+					{budgetChanges.items.length > 0 ? (
+						<section className="overflow-hidden rounded-2xl border border-[#ead9a8] bg-[#fffaf0] shadow-[0_14px_32px_rgba(96,70,15,0.08)]">
+							<header className="border-b border-[#ead9a8] px-5 py-4">
+								<h2 className="font-semibold text-[#2d291e]">
+									Variaciones autorizadas
+								</h2>
+								<p className="mt-1 text-sm text-[#746847]">
+									Recursos aprobados que no pertenecían al presupuesto base.
+								</p>
+							</header>
+							<div className="divide-y divide-[#ead9a8]">
+								{budgetChanges.items.map((item) => (
+									<div
+										className="grid gap-2 px-5 py-4 text-sm md:grid-cols-[1fr_1.4fr_auto] md:items-center"
+										key={item.id}
+									>
+										<div>
+											<strong>{item.description}</strong>
+											<p className="text-xs text-[#746847]">
+												{item.requisition.number} · {item.quantity.toString()}{" "}
+												{item.unit ?? "U"}
+											</p>
+										</div>
+										<p className="text-[#5f5740]">{item.outsideBudgetReason}</p>
+										<strong className="tabular-nums text-[#9a6600]">
+											{currencyFormatter.format(item.amount.toNumber())}
+										</strong>
+									</div>
+								))}
+							</div>
+						</section>
+					) : null}
 
 					{canEdit && !draftVersion && approvedVersion ? (
 						<section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#f0d2d6] bg-[#fff7f8] p-4 text-sm shadow-sm">
@@ -259,7 +325,7 @@ export default async function ProjectBudgetPage({
 						<h2 className="text-[clamp(1.7rem,2vw,2.1rem)] font-semibold tracking-[-0.05em] text-[#1f2527]">
 							Historial
 						</h2>
-						<div className="mt-4 overflow-x-auto">
+						<div className="mt-4 hidden overflow-x-auto md:block">
 							<table className="w-full min-w-[640px] text-sm">
 								<thead className="text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-[#657078]">
 									<tr>
@@ -295,6 +361,33 @@ export default async function ProjectBudgetPage({
 									))}
 								</tbody>
 							</table>
+						</div>
+						<div className="mt-4 grid gap-3 md:hidden">
+							{budget.versions.map((version) => (
+								<div
+									className="rounded-2xl border border-[#d9d3cf] bg-white p-4"
+									key={version.id}
+								>
+									<div className="flex items-center justify-between gap-3">
+										<strong className="text-[#1f2527]">
+											v{version.versionNumber}
+										</strong>
+										<span className="text-xs font-semibold text-[#657078]">
+											{budgetStatusLabel(version.status)}
+										</span>
+									</div>
+									<div className="mt-2 flex items-center justify-between text-sm text-[#1f2527]">
+										<span className="font-medium tabular-nums">
+											{currencyFormatter.format(version.grandTotal.toNumber())}
+										</span>
+										<span className="text-xs text-[#657078]">
+											{version.approvedAt
+												? version.approvedAt.toLocaleDateString("es-GT")
+												: "Pendiente"}
+										</span>
+									</div>
+								</div>
+							))}
 						</div>
 					</section>
 				</>

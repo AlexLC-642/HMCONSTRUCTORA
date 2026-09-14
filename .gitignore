@@ -18,3 +18,8 @@ tmp/
 # parte de la aplicacion, se quedan en el disco de cada quien.
 .agents/
 .codex/
+.impeccable/
+
+# Documentos internos de referencia: conservar solo en el equipo local.
+docs/references/*
+!docs/references/.gitkeep

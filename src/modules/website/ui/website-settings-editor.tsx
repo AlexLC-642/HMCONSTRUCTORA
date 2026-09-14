@@ -14,35 +14,41 @@ import {
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { updateWebsiteSettingsAction } from "../application/actions";
+import { getSocialContact } from "../domain/contact-links";
 import type { WebsiteCopy } from "../domain/defaults";
 
 type SectionKey = "portada" | "nosotros" | "paginas" | "contacto" | "seo";
 type EditableCopy = WebsiteCopy & { heroImageUrl: string };
 
 const sections = [
-	{ key: "portada", label: "Portada", detail: "Primera impresión", icon: Type },
+	{
+		key: "portada",
+		label: "Página de inicio",
+		detail: "Título, mensaje e imagen principal",
+		icon: Type,
+	},
 	{
 		key: "nosotros",
-		label: "Nosotros",
-		detail: "Historia y propósito",
+		label: "Quiénes somos",
+		detail: "Historia y presentación de la empresa",
 		icon: Building2,
 	},
 	{
 		key: "paginas",
-		label: "Páginas",
-		detail: "Servicios y proyectos",
+		label: "Servicios y proyectos",
+		detail: "Textos de estas páginas públicas",
 		icon: PanelsTopLeft,
 	},
 	{
 		key: "contacto",
 		label: "Contacto",
-		detail: "Canales y horarios",
+		detail: "Teléfonos, redes, correo y horarios",
 		icon: Contact,
 	},
 	{
 		key: "seo",
-		label: "Buscadores",
-		detail: "Título y descripción",
+		label: "Aparición en Google",
+		detail: "Título y descripción para buscadores",
 		icon: Search,
 	},
 ] as const;
@@ -111,8 +117,8 @@ export function WebsiteSettingsEditor({
 		<form action={updateWebsiteSettingsAction} className="website-editor-shell">
 			<aside className="website-editor-nav">
 				<div className="website-editor-nav__heading">
-					<p>Contenido del sitio</p>
-					<span>Selecciona una sección para editarla.</span>
+					<p>Editor del sitio web</p>
+					<span>Elige qué información deseas modificar.</span>
 				</div>
 				<nav aria-label="Secciones del contenido">
 					{sections.map((section) => {
@@ -483,23 +489,33 @@ export function WebsiteSettingsEditor({
 										value={values.hoursSaturday}
 									/>
 								</Field>
-								<Field label="Facebook">
+								<Field
+									label="Enlace de Facebook"
+									hint="Pega el enlace completo de la página o perfil."
+								>
 									<input
 										className={inputClass}
+										inputMode="url"
 										name="facebookUrl"
 										onChange={(event) =>
 											update("facebookUrl", event.target.value)
 										}
+										placeholder="https://facebook.com/hmconstructora"
 										value={values.facebookUrl}
 									/>
 								</Field>
-								<Field label="Instagram">
+								<Field
+									label="Enlace de Instagram"
+									hint="Pega el enlace completo; públicamente se mostrará el @usuario."
+								>
 									<input
 										className={inputClass}
+										inputMode="url"
 										name="instagramUrl"
 										onChange={(event) =>
 											update("instagramUrl", event.target.value)
 										}
+										placeholder="https://instagram.com/hmconstructoragt"
 										value={values.instagramUrl}
 									/>
 								</Field>
@@ -588,6 +604,12 @@ export function WebsiteSettingsEditor({
 									<li>{values.email}</li>
 									<li>{values.address}</li>
 									<li>{values.hoursWeekdays}</li>
+									<li>
+										{getSocialContact("facebook", values.facebookUrl)?.label}
+									</li>
+									<li>
+										{getSocialContact("instagram", values.instagramUrl)?.label}
+									</li>
 								</ul>
 							</div>
 						) : null}

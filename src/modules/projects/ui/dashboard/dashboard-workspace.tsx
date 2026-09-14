@@ -20,7 +20,7 @@ import {
 	moneyCompact,
 	moneyFull,
 	percent,
-	pp,
+	progressGap,
 	shortDate,
 } from "@/shared/ui/charts/format";
 import {
@@ -390,7 +390,7 @@ export function DashboardWorkspace({
 		{
 			title: "Avance global",
 			value: percent(scopedMetrics.realProgressAverage),
-			detail: `Plan ${percent(scopedMetrics.plannedProgressAverage)} - ${pp(advanceGap)}`,
+			detail: `Plan para hoy: ${percent(scopedMetrics.plannedProgressAverage)} · ${progressGap(advanceGap)}`,
 			icon: PackageSearch,
 			tone: "var(--info)",
 			data: trendData(scopedMetrics.realProgressAverage),
@@ -401,16 +401,11 @@ export function DashboardWorkspace({
 	return (
 		<main className="executive-dashboard space-y-5">
 			<section className="dashboard-command-hero relative z-10 overflow-visible">
+				{/* The sidebar already highlights "Dashboard" as the active item,
+				    so this page doesn't repeat the module name visually - kept for
+				    screen readers, which need a page-identifying heading. */}
+				<h1 className="sr-only">Dashboard</h1>
 				<div className="dashboard-command-hero__layout">
-					{/* Left: Title section with visual anchor */}
-					<div className="dashboard-command-hero__intro">
-						<h1 className="dashboard-command-hero__title">Dashboard</h1>
-						<p className="dashboard-command-hero__description">
-							Resumen ejecutivo de todos los proyectos
-						</p>
-					</div>
-
-					{/* Right: Controls group with visual cohesion */}
 					<div className="dashboard-command-controls">
 						{/* Search and filters row */}
 						<div className="dashboard-quick-filters">
@@ -706,8 +701,8 @@ export function DashboardWorkspace({
 
 			<section className="grid gap-4 xl:grid-cols-[1fr_0.8fr]">
 				<DashboardPanel
-					subtitle="Semaforo de brecha entre avance real y planificado."
-					title="Desviacion de avance"
+					subtitle="Muestra cuáles proyectos van al día, adelantados o atrasados según el plan de hoy."
+					title="Estado del avance"
 				>
 					<ProgressVarianceChart projects={projects} />
 				</DashboardPanel>
@@ -1276,7 +1271,10 @@ function ProjectDrawer({
 						value={percent(project.realProgress)}
 					/>
 					<DrawerMetric label="Plan" value={percent(project.plannedProgress)} />
-					<DrawerMetric label="Brecha" value={pp(gap)} />
+					<DrawerMetric
+						label="Estado frente al plan"
+						value={progressGap(gap)}
+					/>
 					<DrawerMetric
 						label="Presupuesto"
 						value={moneyCompact(project.budgetTotal)}

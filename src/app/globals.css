@@ -1,5 +1,340 @@
 @import "tailwindcss";
 
+/* Avances: personal y materiales consumidos sin duplicar movimientos de bodega. */
+.progress-resources-layout {
+	display: grid;
+	gap: 1rem;
+	padding: 1.25rem;
+}
+
+.progress-resource-section {
+	overflow: hidden;
+	border: 1px solid var(--border);
+	border-radius: 16px;
+	background: var(--surface);
+	box-shadow: 0 18px 44px rgba(20, 31, 29, 0.09);
+}
+
+.progress-resource-section__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 1rem 1.25rem;
+	background: color-mix(in srgb, var(--surface) 92%, var(--success) 8%);
+}
+
+.progress-resource-section__heading {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: 0.8rem;
+}
+
+.progress-resource-section__heading h2 {
+	font-size: 1rem;
+	font-weight: 750;
+	letter-spacing: -0.015em;
+}
+
+.progress-resource-section__heading p {
+	margin-top: 0.15rem;
+	color: var(--muted);
+	font-size: 0.78rem;
+	line-height: 1.45;
+}
+
+.progress-resource-section__icon {
+	display: grid;
+	width: 2.65rem;
+	height: 2.65rem;
+	flex: 0 0 auto;
+	place-items: center;
+	border-radius: 12px;
+}
+
+.progress-resource-section__icon--labor {
+	background: color-mix(in srgb, var(--success) 13%, var(--surface));
+	color: var(--success);
+}
+
+.progress-resource-section__icon--material {
+	background: color-mix(in srgb, var(--safety) 15%, var(--surface));
+	color: var(--warning);
+}
+
+.progress-resource-add,
+.progress-resource-remove {
+	display: inline-flex;
+	min-height: 2.65rem;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--border);
+	border-radius: 11px;
+	background: var(--surface);
+	color: var(--foreground);
+	box-shadow: 0 7px 18px rgba(18, 27, 26, 0.1);
+	font-size: 0.78rem;
+	font-weight: 700;
+	transition:
+		transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+		border-color 180ms ease,
+		background-color 180ms ease,
+		box-shadow 180ms ease,
+		color 180ms ease;
+}
+
+.progress-resource-add {
+	gap: 0.45rem;
+	padding: 0 0.9rem;
+}
+
+.progress-resource-add:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--success) 46%, var(--border));
+	background: color-mix(in srgb, var(--surface) 94%, var(--success) 6%);
+	box-shadow: 0 11px 24px rgba(18, 27, 26, 0.14);
+	transform: translateY(-1px);
+}
+
+.progress-resource-add:disabled,
+.progress-resource-remove:disabled {
+	cursor: not-allowed;
+	opacity: 0.42;
+	box-shadow: none;
+}
+
+.progress-resource-entries {
+	display: grid;
+	padding: 0 1.25rem;
+}
+
+.progress-resource-entry {
+	padding: 1.1rem 0;
+	animation: progress-resource-entry-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.progress-resource-entry + .progress-resource-entry {
+	border-top: 1px solid var(--border);
+}
+
+@keyframes progress-resource-entry-in {
+	from {
+		opacity: 0.72;
+		filter: blur(2px);
+		transform: translateY(5px);
+	}
+	to {
+		opacity: 1;
+		filter: blur(0);
+		transform: translateY(0);
+	}
+}
+
+.progress-labor-grid,
+.progress-material-primary-grid,
+.progress-material-secondary-grid {
+	display: grid;
+	align-items: end;
+	gap: 0.75rem;
+}
+
+.progress-labor-grid {
+	grid-template-columns:
+		minmax(13rem, 1.25fr) minmax(11rem, 1fr) minmax(5.5rem, 0.35fr)
+		minmax(5.5rem, 0.35fr) 2.65rem;
+}
+
+.progress-labor-note {
+	grid-column: 1 / -1;
+}
+
+.progress-material-primary-grid {
+	grid-template-columns:
+		minmax(18rem, 1.6fr) minmax(7rem, 0.42fr) minmax(6rem, 0.34fr)
+		minmax(12rem, 0.7fr) 2.65rem;
+}
+
+.progress-material-secondary-grid {
+	grid-template-columns:
+		minmax(7rem, 0.35fr) minmax(9rem, 0.42fr) minmax(13rem, 0.75fr)
+		minmax(18rem, 1.5fr);
+	margin-top: 0.9rem;
+	padding-top: 0.9rem;
+	border-top: 1px dashed color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.progress-resource-label {
+	color: var(--muted);
+	font-size: 0.68rem;
+	font-weight: 750;
+	letter-spacing: 0.065em;
+	line-height: 1.25;
+	text-transform: uppercase;
+}
+
+.progress-resource-input,
+.progress-resource-readonly {
+	width: 100%;
+	min-width: 0;
+	height: 2.65rem;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--surface) 96%, var(--background) 4%);
+	color: var(--foreground);
+	font-size: 0.82rem;
+}
+
+.progress-resource-input {
+	padding: 0 0.8rem;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
+	transition:
+		border-color 160ms ease,
+		background-color 160ms ease,
+		box-shadow 160ms ease;
+}
+
+.progress-resource-input:hover {
+	border-color: color-mix(in srgb, var(--foreground) 26%, var(--border));
+}
+
+.progress-resource-input:focus {
+	border-color: color-mix(in srgb, var(--success) 62%, var(--border));
+	background: var(--surface);
+	box-shadow: 0 8px 20px rgba(20, 63, 49, 0.08);
+}
+
+.progress-resource-readonly {
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+	padding: 0 0.8rem;
+	background: color-mix(in srgb, var(--background) 58%, var(--surface));
+	color: var(--muted);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.progress-resource-remove {
+	width: 2.65rem;
+	padding: 0;
+	color: var(--muted);
+}
+
+.progress-resource-remove:hover:not(:disabled) {
+	border-color: color-mix(in srgb, var(--brand-red) 45%, var(--border));
+	background: color-mix(in srgb, var(--surface) 92%, var(--brand-red) 8%);
+	color: var(--brand-red);
+	box-shadow: 0 10px 22px rgba(200, 32, 47, 0.12);
+	transform: translateY(-1px);
+}
+
+.progress-resource-availability {
+	color: var(--muted);
+	font-size: 0.7rem;
+}
+
+.progress-resource-availability strong {
+	color: var(--success);
+	font-weight: 750;
+}
+
+.progress-resource-empty {
+	display: flex;
+	align-items: center;
+	gap: 0.8rem;
+	margin: 0 1.25rem 1.25rem;
+	padding: 1rem;
+	border: 1px dashed var(--border);
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--background) 48%, var(--surface));
+	color: var(--muted);
+}
+
+.progress-resource-empty strong {
+	display: block;
+	color: var(--foreground);
+	font-size: 0.84rem;
+}
+
+.progress-resource-empty p {
+	margin-top: 0.15rem;
+	font-size: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+	.progress-labor-grid,
+	.progress-material-primary-grid,
+	.progress-material-secondary-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.progress-labor-note {
+		grid-column: 1 / -1;
+	}
+
+	.progress-resource-remove {
+		justify-self: end;
+	}
+}
+
+@media (max-width: 640px) {
+	.progress-resources-layout {
+		padding: 0.75rem;
+	}
+
+	.progress-resource-section__header {
+		align-items: flex-start;
+		padding: 0.9rem;
+	}
+
+	.progress-resource-section__heading {
+		align-items: flex-start;
+	}
+
+	.progress-resource-section__heading p {
+		display: none;
+	}
+
+	.progress-resource-add {
+		min-width: 2.65rem;
+		padding: 0 0.7rem;
+	}
+
+	.progress-resource-add svg + * {
+		display: none;
+	}
+
+	.progress-resource-entries {
+		padding: 0 0.9rem;
+	}
+
+	.progress-labor-grid,
+	.progress-material-primary-grid,
+	.progress-material-secondary-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.progress-labor-note {
+		grid-column: auto;
+	}
+
+	.progress-resource-remove {
+		justify-self: end;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.progress-resource-entry {
+		animation: none;
+	}
+
+	.progress-resource-add,
+	.progress-resource-remove,
+	.progress-resource-input {
+		transition: none;
+	}
+}
+
 /* Compras: solicitudes autorizadas, proveedores, órdenes y recepción. */
 .purchases-workspace {
 	--purchases-ink: #172023;
@@ -77,7 +412,7 @@
 .purchases-hero__title {
 	display: flex;
 	grid-area: title;
-	align-items: flex-start;
+	align-items: center;
 	gap: 1rem;
 }
 
@@ -93,19 +428,22 @@
 	box-shadow: 0 14px 32px rgba(200, 32, 47, 0.34);
 }
 
-.purchases-hero h1 {
-	font-size: clamp(1.75rem, 2.2vw, 2.35rem);
-	font-weight: 800;
-	letter-spacing: -0.04em;
-	line-height: 1.05;
+.purchases-hero__context {
+	display: grid;
+	gap: 0.22rem;
 }
 
-.purchases-hero__title p {
-	max-width: 34rem;
-	margin-top: 0.55rem;
-	color: #c5cfcc;
-	font-size: 0.86rem;
-	line-height: 1.6;
+.purchases-hero__context strong {
+	color: #ffffff;
+	font-size: 0.92rem;
+	font-weight: 780;
+	letter-spacing: -0.015em;
+}
+
+.purchases-hero__context span {
+	color: #aebebb;
+	font-size: 0.7rem;
+	line-height: 1.4;
 }
 
 .purchases-flow {
@@ -3172,19 +3510,23 @@
 }
 
 :root {
-	--background: #eef0ec;
+	--background: #e5eceb;
 	--foreground: #111719;
-	--muted: #5a6661;
-	--border: #cfd5ce;
-	--surface: #ffffff;
+	--muted: #596867;
+	--border: #c3d0ce;
+	--surface: #fbfdfc;
+	--surface-raised: #f4f8f7;
+	--surface-inset: #eaf1f0;
+	--surface-hover: #dfeae8;
+	--border-strong: #aabbb8;
 	--primary: #c8202f;
 	--primary-foreground: #ffffff;
 	--brand-red: #c8202f;
 	--brand-gray: #8b8f8f;
 	--steel: #253033;
 	--graphite: #161b1d;
-	--concrete: #e2e1da;
-	--paper: #fbfaf6;
+	--concrete: #cdd8d6;
+	--paper: #fbfcfa;
 	--safety: #f2a900;
 	--success: #1f7a5b;
 	--info: #2563eb;
@@ -3194,17 +3536,22 @@
 	--app-shell-sidebar-width: 14rem;
 	--app-shell-sidebar-collapsed-width: 4.75rem;
 
-	/* Glass surface tokens: moderate frosted texture for chrome that is always
-	   on screen (AppShell, login, KPI/toolbar surfaces) — never for dense
-	   content like tables or print. See .glass-panel / .glass-panel-dark. */
-	--glass-surface: rgba(255, 255, 255, 0.74);
-	--glass-surface-strong: rgba(255, 255, 255, 0.9);
-	--glass-border: rgba(255, 255, 255, 0.6);
-	--glass-blur: 18px;
-	--glass-shadow: 0 20px 50px rgba(22, 27, 29, 0.1);
-	--glass-dark-surface: rgba(23, 32, 34, 0.78);
-	--glass-dark-surface-strong: rgba(20, 28, 30, 0.92);
-	--glass-dark-border: rgba(255, 255, 255, 0.1);
+	/* Glass surface tokens: frosted chrome for surfaces that are always on
+	   screen (AppShell, login, KPI/toolbar surfaces) — never for dense
+	   content like tables or print. See .glass-panel / .glass-panel-dark.
+	   Tuned for a visible "raised pane" read (not just a tint): more
+	   see-through so scrolled content actually blurs behind it, a brighter
+	   edge to catch light, and a deeper shadow so it reads as elevated. */
+	--glass-surface: rgba(247, 252, 251, 0.66);
+	--glass-surface-strong: rgba(251, 254, 253, 0.9);
+	--glass-border: rgba(255, 255, 255, 0.75);
+	--glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+	--glass-blur: 26px;
+	--glass-shadow: 0 24px 60px rgba(15, 48, 51, 0.14);
+	--glass-dark-surface: rgba(23, 32, 34, 0.66);
+	--glass-dark-surface-strong: rgba(20, 28, 30, 0.88);
+	--glass-dark-border: rgba(255, 255, 255, 0.14);
+	--glass-dark-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 /* Densidad de escritorio: conserva 16 px en portátiles, tabletas y móviles,
@@ -3472,8 +3819,22 @@
 
 .requisition-line__resource,
 .requisition-line__selected,
-.requisition-line__catalog {
+.requisition-line__catalog,
+.requisition-line__budget-control {
 	grid-column: span 2;
+}
+
+.requisition-line__budget-control {
+	border: 1px solid #ecd99d;
+	border-radius: 11px;
+	background: linear-gradient(135deg, #fffaf0, #fff4dc);
+	padding: 0.7rem;
+	box-shadow: 0 8px 20px rgba(125, 88, 13, 0.08);
+}
+
+.requisition-line__budget-control .requisitions-textarea {
+	min-height: 4.5rem;
+	margin-top: 0.65rem;
 }
 
 .requisition-line__selected {
@@ -3846,6 +4207,7 @@
 			background: var(--glass-surface);
 			backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
 			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+			box-shadow: var(--glass-highlight);
 		}
 	}
 }
@@ -3898,8 +4260,11 @@
 					transparent 18rem
 				),
 				var(--glass-surface-strong);
-			backdrop-filter: blur(20px) saturate(1.3);
-			-webkit-backdrop-filter: blur(20px) saturate(1.3);
+			backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+			box-shadow:
+				var(--glass-highlight),
+				20px 0 54px rgba(17, 29, 26, 0.19);
 		}
 	}
 }
@@ -4017,11 +4382,15 @@
 	transform: translateX(2px);
 }
 .app-shell-nav-link--active {
-	background: linear-gradient(110deg, #e8f3ec, #f0f6f2);
+	background: linear-gradient(
+		110deg,
+		rgba(200, 32, 47, 0.09),
+		rgba(255, 255, 255, 0.7)
+	);
 	color: #15201d;
 	box-shadow:
-		inset 0 0 0 1px #d9e8de,
-		0 8px 20px rgba(31, 122, 91, 0.09);
+		inset 0 0 0 1px rgba(200, 32, 47, 0.16),
+		0 8px 20px rgba(37, 48, 51, 0.08);
 }
 .app-shell-nav-link--active::before {
 	position: absolute;
@@ -4099,6 +4468,45 @@
 
 .budget-measurement-guide__item + .budget-measurement-guide__item {
 	border-left: 1px solid #dfe6e2;
+}
+
+.budget-kpi {
+	border: 1px solid var(--border);
+	background: var(--surface);
+	box-shadow: 0 10px 26px rgba(37, 48, 51, 0.08);
+	transition:
+		transform 200ms ease,
+		box-shadow 200ms ease;
+}
+
+.budget-kpi:hover {
+	box-shadow: 0 16px 36px rgba(37, 48, 51, 0.12);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media (prefers-reduced-transparency: no-preference) {
+		.budget-kpi {
+			background:
+				radial-gradient(
+					circle at 100% 0%,
+					rgba(200, 32, 47, 0.26),
+					transparent 75%
+				),
+				var(--glass-surface);
+			backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+			border-color: var(--glass-border);
+			box-shadow:
+				var(--glass-highlight),
+				0 10px 26px rgba(37, 48, 51, 0.08);
+		}
+
+		.budget-kpi:hover {
+			box-shadow:
+				var(--glass-highlight),
+				0 16px 36px rgba(37, 48, 51, 0.12);
+		}
+	}
 }
 
 .budget-financial-summary {
@@ -4541,6 +4949,15 @@ textarea {
 	outline-offset: 2px;
 }
 
+/* Form fields get a neutral graphite focus ring instead of the brand-red one
+   used everywhere else (buttons, links, nav) - on an input specifically, a
+   red ring reads as "this field is invalid" even when nothing is wrong. */
+input.focus-ring:focus-visible,
+select.focus-ring:focus-visible,
+textarea.focus-ring:focus-visible {
+	outline-color: rgba(37, 48, 51, 0.32);
+}
+
 .global-user-menu {
 	position: relative;
 }
@@ -4717,7 +5134,24 @@ textarea {
 }
 
 .login-card {
+	background: var(--glass-surface-strong);
+	border: 1px solid var(--border);
+	box-shadow: 0 30px 80px rgba(30, 36, 38, 0.16);
 	animation: login-card-in 760ms 130ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media (prefers-reduced-transparency: no-preference) {
+		.login-card {
+			background: var(--glass-surface);
+			backdrop-filter: blur(var(--glass-blur)) saturate(1.35);
+			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.35);
+			border-color: var(--glass-border);
+			box-shadow:
+				var(--glass-highlight),
+				0 30px 80px rgba(30, 36, 38, 0.16);
+		}
+	}
 }
 
 .login-input-row {
@@ -4912,6 +5346,24 @@ textarea {
 	content: "";
 	mask-image: linear-gradient(90deg, transparent, black);
 	pointer-events: none;
+}
+
+.inventory-commandbar__context {
+	display: grid;
+	gap: 0.2rem;
+}
+
+.inventory-commandbar__context strong {
+	color: #ffffff;
+	font-size: 0.88rem;
+	font-weight: 780;
+	letter-spacing: -0.01em;
+}
+
+.inventory-commandbar__context span {
+	color: #afc2bf;
+	font-size: 0.68rem;
+	line-height: 1.4;
 }
 
 .inventory-main-tab {
@@ -6366,6 +6818,19 @@ textarea {
 	color: #6b7772;
 	font-size: 0.72rem;
 }
+.documents-file-list {
+	display: grid;
+	max-height: 8rem;
+	gap: 0.25rem;
+	overflow-y: auto;
+	margin-top: -0.5rem;
+	padding: 0.6rem 0.8rem;
+	border: 1px solid #d8ded8;
+	border-radius: 10px;
+	background: #f7f9f7;
+	color: #4f5c57;
+	font-size: 0.76rem;
+}
 .documents-form-section {
 	margin-top: 1rem;
 	padding: 1rem;
@@ -7026,40 +7491,17 @@ textarea {
 }
 
 .dashboard-command-hero__layout {
-	display: grid;
-	grid-template-columns: minmax(15rem, 0.52fr) minmax(0, 1.48fr);
+	display: flex;
 	align-items: center;
-	gap: clamp(1.5rem, 3vw, 3rem);
 	padding: clamp(1.35rem, 2.5vw, 2.25rem);
-}
-
-.dashboard-command-hero__intro {
-	min-width: 0;
-	padding-right: clamp(1rem, 2vw, 2rem);
-	border-right: 1px solid rgba(255, 255, 255, 0.13);
-}
-
-.dashboard-command-hero__title {
-	color: #fff;
-	font-size: clamp(2rem, 3.6vw, 3.3rem);
-	font-weight: 820;
-	letter-spacing: -0.035em;
-	line-height: 1;
-}
-
-.dashboard-command-hero__description {
-	max-width: 34rem;
-	margin-top: 0.75rem;
-	color: #c8d1ce;
-	font-size: 0.9rem;
 }
 
 .dashboard-command-controls {
 	display: flex;
+	width: 100%;
 	min-width: 0;
 	flex-wrap: wrap;
 	align-items: center;
-	justify-content: flex-end;
 	gap: 0.75rem;
 }
 
@@ -7078,6 +7520,22 @@ textarea {
 	box-shadow:
 		0 16px 38px rgba(5, 11, 12, 0.2),
 		inset 0 0 0 1px rgba(255, 255, 255, 0.75);
+}
+
+/* Sitting on the hero's dark, colored gradient, this pill is where liquid
+   glass actually reads: the hero's red/green glow blurs visibly through it,
+   unlike a white glass panel over a near-white page. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media (prefers-reduced-transparency: no-preference) {
+		.dashboard-quick-filters {
+			background: rgba(255, 255, 255, 0.66);
+			backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+			box-shadow:
+				var(--glass-highlight),
+				0 16px 38px rgba(5, 11, 12, 0.24);
+		}
+	}
 }
 
 .dashboard-quick-select,
@@ -7139,6 +7597,19 @@ textarea {
 		box-shadow 160ms ease;
 }
 
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media (prefers-reduced-transparency: no-preference) {
+		.dashboard-command-filter-button {
+			background: rgba(255, 255, 255, 0.55);
+			backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+			box-shadow:
+				var(--glass-highlight),
+				0 14px 30px rgba(5, 11, 12, 0.22);
+		}
+	}
+}
+
 .dashboard-command-filter-button:hover {
 	background: #fff;
 	box-shadow: 0 18px 36px rgba(5, 11, 12, 0.27);
@@ -7173,6 +7644,20 @@ textarea {
 	box-shadow:
 		0 28px 70px rgba(5, 11, 12, 0.28),
 		0 8px 22px rgba(5, 11, 12, 0.13);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media (prefers-reduced-transparency: no-preference) {
+		.dashboard-advanced-filters {
+			background: var(--glass-surface-strong);
+			backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+			border-color: var(--glass-border);
+			box-shadow:
+				var(--glass-highlight),
+				0 28px 70px rgba(5, 11, 12, 0.28);
+		}
+	}
 }
 
 .dashboard-advanced-filters__header {
@@ -7316,21 +7801,6 @@ textarea {
 	background: var(--kpi-accent);
 	content: "";
 	opacity: 0.9;
-}
-
-@container dashboard-header (max-width: 76rem) {
-	.dashboard-command-hero__layout {
-		grid-template-columns: 1fr;
-	}
-	.dashboard-command-hero__intro {
-		padding-right: 0;
-		padding-bottom: 1.25rem;
-		border-right: 0;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.13);
-	}
-	.dashboard-command-controls {
-		justify-content: stretch;
-	}
 }
 
 @container dashboard-header (max-width: 48rem) {
@@ -7561,6 +8031,27 @@ textarea {
 			transparent 16rem
 		);
 	box-shadow: var(--panel-shadow);
+}
+
+/* KPI summary cards are approved "chrome" for glass (unlike the dense chart
+   panels sharing the rule above, which stay solid on purpose); give them
+   real translucency with the app's shared glass tokens. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media (prefers-reduced-transparency: no-preference) {
+		.executive-kpi {
+			background:
+				radial-gradient(
+					circle at 100% -10%,
+					color-mix(in srgb, var(--kpi-accent, #c8202f) 32%, transparent),
+					transparent 11rem
+				),
+				var(--glass-surface);
+			backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+			border-color: var(--glass-border);
+			box-shadow: var(--glass-highlight), var(--panel-shadow);
+		}
+	}
 }
 
 .executive-kpi {
@@ -7896,37 +8387,124 @@ textarea {
 }
 
 .portal-shell {
+	--background: #e5eceb;
+	--foreground: #11191b;
+	--muted: #586766;
+	--border: #c2d0ce;
+	--surface: #fbfdfc;
+	--surface-raised: #f2f7f6;
+	--surface-inset: #e8f0ef;
+	--surface-hover: #dce8e6;
+	--border-strong: #a5b9b6;
+	--glass-surface: rgba(247, 252, 251, 0.68);
+	--glass-surface-strong: rgba(250, 253, 252, 0.9);
 	position: relative;
 	background:
-		radial-gradient(circle at 8% 0%, rgba(31, 122, 91, 0.07), transparent 26rem),
+		radial-gradient(circle at 8% 0%, rgba(20, 92, 96, 0.17), transparent 30rem),
 		radial-gradient(
 			circle at 100% 6%,
-			rgba(200, 32, 47, 0.06),
+			rgba(200, 32, 47, 0.075),
 			transparent 26rem
 		),
 		radial-gradient(
 			circle at 1px 1px,
-			rgba(48, 56, 59, 0.05) 1px,
+			rgba(35, 74, 76, 0.065) 1px,
 			transparent 0
 		)
 		0 0 / 24px 24px,
-		#f4f5f2;
+		linear-gradient(155deg, #f5f9f8 0%, var(--background) 56%, #edf2f1 100%);
+	color: var(--foreground, #101618);
+}
+
+.portal-shell::selection {
+	background: rgba(200, 32, 47, 0.2);
+}
+
+.portal-topbar {
+	position: relative;
+	overflow: hidden;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+	background:
+		radial-gradient(
+			circle at 8% -80%,
+			rgba(53, 150, 147, 0.3),
+			transparent 24rem
+		),
+		radial-gradient(
+			circle at 96% 160%,
+			rgba(200, 32, 47, 0.18),
+			transparent 23rem
+		),
+		linear-gradient(118deg, #17383b, #102c30 62%, #17252a);
+	color: #ffffff;
+	box-shadow: 0 18px 46px rgba(7, 34, 37, 0.22);
+}
+
+.portal-topbar::after {
+	position: absolute;
+	inset: 0 0 0 auto;
+	width: min(38rem, 48%);
+	background-image: repeating-linear-gradient(
+		132deg,
+		transparent 0 34px,
+		rgba(255, 255, 255, 0.065) 34px 35px
+	);
+	content: "";
+	mask-image: linear-gradient(90deg, transparent, #000);
+	pointer-events: none;
+}
+
+.portal-topbar > div {
+	position: relative;
+	z-index: 1;
+}
+
+.portal-brand-mark {
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	background: rgba(255, 255, 255, 0.94);
+	box-shadow:
+		0 16px 35px rgba(4, 23, 25, 0.28),
+		inset 0 1px 0 #fff;
+}
+
+.portal-project-identity > p {
+	color: #ff7b84;
+}
+
+.portal-project-identity h1 {
+	color: #ffffff;
+}
+
+.portal-private-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	border: 1px solid rgba(94, 222, 172, 0.34);
+	border-radius: 999px;
+	background: rgba(31, 122, 91, 0.2);
+	padding: 0.55rem 0.9rem;
+	color: #9aebcb;
+	font-size: 0.78rem;
+	font-weight: 700;
+	box-shadow:
+		0 10px 24px rgba(4, 23, 25, 0.18),
+		inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .portal-card {
-	border: 1px solid #d0d6cf;
+	border: 1px solid rgba(255, 255, 255, 0.9);
 	border-radius: 18px;
 	background:
 		linear-gradient(
-			180deg,
-			rgba(255, 255, 255, 0.97),
-			rgba(255, 255, 255, 0.91)
+			145deg,
+			rgba(255, 255, 255, 0.96),
+			rgba(232, 241, 240, 0.82)
 		),
-		#ffffff;
+		rgba(249, 253, 252, 0.9);
 	box-shadow:
-		0 20px 48px rgba(24, 33, 30, 0.13),
-		0 3px 10px rgba(24, 33, 30, 0.06),
-		0 1px 0 rgba(255, 255, 255, 0.8) inset;
+		0 22px 52px rgba(15, 48, 51, 0.12),
+		0 3px 10px rgba(15, 48, 51, 0.05),
+		inset 0 1px 0 #fff;
 	padding: 1.5rem;
 	transition:
 		transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -7945,15 +8523,15 @@ textarea {
 	background:
 		radial-gradient(
 			circle at 100% 0%,
-			rgba(208, 31, 53, 0.08),
+			rgba(208, 31, 53, 0.1),
 			transparent 18rem
 		),
 		radial-gradient(
 			circle at 0% 100%,
-			rgba(31, 122, 90, 0.08),
+			rgba(20, 92, 96, 0.12),
 			transparent 16rem
 		),
-		#ffffff;
+		linear-gradient(145deg, #ffffff, #eaf3f1);
 }
 
 .portal-tabs {
@@ -7963,10 +8541,14 @@ textarea {
 	display: grid;
 	grid-template-columns: repeat(5, minmax(0, 1fr));
 	gap: 0.5rem;
-	border: 1px solid #d7d9d2;
+	border: 1px solid rgba(255, 255, 255, 0.12);
 	border-radius: 18px;
-	background: rgba(255, 255, 255, 0.92);
-	box-shadow: 0 18px 45px rgba(37, 48, 51, 0.11);
+	background:
+		radial-gradient(circle at 0 0, rgba(53, 150, 147, 0.18), transparent 18rem),
+		linear-gradient(120deg, rgba(23, 56, 59, 0.97), rgba(16, 44, 48, 0.97));
+	box-shadow:
+		0 18px 45px rgba(7, 34, 37, 0.2),
+		inset 0 1px 0 rgba(255, 255, 255, 0.08);
 	padding: 0.55rem;
 	backdrop-filter: blur(16px);
 }
@@ -7977,32 +8559,29 @@ textarea {
 	overflow: hidden;
 	border-radius: 13px;
 	padding: 0.75rem 0.9rem;
-	color: #52615f;
+	color: #c5d5d2;
 	text-decoration: none;
 }
 
 .portal-tab:hover {
-	background: #f7f5f1;
+	background: rgba(255, 255, 255, 0.08);
+	color: #ffffff;
 }
 
 .portal-tab[data-active="true"] {
-	color: #101618;
+	color: #172123;
 }
 
 .portal-tab-active {
 	position: absolute;
 	inset: 0;
 	z-index: -1;
-	border: 1px solid rgba(208, 31, 53, 0.18);
+	border: 1px solid rgba(255, 255, 255, 0.82);
 	border-radius: inherit;
-	background:
-		linear-gradient(
-			135deg,
-			rgba(255, 241, 241, 0.94),
-			rgba(237, 249, 242, 0.92)
-		),
-		#ffffff;
-	box-shadow: 0 10px 24px rgba(37, 48, 51, 0.1);
+	background: linear-gradient(135deg, #ffffff, #e8f1ef);
+	box-shadow:
+		0 10px 24px rgba(4, 23, 25, 0.24),
+		inset 0 1px 0 #fff;
 }
 
 .portal-tab-label,
@@ -8018,11 +8597,15 @@ textarea {
 .portal-tab-detail {
 	margin-top: 0.15rem;
 	overflow: hidden;
-	color: #596765;
+	color: #94aaa6;
 	font-size: 0.74rem;
 	font-weight: 600;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.portal-tab[data-active="true"] .portal-tab-detail {
+	color: #5a6c69;
 }
 
 .portal-shortcut {
@@ -8030,18 +8613,24 @@ textarea {
 	align-items: center;
 	justify-content: space-between;
 	gap: 1rem;
-	border: 1px solid #d7d9d2;
+	border: 1px solid var(--border, #d7d9d2);
 	border-radius: 14px;
-	background: #fbfaf6;
+	background: rgba(246, 250, 249, 0.82);
 	padding: 0.85rem 1rem;
-	color: #101618;
+	color: var(--foreground, #101618);
 	text-decoration: none;
-	box-shadow: 0 10px 24px rgba(37, 48, 51, 0.05);
+	box-shadow:
+		0 10px 24px rgba(15, 48, 51, 0.06),
+		inset 0 1px 0 #fff;
 }
 
 .portal-shortcut:hover {
 	border-color: rgba(208, 31, 53, 0.28);
-	background: #fff8f8;
+	background: color-mix(
+		in srgb,
+		var(--danger, #d01f35) 6%,
+		var(--surface, #fff8f8)
+	);
 }
 
 .portal-chart-grid {
@@ -8051,12 +8640,18 @@ textarea {
 }
 
 .portal-chart-card {
-	border: 1px solid #d7d9d2;
+	border: 1px solid rgba(255, 255, 255, 0.9);
 	border-radius: 18px;
-	background: #ffffff;
+	background:
+		linear-gradient(
+			145deg,
+			rgba(255, 255, 255, 0.96),
+			rgba(232, 241, 240, 0.82)
+		),
+		rgba(249, 253, 252, 0.9);
 	box-shadow:
-		0 18px 45px rgba(37, 48, 51, 0.09),
-		0 1px 0 rgba(255, 255, 255, 0.75) inset;
+		0 18px 45px rgba(15, 48, 51, 0.1),
+		inset 0 1px 0 #fff;
 	padding: 1.25rem;
 }
 
@@ -8073,21 +8668,25 @@ textarea {
 
 .portal-chart-head h3 {
 	margin: 0;
-	color: #101618;
+	color: var(--foreground, #101618);
 	font-size: 1.08rem;
 	font-weight: 800;
 }
 
 .portal-chart-head p {
 	margin: 0.2rem 0 0;
-	color: #596765;
+	color: var(--muted, #596765);
 	font-size: 0.875rem;
 }
 
 .portal-chart-head span {
 	border-radius: 999px;
-	background: #edf9f2;
-	color: #1f7a5a;
+	background: color-mix(
+		in srgb,
+		var(--success, #1f7a5a) 16%,
+		var(--surface, #fff)
+	);
+	color: var(--success, #1f7a5a);
 	padding: 0.4rem 0.7rem;
 	font-size: 0.78rem;
 	font-weight: 800;
@@ -8116,6 +8715,28 @@ textarea {
 		transparent 78%
 	);
 	content: "";
+}
+
+.access-kpi {
+	background: var(--glass-surface-strong);
+	border: 1px solid var(--border);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media (prefers-reduced-transparency: no-preference) {
+		.access-kpi {
+			background:
+				radial-gradient(
+					circle at 100% 0%,
+					color-mix(in srgb, var(--kpi-accent, #30383b) 26%, transparent),
+					transparent 75%
+				),
+				var(--glass-surface);
+			backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+			border-color: var(--glass-border);
+		}
+	}
 }
 
 .access-kpi::before {
@@ -8400,6 +9021,65 @@ input[id^="tab-seguridad-"]:checked
 
 	.portal-tabs {
 		grid-template-columns: 1fr;
+	}
+}
+
+@media screen {
+	:root[data-theme="dark"] .portal-card,
+	:root[data-theme="dark"] .portal-chart-card {
+		border-color: var(--border);
+		background: var(--surface);
+		box-shadow:
+			0 22px 52px rgba(0, 0, 0, 0.28),
+			inset 0 1px 0 rgba(255, 255, 255, 0.04);
+	}
+
+	:root[data-theme="dark"] .portal-card-feature {
+		background:
+			radial-gradient(
+				circle at 100% 0%,
+				rgba(255, 90, 99, 0.09),
+				transparent 18rem
+			),
+			radial-gradient(
+				circle at 0 100%,
+				rgba(62, 207, 150, 0.08),
+				transparent 16rem
+			),
+			var(--surface);
+	}
+
+	:root[data-theme="dark"] .portal-tabs {
+		border-color: var(--border);
+		background: rgba(18, 29, 32, 0.94);
+	}
+
+	:root[data-theme="dark"] .portal-tab {
+		color: #a9b8b4;
+	}
+
+	:root[data-theme="dark"] .portal-tab[data-active="true"] {
+		color: var(--foreground);
+	}
+
+	:root[data-theme="dark"] .portal-tab-active {
+		border-color: rgba(255, 255, 255, 0.1);
+		background: var(--surface-raised);
+		box-shadow:
+			0 10px 24px rgba(0, 0, 0, 0.24),
+			inset 0 1px 0 rgba(255, 255, 255, 0.04);
+	}
+
+	:root[data-theme="dark"] .portal-tab-detail,
+	:root[data-theme="dark"] .portal-tab[data-active="true"] .portal-tab-detail {
+		color: var(--muted);
+	}
+
+	:root[data-theme="dark"] .portal-shortcut {
+		border-color: var(--border);
+		background: var(--surface-raised);
+		color: var(--foreground);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 	}
 }
 
@@ -9771,6 +10451,7 @@ input[id^="tab-seguridad-"]:checked
 			background: var(--glass-surface);
 			backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
 			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+			border-color: var(--glass-border);
 		}
 	}
 }
@@ -10874,6 +11555,10 @@ input[id^="tab-seguridad-"]:checked
 	font-size: 0.75rem;
 	box-shadow: 0 8px 20px rgba(20, 31, 28, 0.07);
 }
+.website-live-preview__contact li:nth-last-child(-n + 2) {
+	color: #157457;
+	font-weight: 720;
+}
 .website-live-preview__pages {
 	min-height: 27rem;
 	padding: 2rem;
@@ -11335,9 +12020,107 @@ input[id^="tab-seguridad-"]:checked
 	box-shadow: 0 18px 38px rgba(200, 32, 47, 0.34);
 }
 
+.public-nav__menu-btn {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: 2.75rem;
+	height: 2.75rem;
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	background: var(--surface);
+	color: var(--foreground);
+	transition:
+		background-color 180ms ease,
+		color 180ms ease;
+}
+
+.public-nav__menu-btn:hover {
+	background: color-mix(in srgb, var(--brand-red) 8%, var(--surface));
+	color: var(--brand-red);
+}
+
+.public-nav__mobile-panel {
+	position: fixed;
+	inset: 0;
+	z-index: 60;
+}
+
+.public-nav__mobile-backdrop {
+	position: absolute;
+	inset: 0;
+	border: 0;
+	background: rgba(13, 19, 20, 0.55);
+	backdrop-filter: blur(2px);
+	cursor: default;
+}
+
+.public-nav__mobile-sheet {
+	position: absolute;
+	top: 0;
+	right: 0;
+	display: flex;
+	width: min(20rem, 86vw);
+	height: 100%;
+	flex-direction: column;
+	gap: 0.25rem;
+	padding: 1.25rem;
+	background: var(--surface, #fff);
+	box-shadow: -20px 0 50px rgba(15, 20, 21, 0.25);
+	overflow-y: auto;
+}
+
+.public-nav__mobile-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 0.5rem;
+	padding-bottom: 0.75rem;
+	border-bottom: 1px solid var(--border);
+	color: var(--foreground);
+	font-weight: 800;
+}
+
+.public-nav__mobile-sheet nav {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.public-nav__mobile-sheet nav a {
+	display: flex;
+	min-height: 3rem;
+	align-items: center;
+	border-radius: 10px;
+	padding: 0 0.5rem;
+	color: var(--foreground);
+	font-size: 0.92rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	text-decoration: none;
+	text-transform: uppercase;
+}
+
+.public-nav__mobile-sheet nav a:hover {
+	background: color-mix(in srgb, var(--brand-red) 8%, transparent);
+	color: var(--brand-red);
+}
+
+.public-nav__cta--mobile {
+	display: inline-flex;
+	width: 100%;
+	margin-top: 1rem;
+}
+
 @media (min-width: 860px) {
 	.public-nav__links {
 		display: inline-flex;
+	}
+
+	.public-nav__menu-btn,
+	.public-nav__mobile-panel {
+		display: none;
 	}
 }
 
@@ -12266,12 +13049,25 @@ input[id^="tab-seguridad-"]:checked
 }
 
 .public-contact__item a {
+	position: relative;
 	color: #d7ddda;
 	text-decoration: none;
+	text-underline-offset: 0.22em;
+	transition:
+		color 220ms ease,
+		text-decoration-color 220ms ease;
 }
 
 .public-contact__item a:hover {
 	color: #ff9fa6;
+	text-decoration: underline;
+	text-decoration-color: rgba(255, 159, 166, 0.58);
+}
+
+.public-contact__item a:focus-visible {
+	border-radius: 4px;
+	outline: 2px solid #ff9fa6;
+	outline-offset: 4px;
 }
 
 .public-contact__item div {
@@ -12442,10 +13238,19 @@ input[id^="tab-seguridad-"]:checked
 .public-footer a {
 	color: #cbd3d0;
 	text-decoration: none;
+	text-underline-offset: 0.22em;
+	transition: color 200ms ease;
 }
 
 .public-footer a:hover {
 	color: #fff;
+	text-decoration: underline;
+}
+
+.public-footer a:focus-visible {
+	border-radius: 3px;
+	outline: 2px solid #ff9fa6;
+	outline-offset: 4px;
 }
 
 .public-footer__bottom {
@@ -12495,6 +13300,10 @@ input[id^="tab-seguridad-"]:checked
 		--muted: #a3afa9;
 		--border: #2a353a;
 		--surface: #182124;
+		--surface-raised: #1d282c;
+		--surface-inset: #131b1e;
+		--surface-hover: #202c30;
+		--border-strong: #3a4a52;
 		--primary: #ff5a63;
 		--primary-foreground: #10161a;
 		--brand-red: #ff5a63;
@@ -12503,6 +13312,39 @@ input[id^="tab-seguridad-"]:checked
 		--concrete: #202b2f;
 		--paper: #161f22;
 		--safety: #f2b93d;
+		--success: #3ecf96;
+		--info: #6ea8fe;
+		--warning: #e3a63e;
+		--danger: #f26a63;
+		--glass-surface: rgba(19, 26, 29, 0.7);
+		--glass-surface-strong: rgba(16, 22, 25, 0.92);
+		--glass-border: rgba(255, 255, 255, 0.09);
+		background: var(--background);
+		color: var(--foreground);
+	}
+
+	/* Client portal (/portal/[token]) shares the same dark palette as the
+	   internal app-shell, scoped separately since the portal is neither
+	   .app-shell nor the public marketing site - it's a private, token-gated
+	   client view that should offer the same light/dark choice as the panel
+	   staff use. The budget and schedule tables inside it stay unthemed on
+	   purpose (see BudgetPreview/SchedulePreview in portal/[token]/page.tsx):
+	   they intentionally mimic the real printed budget sheet clients already
+	   know, the same way /print stays light regardless of theme. */
+	:root[data-theme="dark"] .portal-shell {
+		color-scheme: dark;
+		--background: #10161a;
+		--foreground: #eef1ee;
+		--muted: #a3afa9;
+		--border: #2a353a;
+		--surface: #182124;
+		--surface-raised: #1d282c;
+		--surface-inset: #131b1e;
+		--surface-hover: #202c30;
+		--border-strong: #3a4a52;
+		--primary: #ff5a63;
+		--primary-foreground: #10161a;
+		--brand-red: #ff5a63;
 		--success: #3ecf96;
 		--info: #6ea8fe;
 		--warning: #e3a63e;
@@ -12742,11 +13584,11 @@ input[id^="tab-seguridad-"]:checked
 	:root[data-theme="dark"] .app-shell .app-shell-nav-link--active {
 		background: linear-gradient(
 			110deg,
-			rgba(62, 207, 150, 0.16),
-			rgba(62, 207, 150, 0.06)
+			rgba(255, 90, 99, 0.16),
+			rgba(255, 90, 99, 0.05)
 		);
 		color: #eef1ee;
-		box-shadow: inset 0 0 0 1px rgba(62, 207, 150, 0.22);
+		box-shadow: inset 0 0 0 1px rgba(255, 90, 99, 0.24);
 	}
 	:root[data-theme="dark"] .app-shell .app-shell-topbar {
 		border-bottom-color: #202b2f;
@@ -17604,6 +18446,414 @@ input[id^="tab-seguridad-"]:checked
 }
 
 /* ============================================================
+   Tema claro canónico: materialidad liquid glass mineral para
+   todos los módulos. Se nombran superficies concretas para no
+   diluir colores de estado, alertas ni acciones principales.
+   ============================================================ */
+@media screen {
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.executive-panel,
+			.project-panel,
+			.projects-panel,
+			.projects-filter-panel,
+			.project-form-panel,
+			.inventory-panel,
+			.reports-panel,
+			.documents-panel,
+			.requisitions-panel,
+			.purchases-command,
+			.users-panel,
+			.finances-panel,
+			.website-admin-panel,
+			.website-gallery-uploader,
+			.website-gallery-library,
+			.website-service-library,
+			.website-editor-shell,
+			.budget-financial-summary
+		) {
+		border-color: rgba(255, 255, 255, 0.82);
+		background:
+			linear-gradient(
+				145deg,
+				rgba(255, 255, 255, 0.9),
+				rgba(249, 251, 248, 0.72)
+			),
+			rgba(255, 255, 255, 0.82);
+		box-shadow:
+			0 24px 58px rgba(28, 48, 40, 0.11),
+			0 3px 10px rgba(28, 48, 40, 0.045),
+			inset 0 1px 0 rgba(255, 255, 255, 0.98);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.executive-kpi,
+			.project-kpi,
+			.projects-kpis > *,
+			.inventory-metric,
+			.reports-metric,
+			.documents-metric,
+			.requisitions-metric,
+			.purchases-kpi,
+			.access-kpi,
+			.finances-metric,
+			.website-metric
+		) {
+		border-color: rgba(255, 255, 255, 0.88);
+		background:
+			linear-gradient(
+				148deg,
+				rgba(255, 255, 255, 0.94),
+				rgba(248, 251, 248, 0.7)
+			),
+			rgba(255, 255, 255, 0.8);
+		box-shadow:
+			0 18px 38px rgba(28, 48, 40, 0.105),
+			0 2px 7px rgba(28, 48, 40, 0.04),
+			inset 0 1px 0 #fff;
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.project-tabs,
+			.inventory-commandbar,
+			.reports-tabs,
+			.reports-filters,
+			.documents-toolbar,
+			.purchases-tabs,
+			.purchases-toolbar,
+			.purchases-order-filters,
+			.website-editor-nav
+		) {
+		border-color: rgba(139, 158, 149, 0.22);
+		background:
+			linear-gradient(
+				135deg,
+				rgba(236, 243, 239, 0.76),
+				rgba(255, 255, 255, 0.62)
+			),
+			rgba(241, 246, 243, 0.72);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.9),
+			0 10px 26px rgba(28, 48, 40, 0.065);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.documents-project-card,
+			.requisitions-card,
+			.purchases-order-detail,
+			.purchases-supplier,
+			.purchases-requisition,
+			.website-gallery-card,
+			.project-completion-status,
+			.projects-list__row
+		) {
+		border-color: rgba(151, 169, 160, 0.25);
+		background:
+			linear-gradient(
+				145deg,
+				rgba(255, 255, 255, 0.84),
+				rgba(246, 250, 247, 0.66)
+			),
+			rgba(255, 255, 255, 0.74);
+		box-shadow:
+			0 14px 32px rgba(28, 48, 40, 0.075),
+			inset 0 1px 0 rgba(255, 255, 255, 0.94);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.documents-form-section,
+			.requisitions-form-section,
+			.purchases-form__section,
+			.purchases-order-form__section,
+			.purchases-order-lines,
+			.purchases-order-total,
+			.user-account-editor,
+			.user-security-section,
+			.website-editor-form section
+		) {
+		border-color: rgba(151, 169, 160, 0.26);
+		background:
+			linear-gradient(
+				145deg,
+				rgba(255, 255, 255, 0.9),
+				rgba(248, 251, 248, 0.76)
+			),
+			rgba(255, 255, 255, 0.84);
+		box-shadow:
+			0 16px 36px rgba(28, 48, 40, 0.075),
+			inset 0 1px 0 rgba(255, 255, 255, 0.96);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(.projects-list, .reports-table, .documents-table, .requisitions-list) {
+		border-color: rgba(151, 169, 160, 0.22);
+		background: rgba(248, 251, 249, 0.65);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+		border-color: rgba(126, 145, 136, 0.34);
+		background-color: rgba(255, 255, 255, 0.82);
+		box-shadow:
+			0 5px 14px rgba(28, 48, 40, 0.035),
+			inset 0 1px 0 rgba(255, 255, 255, 0.95);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(input, select, textarea):not([type="checkbox"]):not(
+			[type="radio"]
+		):hover {
+		border-color: rgba(76, 108, 94, 0.48);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(input, select, textarea):not([type="checkbox"]):not(
+			[type="radio"]
+		):focus {
+		border-color: rgba(200, 32, 47, 0.52);
+		background-color: rgba(255, 255, 255, 0.96);
+		box-shadow:
+			0 0 0 3px rgba(200, 32, 47, 0.11),
+			0 9px 22px rgba(28, 48, 40, 0.07);
+	}
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media screen and (prefers-reduced-transparency: no-preference) {
+		:root:not([data-theme="dark"])
+			.app-shell:not(:has(.print-surface))
+			:is(
+				.executive-panel,
+				.project-panel,
+				.projects-panel,
+				.projects-filter-panel,
+				.project-form-panel,
+				.inventory-panel,
+				.reports-panel,
+				.documents-panel,
+				.requisitions-panel,
+				.purchases-command,
+				.users-panel,
+				.finances-panel,
+				.website-admin-panel,
+				.website-editor-shell
+			) {
+			backdrop-filter: blur(24px) saturate(1.18);
+			-webkit-backdrop-filter: blur(24px) saturate(1.18);
+		}
+
+		:root:not([data-theme="dark"])
+			.app-shell:not(:has(.print-surface))
+			:is(
+				.executive-kpi,
+				.project-kpi,
+				.projects-kpis > *,
+				.inventory-metric,
+				.reports-metric,
+				.documents-metric,
+				.requisitions-metric,
+				.purchases-kpi,
+				.access-kpi,
+				.finances-metric,
+				.website-metric,
+				.projects-list__row
+			) {
+			backdrop-filter: blur(18px) saturate(1.16);
+			-webkit-backdrop-filter: blur(18px) saturate(1.16);
+		}
+	}
+}
+
+/* ============================================================
+   Modo claro: liquid glass mineral. La barra lateral recibe una
+   superficie propia y los controles conservan contraste sin perder
+   la transparencia. El bloque se excluye por completo del modo oscuro.
+   ============================================================ */
+@media screen {
+	:root:not([data-theme="dark"]) .app-shell:not(:has(.print-surface)) {
+		background:
+			radial-gradient(
+				circle at 8% 2%,
+				rgba(31, 122, 91, 0.105),
+				transparent 31rem
+			),
+			radial-gradient(
+				circle at 96% 5%,
+				rgba(200, 32, 47, 0.075),
+				transparent 29rem
+			),
+			linear-gradient(155deg, #f4f7f4 0%, #e8eeea 48%, #f1eeeb 100%);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-topbar {
+		border-bottom-color: rgba(173, 187, 179, 0.62);
+		background: rgba(249, 251, 249, 0.88);
+		box-shadow:
+			inset 0 -1px 0 rgba(255, 255, 255, 0.86),
+			0 10px 30px rgba(24, 42, 36, 0.055);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-sidebar {
+		border-right-color: rgba(149, 170, 159, 0.55);
+		background:
+			radial-gradient(
+				circle at -12% 12%,
+				rgba(31, 122, 91, 0.16),
+				transparent 17rem
+			),
+			radial-gradient(
+				circle at 112% 92%,
+				rgba(200, 32, 47, 0.105),
+				transparent 19rem
+			),
+			linear-gradient(
+				165deg,
+				rgba(247, 251, 248, 0.98),
+				rgba(226, 236, 230, 0.96) 58%,
+				rgba(245, 238, 237, 0.96)
+			);
+		box-shadow:
+			12px 0 38px rgba(20, 39, 33, 0.13),
+			inset -1px 0 0 rgba(255, 255, 255, 0.72);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-brandbar {
+		border-bottom-color: rgba(147, 169, 157, 0.46);
+		background: rgba(255, 255, 255, 0.3);
+		box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.68);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-nav-scroll {
+		background:
+			linear-gradient(
+				180deg,
+				rgba(223, 236, 228, 0.48),
+				rgba(245, 247, 244, 0.2) 36%,
+				rgba(239, 228, 228, 0.22)
+			),
+			rgba(255, 255, 255, 0.16);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.62),
+			inset 0 -1px 0 rgba(255, 255, 255, 0.46);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-nav-link {
+		border: 1px solid transparent;
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-nav-link--inactive {
+		border-color: rgba(255, 255, 255, 0.28);
+		background: rgba(255, 255, 255, 0.18);
+		color: #4b5c55;
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell
+		.app-shell-nav-link--inactive:hover {
+		border-color: rgba(255, 255, 255, 0.82);
+		background: rgba(255, 255, 255, 0.64);
+		color: #17231f;
+		box-shadow:
+			0 10px 24px rgba(28, 51, 42, 0.1),
+			inset 0 1px 0 rgba(255, 255, 255, 0.9);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-nav-link--active {
+		border-color: rgba(200, 32, 47, 0.18);
+		background:
+			linear-gradient(
+				110deg,
+				rgba(200, 32, 47, 0.105),
+				rgba(255, 255, 255, 0.7)
+			),
+			rgba(255, 255, 255, 0.58);
+		box-shadow:
+			0 12px 28px rgba(46, 54, 50, 0.095),
+			inset 0 1px 0 rgba(255, 255, 255, 0.88);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-collapse {
+		border-color: rgba(255, 255, 255, 0.74);
+		background: rgba(255, 255, 255, 0.54);
+		color: #465650;
+		box-shadow:
+			0 12px 28px rgba(27, 45, 38, 0.11),
+			inset 0 1px 0 rgba(255, 255, 255, 0.92);
+		transition:
+			transform 170ms cubic-bezier(0.16, 1, 0.3, 1),
+			background-color 170ms ease,
+			box-shadow 170ms ease;
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-collapse:hover {
+		background: rgba(255, 255, 255, 0.78);
+		box-shadow:
+			0 16px 34px rgba(27, 45, 38, 0.15),
+			inset 0 1px 0 #fff;
+		transform: translateY(-1px);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.executive-panel {
+		border-color: rgba(255, 255, 255, 0.78);
+		background: rgba(255, 255, 255, 0.86);
+		box-shadow:
+			0 24px 58px rgba(28, 48, 40, 0.12),
+			inset 0 1px 0 rgba(255, 255, 255, 0.94);
+	}
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media screen and (prefers-reduced-transparency: no-preference) {
+		:root:not([data-theme="dark"]) .app-shell .app-shell-topbar {
+			background: rgba(248, 251, 249, 0.7);
+			backdrop-filter: blur(24px) saturate(1.3);
+			-webkit-backdrop-filter: blur(24px) saturate(1.3);
+		}
+
+		:root:not([data-theme="dark"]) .app-shell .app-shell-sidebar {
+			background:
+				radial-gradient(
+					circle at -12% 12%,
+					rgba(31, 122, 91, 0.13),
+					transparent 17rem
+				),
+				radial-gradient(
+					circle at 112% 92%,
+					rgba(200, 32, 47, 0.09),
+					transparent 19rem
+				),
+				rgba(239, 245, 241, 0.78);
+			backdrop-filter: blur(30px) saturate(1.34);
+			-webkit-backdrop-filter: blur(30px) saturate(1.34);
+		}
+
+		:root:not([data-theme="dark"])
+			.app-shell:not(:has(.print-surface))
+			.executive-panel {
+			background: rgba(255, 255, 255, 0.72);
+			backdrop-filter: blur(24px) saturate(1.22);
+			-webkit-backdrop-filter: blur(24px) saturate(1.22);
+		}
+	}
+}
+
+/* ============================================================
    Modo oscuro (pase 6): clases de paleta estandar de Tailwind
    (text-slate-400, bg-emerald-50, etc.) en vez de hex arbitrario -
    el barrido automatico original solo buscaba "bg-[#...]" y se
@@ -20277,5 +21527,491 @@ input[id^="tab-seguridad-"]:checked
 		.budget-financial-summary__grand-total
 		strong {
 		color: #8beac6;
+	}
+}
+
+/* ============================================================
+   Tema oscuro canónico: la escala del Dashboard es la referencia
+   para todo el panel. Los colores de estado conservan su significado;
+   las superficies neutras ya no heredan matices oliva o azulados.
+   ============================================================ */
+@media screen {
+	:root[data-theme="dark"] .app-shell:not(:has(.print-surface)) {
+		background: var(--background);
+		color: var(--foreground);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.app-shell-content,
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.app-shell-main {
+		background-color: var(--background);
+	}
+
+	:root[data-theme="dark"] .app-shell .app-shell-topbar {
+		background: rgba(16, 22, 26, 0.92);
+		box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.035);
+	}
+
+	:root[data-theme="dark"] .app-shell .app-shell-sidebar {
+		background:
+			radial-gradient(
+				circle at 0 0,
+				rgba(62, 207, 150, 0.07),
+				transparent 15rem
+			),
+			radial-gradient(
+				circle at 100% 100%,
+				rgba(255, 90, 99, 0.07),
+				transparent 18rem
+			),
+			rgba(16, 22, 26, 0.96);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.bg-\[\#f7f8f5\],
+			.bg-\[\#fbfbf8\],
+			.bg-\[\#f4f0ed\],
+			.bg-\[\#eaf0ee\],
+			.bg-\[\#f1f5f3\],
+			.bg-\[\#e8eeea\],
+			.bg-\[\#f3f5f1\],
+			.bg-\[\#f9faf8\],
+			.bg-\[\#f2f4f0\],
+			.bg-\[\#fbfaf6\],
+			.bg-\[\#f5f6f2\],
+			.bg-\[\#f7f6f1\],
+			.bg-\[\#f3f0ec\],
+			.bg-\[\#f4f7f4\],
+			.bg-\[\#f9faf7\],
+			.bg-\[\#f8f7f4\],
+			.bg-\[\#f8faf8\],
+			.bg-\[\#f9f7f4\],
+			.bg-\[\#f3f1ec\]
+		) {
+		background-color: var(--surface-raised);
+		background-image: none;
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		:is(.users-hero, .projects-hero, .purchases-hero) {
+		border: 1px solid var(--border);
+		background:
+			radial-gradient(
+				circle at 4% 112%,
+				rgba(62, 207, 150, 0.13),
+				transparent 25rem
+			),
+			radial-gradient(
+				circle at 96% -12%,
+				rgba(255, 90, 99, 0.1),
+				transparent 23rem
+			),
+			var(--surface);
+		box-shadow:
+			0 26px 58px rgba(0, 0, 0, 0.3),
+			inset 0 1px 0 rgba(255, 255, 255, 0.045);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.users-panel,
+			.projects-panel,
+			.projects-filter-panel,
+			.purchases-command
+		) {
+		border-color: var(--border);
+		background: var(--surface);
+		background-image: none;
+		box-shadow:
+			0 22px 52px rgba(0, 0, 0, 0.25),
+			inset 0 1px 0 rgba(255, 255, 255, 0.035);
+	}
+
+	:root[data-theme="dark"] .app-shell:not(:has(.print-surface)) .access-kpi,
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.projects-kpis
+		> *,
+	:root[data-theme="dark"] .app-shell:not(:has(.print-surface)) .purchases-kpi {
+		border-color: var(--border);
+		background: var(--surface);
+		background-image: none;
+		box-shadow:
+			0 18px 40px rgba(0, 0, 0, 0.22),
+			inset 0 1px 0 rgba(255, 255, 255, 0.035);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.projects-panel__header,
+	:root[data-theme="dark"] .app-shell:not(:has(.print-surface)) .projects-list {
+		border-color: var(--border);
+		background: var(--surface-raised);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.projects-list__row {
+		border-color: var(--border);
+		background: var(--surface);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.projects-list__row:hover {
+		background: var(--surface-hover);
+		box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.projects-list__fact {
+		background: var(--surface-inset);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+	}
+
+	:root[data-theme="dark"] .app-shell:not(:has(.print-surface)) .purchases-kpi,
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.purchases-order-detail,
+			.purchases-supplier,
+			.purchases-requisition,
+			.purchases-form__section,
+			.purchases-order-form__section,
+			.purchases-order-lines,
+			.purchases-order-total
+		) {
+		background: var(--surface);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.purchases-tabs,
+			.purchases-toolbar,
+			.purchases-order-filters,
+			.purchases-supplier__contact,
+			.purchases-requisition__destination,
+			.purchases-order-detail__facts > div,
+			.purchases-empty--large
+		) {
+		background: var(--surface-raised);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		:is(input, select, textarea) {
+		border-color: var(--border-strong);
+		background-color: var(--surface-inset);
+		color: var(--foreground);
+	}
+
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		:is(input, textarea)::placeholder {
+		color: #87948e;
+	}
+}
+
+/* ============================================================
+   Tema claro industrial: petróleo, concreto frío y blanco técnico.
+   La navegación concentra el color; el rojo HM identifica acciones
+   y selección, y el amarillo conserva su función de advertencia.
+   ============================================================ */
+@media screen {
+	:root:not([data-theme="dark"]) .app-shell:not(:has(.print-surface)) {
+		background:
+			radial-gradient(
+				circle at 8% 0%,
+				rgba(20, 92, 96, 0.17),
+				transparent 32rem
+			),
+			radial-gradient(
+				circle at 96% 4%,
+				rgba(200, 32, 47, 0.075),
+				transparent 28rem
+			),
+			linear-gradient(155deg, #f4f8f7 0%, #d8e5e3 50%, #e8eeee 100%);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-topbar {
+		border-bottom-color: rgba(63, 92, 94, 0.24);
+		background: rgba(249, 252, 251, 0.92);
+		box-shadow:
+			inset 0 -1px 0 rgba(255, 255, 255, 0.88),
+			0 10px 30px rgba(15, 48, 51, 0.08);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-sidebar {
+		border-right-color: rgba(255, 255, 255, 0.12);
+		background:
+			radial-gradient(
+				circle at -10% 8%,
+				rgba(53, 150, 147, 0.24),
+				transparent 17rem
+			),
+			radial-gradient(
+				circle at 112% 92%,
+				rgba(200, 32, 47, 0.16),
+				transparent 20rem
+			),
+			linear-gradient(165deg, #17383b, #102c30 58%, #17252a);
+		color: #f7fbfa;
+		box-shadow:
+			12px 0 38px rgba(7, 34, 37, 0.23),
+			inset -1px 0 0 rgba(255, 255, 255, 0.08);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-brandbar {
+		border-bottom-color: rgba(255, 255, 255, 0.12);
+		background: rgba(6, 30, 33, 0.18);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell
+		.app-shell-brandbar
+		:is(strong, span) {
+		color: #f6faf9;
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-brandbar small {
+		color: #aec2c0;
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-nav-scroll {
+		background:
+			linear-gradient(
+				180deg,
+				rgba(35, 82, 84, 0.42),
+				rgba(10, 36, 39, 0.12) 42%,
+				rgba(87, 32, 40, 0.18)
+			),
+			rgba(8, 31, 34, 0.12);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-nav-link--inactive {
+		border-color: rgba(255, 255, 255, 0.055);
+		background: rgba(255, 255, 255, 0.035);
+		color: #c9d8d6;
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell
+		.app-shell-nav-link--inactive:hover {
+		border-color: rgba(255, 255, 255, 0.2);
+		background: rgba(255, 255, 255, 0.105);
+		color: #ffffff;
+		box-shadow:
+			0 10px 24px rgba(4, 23, 25, 0.2),
+			inset 0 1px 0 rgba(255, 255, 255, 0.14);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-nav-link--active {
+		border-color: rgba(255, 102, 114, 0.42);
+		background:
+			linear-gradient(110deg, rgba(200, 32, 47, 0.38), rgba(255, 255, 255, 0.1)),
+			rgba(255, 255, 255, 0.08);
+		color: #ffffff;
+		box-shadow:
+			0 12px 28px rgba(4, 23, 25, 0.24),
+			inset 0 1px 0 rgba(255, 255, 255, 0.16);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-collapse {
+		border-color: rgba(255, 255, 255, 0.16);
+		background: rgba(255, 255, 255, 0.08);
+		color: #edf5f4;
+		box-shadow:
+			0 12px 28px rgba(4, 23, 25, 0.24),
+			inset 0 1px 0 rgba(255, 255, 255, 0.12);
+	}
+
+	:root:not([data-theme="dark"]) .app-shell .app-shell-collapse:hover {
+		background: rgba(255, 255, 255, 0.15);
+		box-shadow:
+			0 16px 34px rgba(4, 23, 25, 0.28),
+			inset 0 1px 0 rgba(255, 255, 255, 0.18);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.executive-panel,
+			.project-panel,
+			.projects-panel,
+			.projects-filter-panel,
+			.project-form-panel,
+			.inventory-panel,
+			.reports-panel,
+			.documents-panel,
+			.requisitions-panel,
+			.purchases-command,
+			.users-panel,
+			.finances-panel,
+			.website-admin-panel,
+			.website-gallery-uploader,
+			.website-gallery-library,
+			.website-service-library,
+			.website-editor-shell,
+			.budget-financial-summary
+		) {
+		border-color: rgba(255, 255, 255, 0.9);
+		background:
+			linear-gradient(
+				145deg,
+				rgba(255, 255, 255, 0.96),
+				rgba(232, 241, 240, 0.8)
+			),
+			rgba(249, 253, 252, 0.88);
+		box-shadow:
+			0 24px 58px rgba(15, 48, 51, 0.12),
+			inset 0 1px 0 #fff;
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.executive-kpi,
+			.project-kpi,
+			.projects-kpis > *,
+			.inventory-metric,
+			.reports-metric,
+			.documents-metric,
+			.requisitions-metric,
+			.purchases-kpi,
+			.access-kpi,
+			.finances-metric,
+			.website-metric
+		) {
+		border-color: rgba(255, 255, 255, 0.94);
+		background:
+			linear-gradient(
+				148deg,
+				rgba(255, 255, 255, 0.98),
+				rgba(226, 238, 236, 0.8)
+			),
+			rgba(249, 253, 252, 0.9);
+		box-shadow:
+			0 18px 38px rgba(15, 48, 51, 0.115),
+			inset 0 1px 0 #fff;
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.project-tabs,
+			.inventory-commandbar,
+			.reports-tabs,
+			.reports-filters,
+			.documents-toolbar,
+			.purchases-tabs,
+			.purchases-toolbar,
+			.purchases-order-filters,
+			.website-editor-nav
+		) {
+		border-color: rgba(65, 102, 103, 0.26);
+		background:
+			linear-gradient(
+				135deg,
+				rgba(190, 216, 213, 0.72),
+				rgba(250, 253, 252, 0.8)
+			),
+			rgba(223, 236, 234, 0.82);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.9),
+			0 10px 26px rgba(15, 48, 51, 0.085);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+		border-color: rgba(73, 105, 105, 0.36);
+		background-color: rgba(253, 255, 255, 0.92);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.inventory-commandbar {
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		background:
+			radial-gradient(
+				circle at 92% 12%,
+				rgba(200, 32, 47, 0.2),
+				transparent 18rem
+			),
+			linear-gradient(120deg, #16383b, #102c30 58%, #17252a);
+		box-shadow:
+			0 20px 48px rgba(7, 34, 37, 0.22),
+			inset 0 1px 0 rgba(255, 255, 255, 0.09);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.website-editor-nav {
+		border-right: 1px solid rgba(255, 255, 255, 0.1);
+		background:
+			radial-gradient(circle at 0 0, rgba(53, 150, 147, 0.2), transparent 16rem),
+			linear-gradient(155deg, #17383b, #17272b);
+		color: #ffffff;
+		box-shadow: 12px 0 30px rgba(7, 34, 37, 0.12);
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.website-editor-nav__heading
+		span {
+		color: #bbcecb;
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.website-editor-nav__item:not([aria-current="page"]) {
+		color: #d8e4e2;
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.website-editor-nav__item:not([aria-current="page"])
+		small {
+		color: #9fb5b2;
+	}
+
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.website-editor-nav__item:not([aria-current="page"]):hover {
+		background: rgba(255, 255, 255, 0.09);
+		color: #ffffff;
+	}
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media screen and (prefers-reduced-transparency: no-preference) {
+		:root:not([data-theme="dark"]) .app-shell .app-shell-topbar {
+			background: rgba(249, 253, 252, 0.78);
+		}
+
+		:root:not([data-theme="dark"]) .app-shell .app-shell-sidebar {
+			background:
+				radial-gradient(
+					circle at -10% 8%,
+					rgba(53, 150, 147, 0.22),
+					transparent 17rem
+				),
+				radial-gradient(
+					circle at 112% 92%,
+					rgba(200, 32, 47, 0.14),
+					transparent 20rem
+				),
+				rgba(15, 45, 49, 0.94);
+		}
 	}
 }

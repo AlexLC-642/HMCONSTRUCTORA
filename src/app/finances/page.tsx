@@ -39,7 +39,7 @@ const dateFormatter = new Intl.DateTimeFormat("es-GT", { dateStyle: "medium" });
 const inputClass =
 	"focus-ring h-11 w-full rounded-md border border-[#cfd5ce] bg-white px-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)] transition placeholder:text-[#96a09b] hover:border-[#aeb8b1]";
 const panelClass =
-	"rounded-xl bg-white shadow-[0_16px_38px_rgba(22,27,29,0.08)]";
+	"finances-panel rounded-xl bg-white shadow-[0_16px_38px_rgba(22,27,29,0.08)]";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
 	return (
@@ -89,7 +89,7 @@ function MoneyMetric({
 	}[tone];
 
 	return (
-		<div className="group relative overflow-hidden rounded-xl bg-white/80 p-4 shadow-[0_14px_34px_rgba(22,27,29,0.1)] backdrop-blur-xl backdrop-saturate-150 transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_22px_44px_rgba(22,27,29,0.15)]">
+		<div className="finances-metric group relative overflow-hidden rounded-xl bg-white/80 p-4 shadow-[0_14px_34px_rgba(22,27,29,0.1)] backdrop-blur-xl backdrop-saturate-150 transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_22px_44px_rgba(22,27,29,0.15)]">
 			<span className={`absolute inset-x-0 top-0 h-1 ${styles.bar}`} />
 			<span
 				className={`pointer-events-none absolute -bottom-10 -right-8 size-24 rounded-full ${styles.glow} transition duration-300 group-hover:scale-125`}
@@ -209,26 +209,16 @@ export default async function FinancesPage({
 		].sort((left, right) => right.getTime() - left.getTime())[0] ?? new Date();
 
 	return (
-		<main className="mx-auto max-w-[1520px] space-y-6 pb-10">
-			<section className="relative overflow-hidden rounded-2xl bg-[#172023] text-white shadow-[0_26px_72px_rgba(22,27,29,0.26)]">
+		<main className="finances-workspace mx-auto max-w-[1520px] space-y-6 pb-10">
+			<section className="finances-hero relative overflow-hidden rounded-2xl bg-[#172023] text-white shadow-[0_26px_72px_rgba(22,27,29,0.26)]">
 				<div className="pointer-events-none absolute -right-20 -top-32 size-80 rounded-full bg-[#c8202f]/30 blur-3xl" />
 				<div className="pointer-events-none absolute inset-y-0 left-[48%] w-px rotate-[28deg] bg-white/[0.06] shadow-[70px_0_0_rgba(255,255,255,0.04),140px_0_0_rgba(255,255,255,0.025)]" />
 				<div className="relative grid gap-5 p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_460px] xl:items-center">
-					<div>
-						<div className="flex items-center gap-4">
-							<span className="grid size-12 place-items-center rounded-xl bg-[var(--brand-red)] text-white shadow-[0_12px_28px_rgba(200,32,47,0.34)]">
-								<Landmark aria-hidden="true" size={21} />
-							</span>
-							<div>
-								<h1 className="text-3xl font-semibold tracking-tight text-white">
-									Finanzas
-								</h1>
-								<p className="mt-1 max-w-xl text-sm text-white/75">
-									Controla presupuesto, ingresos, compras y pagos desde un solo
-									espacio.
-								</p>
-							</div>
-						</div>
+					<div className="flex items-center gap-4">
+						<span className="grid size-14 shrink-0 place-items-center rounded-xl bg-[var(--brand-red)] text-white shadow-[0_12px_28px_rgba(200,32,47,0.34)]">
+							<Landmark aria-hidden="true" size={24} />
+						</span>
+						<h1 className="sr-only">Finanzas</h1>
 					</div>
 					<AutoFilterForm
 						action="/finances"
@@ -418,7 +408,7 @@ export default async function FinancesPage({
 							</p>
 						</div>
 					</div>
-					<div className="overflow-x-auto">
+					<div className="hidden overflow-x-auto md:block">
 						<table className="w-full min-w-[760px] border-collapse text-sm">
 							<thead className="bg-[#f3f5f1] text-left text-xs uppercase tracking-[0.06em] text-[#58635f]">
 								<tr>
@@ -474,6 +464,61 @@ export default async function FinancesPage({
 								) : null}
 							</tbody>
 						</table>
+					</div>
+					<div className="grid gap-3 p-4 md:hidden">
+						{allocations.map((line) => (
+							<div
+								className="rounded-2xl border border-[#e1e5df] bg-[#f9faf8] p-4"
+								key={line.id}
+							>
+								<div className="flex items-start justify-between gap-3">
+									<div className="min-w-0">
+										<strong>{line.code}</strong>
+										<p className="mt-0.5 text-sm text-[var(--muted)]">
+											{line.name}
+										</p>
+										<small className="text-[var(--muted)]">
+											{line.lineItemCount} conceptos presupuestados
+										</small>
+									</div>
+									<span className="shrink-0 font-semibold tabular-nums text-[#52605b]">
+										{line.coverage.toFixed(0)}%
+									</span>
+								</div>
+								<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e5e9e4]">
+									<div
+										className="h-full rounded-full bg-[var(--success)]"
+										style={{ width: `${line.coverage}%` }}
+									/>
+								</div>
+								<dl className="mt-3 grid grid-cols-3 gap-2 text-xs text-[var(--muted)]">
+									<div>
+										<dt>Valor</dt>
+										<dd className="mt-1 font-bold tabular-nums text-[var(--foreground)]">
+											{currencyFormatter.format(line.total.toNumber())}
+										</dd>
+									</div>
+									<div>
+										<dt>Abonado</dt>
+										<dd className="mt-1 font-bold tabular-nums text-[var(--success)]">
+											{currencyFormatter.format(line.paid)}
+										</dd>
+									</div>
+									<div>
+										<dt>Pendiente</dt>
+										<dd className="mt-1 font-bold tabular-nums text-[var(--foreground)]">
+											{currencyFormatter.format(line.pending)}
+										</dd>
+									</div>
+								</dl>
+							</div>
+						))}
+						{allocations.length === 0 ? (
+							<p className="py-8 text-center text-sm text-[var(--muted)]">
+								Aprueba una versión del presupuesto para aplicar abonos por
+								renglón.
+							</p>
+						) : null}
 					</div>
 				</section>
 
@@ -567,7 +612,7 @@ export default async function FinancesPage({
 							</div>
 						</div>
 					</div>
-					<div className="overflow-x-auto">
+					<div className="hidden overflow-x-auto md:block">
 						<table className="w-full min-w-[1020px] border-collapse text-sm">
 							<thead className="bg-[#f3f5f1] text-left text-xs uppercase tracking-[0.06em] text-[#58635f]">
 								<tr>
@@ -737,6 +782,88 @@ export default async function FinancesPage({
 							</tbody>
 						</table>
 					</div>
+					<div className="grid gap-3 p-4 md:hidden">
+						{payables.map(({ expense, paid, pending, estimatedTotal }) => (
+							<div
+								className="rounded-2xl border border-[#e1e5df] bg-[#f9faf8] p-4"
+								key={expense.id}
+							>
+								<p className="font-medium">{expense.description}</p>
+								<p className="text-xs text-[var(--muted)]">
+									{expense.supplier?.businessName ?? expense.vendor ?? "-"}
+								</p>
+								{estimatedTotal !== null ? (
+									<p className="mt-1 text-xs text-[var(--muted)]">
+										Estimado{" "}
+										{currencyFormatter.format(estimatedTotal.toNumber())}
+									</p>
+								) : null}
+								{expense.purchaseOrder?.paymentType === "CREDIT" &&
+								expense.purchaseOrder.paymentDueDate ? (
+									<p className="mt-2 text-xs">
+										Vence{" "}
+										<span className="font-medium">
+											{dateFormatter.format(
+												expense.purchaseOrder.paymentDueDate,
+											)}
+										</span>
+										{pending.gt(0) &&
+										new Date(expense.purchaseOrder.paymentDueDate) <
+											new Date(`${today}T00:00:00.000Z`) ? (
+											<span className="ml-2 rounded-full bg-[#fdebed] px-2 py-0.5 text-[11px] font-semibold text-[#a81929]">
+												Vencida
+											</span>
+										) : null}
+									</p>
+								) : null}
+								<dl className="mt-3 grid grid-cols-3 gap-2 text-xs text-[var(--muted)]">
+									<div>
+										<dt>Comprado</dt>
+										<dd className="mt-1 font-bold tabular-nums text-[var(--foreground)]">
+											{currencyFormatter.format(expense.subtotal.toNumber())}
+										</dd>
+									</div>
+									<div>
+										<dt>Pagado</dt>
+										<dd className="mt-1 font-bold tabular-nums text-[var(--foreground)]">
+											{currencyFormatter.format(paid.toNumber())}
+										</dd>
+									</div>
+									<div>
+										<dt>Pendiente</dt>
+										<dd
+											className={`mt-1 font-bold tabular-nums ${pending.gt(0) ? "text-[var(--danger)]" : "text-[var(--success)]"}`}
+										>
+											{pending.gt(0)
+												? currencyFormatter.format(pending.toNumber())
+												: "Pagado"}
+										</dd>
+									</div>
+								</dl>
+								{canRegister && pending.gt(0) ? (
+									<div className="mt-3">
+										<SupplierPaymentDialog
+											description={expense.description}
+											expenseId={expense.id}
+											pending={pending.toFixed(2)}
+											projectId={selectedProjectId}
+											provider={
+												expense.supplier?.businessName ??
+												expense.vendor ??
+												"Proveedor no indicado"
+											}
+											today={today}
+										/>
+									</div>
+								) : null}
+							</div>
+						))}
+						{payables.length === 0 ? (
+							<p className="py-8 text-center text-sm text-[var(--muted)]">
+								Sin compras registradas.
+							</p>
+						) : null}
+					</div>
 				</section>
 
 				<section
@@ -748,7 +875,7 @@ export default async function FinancesPage({
 							Abonos del cliente (ingresos)
 						</h2>
 					</div>
-					<div className="overflow-x-auto">
+					<div className="hidden overflow-x-auto md:block">
 						<table className="w-full min-w-[760px] border-collapse text-sm">
 							<thead className="bg-[#f3f5f1] text-left text-xs uppercase tracking-[0.06em] text-[#58635f]">
 								<tr>
@@ -801,6 +928,47 @@ export default async function FinancesPage({
 								) : null}
 							</tbody>
 						</table>
+					</div>
+					<div className="grid gap-3 p-4 md:hidden">
+						{payments.map((payment) => (
+							<div
+								className="rounded-2xl border border-[#e1e5df] bg-[#f9faf8] p-4"
+								key={payment.id}
+							>
+								<div className="flex items-start justify-between gap-3">
+									<div className="min-w-0">
+										<strong>{payment.paymentNumber}</strong>
+										<p className="mt-0.5 text-xs text-[var(--muted)]">
+											{dateFormatter.format(payment.paymentDate)}
+											{payment.method ? ` · ${payment.method}` : ""}
+										</p>
+									</div>
+									<span className="shrink-0 font-bold tabular-nums text-[var(--foreground)]">
+										{currencyFormatter.format(payment.amount.toNumber())}
+									</span>
+								</div>
+								<p className="mt-2 text-xs text-[var(--muted)]">
+									{payment.budgetSection
+										? `Renglón ${payment.budgetSection.code} · ${payment.budgetSection.name}`
+										: "General"}
+								</p>
+								{payment.concept ? (
+									<p className="mt-1 text-xs text-[var(--muted)]">
+										{payment.concept}
+									</p>
+								) : null}
+								{payment.reference ? (
+									<p className="mt-1 text-xs text-[var(--muted)]">
+										Ref. {payment.reference}
+									</p>
+								) : null}
+							</div>
+						))}
+						{payments.length === 0 ? (
+							<p className="py-8 text-center text-sm text-[var(--muted)]">
+								Sin abonos registrados.
+							</p>
+						) : null}
 					</div>
 				</section>
 			</FinanceWorkspaceTabs>

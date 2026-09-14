@@ -78,6 +78,7 @@ export const purchaseOrderInputSchema = z
 	.object({
 		requisitionId: z.string().trim().optional(),
 		projectId: z.string().trim().optional(),
+		budgetExceptionReason: z.string().trim().optional(),
 		warehouseId: z.string().trim().optional(),
 		supplierId: z.string().trim().min(1, "Seleccione un proveedor."),
 		issueDate: z
@@ -142,6 +143,17 @@ export const purchaseOrderInputSchema = z
 				}
 			});
 			return;
+		}
+		if (
+			input.projectId &&
+			(!input.budgetExceptionReason || input.budgetExceptionReason.length < 10)
+		) {
+			context.addIssue({
+				code: "custom",
+				path: ["budgetExceptionReason"],
+				message:
+					"Explique por qué la compra del proyecto se realizará sin una solicitud presupuestada.",
+			});
 		}
 		if (!input.warehouseId) {
 			context.addIssue({

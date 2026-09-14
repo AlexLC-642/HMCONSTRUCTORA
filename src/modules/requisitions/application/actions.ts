@@ -98,7 +98,6 @@ export async function createRequisitionAction(formData: FormData) {
 			title: value(formData, "title"),
 			priority: value(formData, "priority"),
 			neededDate: value(formData, "neededDate"),
-			requestedBy: value(formData, "requestedBy"),
 			notes: value(formData, "notes"),
 			items: jsonValue(formData, "items"),
 		},

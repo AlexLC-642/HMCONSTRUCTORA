@@ -15,13 +15,10 @@ export function InventoryWorkspaceHeader({ view }: { view: View }) {
 					<span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/10 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]">
 						<Boxes aria-hidden="true" size={20} />
 					</span>
-					<div>
-						<h1 className="text-xl font-bold tracking-[-0.025em] text-white">
-							Inventario
-						</h1>
-						<p className="mt-0.5 text-xs font-medium text-[#bac5c0]">
-							Materiales, existencias y trazabilidad
-						</p>
+					<div className="inventory-commandbar__context">
+						<h1 className="sr-only">Inventario</h1>
+						<strong>Control de existencias</strong>
+						<span>Consulta stock o registra movimientos.</span>
 					</div>
 				</div>
 				<nav

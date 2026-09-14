@@ -137,6 +137,10 @@ export async function createRequisition(
 
 	return prisma.$transaction(async (tx) => {
 		const number = await nextRequisitionNumber(tx);
+		const actor = await tx.user.findUniqueOrThrow({
+			where: { id: context.userId },
+			select: { name: true, email: true },
+		});
 		const projectId =
 			parsed.destinationType === "PROJECT" ? nullable(parsed.projectId) : null;
 		const itemRecords: Prisma.RequisitionItemUncheckedCreateWithoutRequisitionInput[] =
@@ -144,6 +148,15 @@ export async function createRequisition(
 
 		for (const item of parsed.items) {
 			const budgetLineItemId = nullable(item.budgetLineItemId);
+			const outsideBudget = projectId ? item.outsideBudget : false;
+			const outsideBudgetReason = outsideBudget
+				? nullable(item.outsideBudgetReason)
+				: null;
+			if (budgetLineItemId && outsideBudget) {
+				throw new Error(
+					"Un recurso no puede estar vinculado al presupuesto y marcado fuera de presupuesto al mismo tiempo.",
+				);
+			}
 			if (budgetLineItemId) {
 				if (!projectId) {
 					throw new Error(
@@ -239,6 +252,8 @@ export async function createRequisition(
 				estimatedCost: material
 					? decimal(material.unitCost)
 					: decimal(item.estimatedCost),
+				outsideBudget,
+				outsideBudgetReason,
 				notes: nullable(item.itemNotes),
 			});
 		}
@@ -256,7 +271,7 @@ export async function createRequisition(
 				neededDate: parsed.neededDate
 					? new Date(`${parsed.neededDate}T00:00:00.000Z`)
 					: null,
-				requestedBy: nullable(parsed.requestedBy),
+				requestedBy: actor.name?.trim() || actor.email.split("@")[0],
 				notes: nullable(parsed.notes),
 				createdById: context.userId,
 				items: {
@@ -385,6 +400,26 @@ export async function approveRequisition(
 		});
 
 		await auditStatus(tx, approved, context);
+		if (requisition.items.some((item) => item.outsideBudget)) {
+			await tx.auditLog.create({
+				data: {
+					userId: context.userId,
+					action: "APPROVE",
+					entityType: "BudgetException",
+					entityId: requisition.id,
+					metadata: {
+						requisitionNumber: requisition.number,
+						items: requisition.items
+							.filter((item) => item.outsideBudget)
+							.map((item) => ({
+								id: item.id,
+								description: item.description,
+								reason: item.outsideBudgetReason,
+							})),
+					},
+				},
+			});
+		}
 		return approved;
 	});
 }

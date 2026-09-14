@@ -19,7 +19,12 @@ import { videoDurationLimitSeconds } from "../domain/catalog";
 import { documentInputClass } from "./document-ui";
 
 type UploadAction = (formData: FormData) => Promise<void>;
-type Category = { id: string; key: string; name: string; description: string | null };
+type Category = {
+	id: string;
+	key: string;
+	name: string;
+	description: string | null;
+};
 
 type Props = {
 	action: UploadAction;
@@ -36,7 +41,7 @@ export function DocumentUploadDrawer({
 	projects = [],
 	closeHref,
 }: Props) {
-	const [fileName, setFileName] = useState("");
+	const [fileNames, setFileNames] = useState<string[]>([]);
 	const [pending, setPending] = useState(false);
 	const [videoPreview, setVideoPreview] = useState("");
 	const [videoDurationSeconds, setVideoDurationSeconds] = useState<
@@ -125,36 +130,56 @@ export function DocumentUploadDrawer({
 				>
 					<div className="documents-upload-body documents-scrollbar">
 						<label
-							className={`documents-file-drop ${fileName ? "documents-file-drop--selected" : ""}`}
+							className={`documents-file-drop ${fileNames.length > 0 ? "documents-file-drop--selected" : ""}`}
 						>
 							<span className="documents-file-drop__icon">
-								{fileName ? <FileCheck2 size={24} /> : <FileUp size={24} />}
+								{fileNames.length > 0 ? (
+									<FileCheck2 size={24} />
+								) : (
+									<FileUp size={24} />
+								)}
 							</span>
-							<strong>{fileName || "Selecciona un archivo"}</strong>
+							<strong>
+								{fileNames.length === 0
+									? "Selecciona uno o más archivos"
+									: fileNames.length === 1
+										? fileNames[0]
+										: `${fileNames.length} archivos seleccionados`}
+							</strong>
 							<span>
-								{fileName
-									? "Archivo listo para cargar"
-									: "PDF, imágenes, videos MP4/MOV, Office, DWG o DXF · máximo 80 MB"}
+								{fileNames.length === 0
+									? "PDF, imágenes, videos MP4/MOV, Office, DWG o DXF · máximo 80 MB cada uno"
+									: "Listos para cargar"}
 							</span>
 							<input
 								className="sr-only"
 								name="file"
 								onChange={(event) => {
-									const file = event.target.files?.[0];
-									setFileName(file?.name ?? "");
+									const files = Array.from(event.target.files ?? []);
+									setFileNames(files.map((file) => file.name));
 									setVideoDurationSeconds(null);
 									setVideoPreview((current) => {
 										if (current) URL.revokeObjectURL(current);
-										return file?.type.startsWith("video/")
-											? URL.createObjectURL(file)
-											: "";
+										const onlyVideo =
+											files.length === 1 && files[0].type.startsWith("video/")
+												? files[0]
+												: null;
+										return onlyVideo ? URL.createObjectURL(onlyVideo) : "";
 									});
 								}}
 								accept=".pdf,.png,.jpg,.jpeg,.webp,.mp4,.mov,.docx,.xlsx,.pptx,.dwg,.dxf"
+								multiple
 								required
 								type="file"
 							/>
 						</label>
+						{fileNames.length > 1 ? (
+							<ul className="documents-file-list">
+								{fileNames.map((name) => (
+									<li key={name}>{name}</li>
+								))}
+							</ul>
+						) : null}
 						{videoPreview ? (
 							<div className="overflow-hidden rounded-2xl bg-[#101719] p-3 shadow-[0_16px_36px_rgba(16,23,25,0.2)]">
 								<div className="mb-2 flex items-center gap-2 text-xs font-semibold text-white">
@@ -222,27 +247,63 @@ export function DocumentUploadDrawer({
 									Título
 									<input
 										className={documentInputClass}
+										disabled={fileNames.length > 1}
 										name="title"
-										placeholder="Nombre del documento"
+										placeholder={
+											fileNames.length > 1
+												? "Se usa el nombre de cada archivo"
+												: "Nombre del documento"
+										}
 									/>
 								</label>
 								<fieldset className="sm:col-span-2">
-									<legend className="documents-field mb-2">Tipo de documento</legend>
-									<p className="mb-3 text-xs leading-relaxed text-[#6c7974]">Elige qué representa el archivo. Las facturas y recibos se adjuntan desde Finanzas; presupuestos, informes y requerimientos se gestionan desde sus propios módulos.</p>
+									<legend className="documents-field mb-2">
+										Tipo de documento
+									</legend>
+									<p className="mb-3 text-xs leading-relaxed text-[#6c7974]">
+										Elige qué representa el archivo. Las facturas y recibos se
+										adjuntan desde Finanzas; presupuestos, informes y
+										requerimientos se gestionan desde sus propios módulos.
+									</p>
 									<div className="grid gap-2 sm:grid-cols-2">
 										{categories.map((category) => {
-											const Icon = categoryIcons[category.key as keyof typeof categoryIcons] ?? FileText;
+											const Icon =
+												categoryIcons[
+													category.key as keyof typeof categoryIcons
+												] ?? FileText;
 											const selected = selectedCategory === category.id;
-											return <label className={`group flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition duration-200 ${selected ? "border-[#278362] bg-[#eef8f3] shadow-[0_8px_22px_rgba(31,122,91,0.12)]" : "border-[#d8ded8] bg-white hover:-translate-y-0.5 hover:border-[#aab7b0] hover:shadow-[0_8px_20px_rgba(22,27,29,0.08)]"}`} key={category.id}>
-												<input className="sr-only" name="categoryId" onChange={() => setSelectedCategory(category.id)} required type="radio" value={category.id} />
-												<span className={`grid size-9 shrink-0 place-items-center rounded-lg ${selected ? "bg-[#d9f0e4] text-[#176f54]" : "bg-[#f0f3f0] text-[#596762]"}`}><Icon size={16} /></span>
-												<span className="min-w-0"><strong className="block text-sm text-[#263330]">{category.name}</strong><small className="mt-0.5 block leading-relaxed text-[#71807a]">{category.description}</small></span>
-											</label>;
+											return (
+												<label
+													className={`group flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition duration-200 ${selected ? "border-[#278362] bg-[#eef8f3] shadow-[0_8px_22px_rgba(31,122,91,0.12)]" : "border-[#d8ded8] bg-white hover:-translate-y-0.5 hover:border-[#aab7b0] hover:shadow-[0_8px_20px_rgba(22,27,29,0.08)]"}`}
+													key={category.id}
+												>
+													<input
+														className="sr-only"
+														name="categoryId"
+														onChange={() => setSelectedCategory(category.id)}
+														required
+														type="radio"
+														value={category.id}
+													/>
+													<span
+														className={`grid size-9 shrink-0 place-items-center rounded-lg ${selected ? "bg-[#d9f0e4] text-[#176f54]" : "bg-[#f0f3f0] text-[#596762]"}`}
+													>
+														<Icon size={16} />
+													</span>
+													<span className="min-w-0">
+														<strong className="block text-sm text-[#263330]">
+															{category.name}
+														</strong>
+														<small className="mt-0.5 block leading-relaxed text-[#71807a]">
+															{category.description}
+														</small>
+													</span>
+												</label>
+											);
 										})}
 									</div>
 								</fieldset>
 							</div>
-							<input name="status" type="hidden" value="DRAFT" />
 						</section>
 
 						<details className="documents-additional">
@@ -284,7 +345,12 @@ export function DocumentUploadDrawer({
 							disabled={pending || durationExceeded}
 							type="submit"
 						>
-							<FileUp size={16} /> {pending ? "Subiendo..." : "Subir documento"}
+							<FileUp size={16} />{" "}
+							{pending
+								? "Subiendo..."
+								: fileNames.length > 1
+									? `Subir ${fileNames.length} documentos`
+									: "Subir documento"}
 						</button>
 					</footer>
 				</form>

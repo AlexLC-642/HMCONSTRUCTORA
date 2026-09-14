@@ -13,6 +13,7 @@ enum UserStatus {
 
 enum AuditAction {
   LOGIN
+  LOGIN_FAILED
   LOGOUT
   CREATE
   UPDATE
@@ -811,22 +812,24 @@ model Requisition {
 }
 
 model RequisitionItem {
-  id                 String              @id @default(uuid())
-  requisitionId      String
-  materialId         String?
-  budgetLineItemId   String?
-  scheduleActivityId String?
-  description        String
-  quantity           Decimal             @default(0) @db.Decimal(14, 2)
-  unit               String?
-  estimatedCost      Decimal             @default(0) @db.Decimal(14, 2)
-  notes              String?             @db.Text
-  requisition        Requisition         @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
-  material           InventoryMaterial?  @relation(fields: [materialId], references: [id], onDelete: SetNull)
-  budgetLineItem     BudgetLineItem?     @relation(fields: [budgetLineItemId], references: [id], onDelete: SetNull)
-  scheduleActivity   ScheduleActivity?   @relation(fields: [scheduleActivityId], references: [id], onDelete: SetNull)
-  financialExpense   FinancialExpense?
-  purchaseOrderItems PurchaseOrderItem[]
+  id                  String              @id @default(uuid())
+  requisitionId       String
+  materialId          String?
+  budgetLineItemId    String?
+  scheduleActivityId  String?
+  description         String
+  quantity            Decimal             @default(0) @db.Decimal(14, 2)
+  unit                String?
+  estimatedCost       Decimal             @default(0) @db.Decimal(14, 2)
+  outsideBudget       Boolean             @default(false)
+  outsideBudgetReason String?             @db.Text
+  notes               String?             @db.Text
+  requisition         Requisition         @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  material            InventoryMaterial?  @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  budgetLineItem      BudgetLineItem?     @relation(fields: [budgetLineItemId], references: [id], onDelete: SetNull)
+  scheduleActivity    ScheduleActivity?   @relation(fields: [scheduleActivityId], references: [id], onDelete: SetNull)
+  financialExpense    FinancialExpense?
+  purchaseOrderItems  PurchaseOrderItem[]
 
   @@index([requisitionId])
   @@index([materialId])
@@ -899,37 +902,38 @@ model Supplier {
 }
 
 model PurchaseOrder {
-  id                String              @id @default(uuid())
-  number            String              @unique
-  supplierId        String
-  requisitionId     String?
-  projectId         String?
-  warehouseId       String?
-  status            PurchaseOrderStatus @default(DRAFT)
-  issueDate         DateTime
-  expectedDate      DateTime?
-  paymentType       PurchasePaymentType @default(IMMEDIATE)
-  paymentDueDate    DateTime?
-  issuedAt          DateTime?
-  receivedAt        DateTime?
-  currency          String              @default("GTQ")
-  subtotal          Decimal             @default(0) @db.Decimal(14, 2)
-  taxPercentage     Decimal             @default(0) @db.Decimal(5, 2)
-  taxAmount         Decimal             @default(0) @db.Decimal(14, 2)
-  total             Decimal             @default(0) @db.Decimal(14, 2)
-  notes             String?             @db.Text
-  createdById       String?
-  issuedById        String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  supplier          Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  requisition       Requisition?        @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
-  project           Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  warehouse         Warehouse?          @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
-  createdBy         User?               @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  issuedBy          User?               @relation("PurchaseOrderIssuedBy", fields: [issuedById], references: [id], onDelete: SetNull)
-  items             PurchaseOrderItem[]
-  financialExpenses FinancialExpense[]
+  id                    String              @id @default(uuid())
+  number                String              @unique
+  supplierId            String
+  requisitionId         String?
+  projectId             String?
+  warehouseId           String?
+  status                PurchaseOrderStatus @default(DRAFT)
+  issueDate             DateTime
+  expectedDate          DateTime?
+  paymentType           PurchasePaymentType @default(IMMEDIATE)
+  paymentDueDate        DateTime?
+  issuedAt              DateTime?
+  receivedAt            DateTime?
+  currency              String              @default("GTQ")
+  subtotal              Decimal             @default(0) @db.Decimal(14, 2)
+  taxPercentage         Decimal             @default(0) @db.Decimal(5, 2)
+  taxAmount             Decimal             @default(0) @db.Decimal(14, 2)
+  total                 Decimal             @default(0) @db.Decimal(14, 2)
+  budgetExceptionReason String?             @db.Text
+  notes                 String?             @db.Text
+  createdById           String?
+  issuedById            String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  supplier              Supplier            @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  requisition           Requisition?        @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  project               Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  warehouse             Warehouse?          @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
+  createdBy             User?               @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  issuedBy              User?               @relation("PurchaseOrderIssuedBy", fields: [issuedById], references: [id], onDelete: SetNull)
+  items                 PurchaseOrderItem[]
+  financialExpenses     FinancialExpense[]
 
   @@index([supplierId])
   @@index([requisitionId])

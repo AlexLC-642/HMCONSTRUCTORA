@@ -214,19 +214,11 @@ export default async function RequisitionsPage({
 		<main className="mx-auto max-w-[1520px] space-y-5">
 			<section className="requisitions-hero">
 				<div className="relative z-10 flex flex-wrap items-center justify-between gap-6">
-					<div className="flex max-w-3xl items-start gap-4">
+					<div className="flex items-center gap-4">
 						<span className="requisitions-hero__icon">
 							<ClipboardCheck aria-hidden="true" size={22} />
 						</span>
-						<div>
-							<h1 className="text-3xl font-extrabold tracking-[-0.04em] text-white sm:text-4xl">
-								Requerimientos de recursos
-							</h1>
-							<p className="mt-2 max-w-2xl text-sm leading-6 text-[#c9d0ce]">
-								Indica qué necesita una obra o bodega. Si hay existencia se
-								entrega desde Inventario; si falta, continúa en Compras.
-							</p>
-						</div>
+						<h1 className="sr-only">Requerimientos de recursos</h1>
 					</div>
 					<div className="flex flex-wrap items-center gap-3">
 						<div className="requisitions-hero__stat">
@@ -310,7 +302,7 @@ export default async function RequisitionsPage({
 							{projectPlans.length} partidas
 						</span>
 					</div>
-					<div className="requisitions-plan-table-wrap">
+					<div className="requisitions-plan-table-wrap hidden md:block">
 						<table className="requisitions-plan-table">
 							<thead>
 								<tr>
@@ -345,6 +337,52 @@ export default async function RequisitionsPage({
 								))}
 							</tbody>
 						</table>
+					</div>
+					<div className="grid gap-3 p-3 md:hidden">
+						{projectPlans.map((material) => (
+							<div
+								className="rounded-2xl border border-[#dfe4df] bg-[#f9faf8] p-4"
+								key={material.id}
+							>
+								<div className="flex items-start justify-between gap-3">
+									<div>
+										<strong>{material.name}</strong>
+										<p className="mt-0.5 text-xs text-[var(--muted)]">
+											v{material.budgetVersion} · {material.unit}
+										</p>
+									</div>
+									<span className="requisitions-pending-value shrink-0">
+										{numberFormatter.format(material.pending)} {material.unit}
+									</span>
+								</div>
+								<dl className="mt-3 grid grid-cols-4 gap-2 text-xs text-[var(--muted)]">
+									<div>
+										<dt>Presup.</dt>
+										<dd className="mt-1 font-bold text-[var(--foreground)]">
+											{numberFormatter.format(material.planned)}
+										</dd>
+									</div>
+									<div>
+										<dt>Solicit.</dt>
+										<dd className="mt-1 font-bold text-[var(--foreground)]">
+											{numberFormatter.format(material.requested)}
+										</dd>
+									</div>
+									<div>
+										<dt>Comprado</dt>
+										<dd className="mt-1 font-bold text-[var(--foreground)]">
+											{numberFormatter.format(material.purchased)}
+										</dd>
+									</div>
+									<div>
+										<dt>Recibido</dt>
+										<dd className="mt-1 font-bold text-[var(--foreground)]">
+											{numberFormatter.format(material.received)}
+										</dd>
+									</div>
+								</dl>
+							</div>
+						))}
 					</div>
 				</section>
 			) : null}
@@ -476,8 +514,17 @@ export default async function RequisitionsPage({
 														<span className="font-medium">
 															{item.description}
 														</span>
-														{item.budgetLineItem || item.scheduleActivity ? (
+														{item.budgetLineItem ||
+														item.scheduleActivity ||
+														item.outsideBudget ? (
 															<small className="mt-1 block text-xs text-[#66736e]">
+																{item.outsideBudget
+																	? `Fuera de presupuesto: ${item.outsideBudgetReason}`
+																	: ""}
+																{item.outsideBudget &&
+																(item.budgetLineItem || item.scheduleActivity)
+																	? " · "
+																	: ""}
 																{item.budgetLineItem
 																	? `Partida: ${item.budgetLineItem.description}`
 																	: ""}

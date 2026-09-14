@@ -18,6 +18,7 @@ import {
 	projectStatuses,
 	projectStatusLabels,
 } from "@/modules/projects/domain/validation";
+import { AutoFilterForm } from "@/shared/ui/auto-filter-form";
 import { displayUserName } from "@/shared/utils/display-user-name";
 
 const currencyFormatter = new Intl.NumberFormat("es-GT", {
@@ -34,7 +35,7 @@ const compactCurrencyFormatter = new Intl.NumberFormat("es-GT", {
 const inputClass =
 	"focus-ring h-11 w-full rounded-xl border border-[#d3d9d3] bg-white px-3 text-sm text-[var(--foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_4px_12px_rgba(17,24,39,0.02)] transition placeholder:text-[#8a9490] hover:border-[#b7bfb8]";
 const panelClass =
-	"rounded-[20px] border border-[#d7dcd5] bg-white shadow-[0_18px_44px_rgba(23,29,31,0.08),0_2px_0_rgba(255,255,255,0.85)]";
+	"rounded-[20px] border border-[#d7dcd5] bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_3px_8px_rgba(23,29,31,0.05),0_20px_46px_rgba(23,29,31,0.1)]";
 
 const statusTone: Record<ProjectStatus, string> = {
 	DRAFT: "bg-[#eef1ef] text-[#58635f] ring-[#d8ddd7]",
@@ -75,7 +76,7 @@ function Metric({
 	}[tone];
 
 	return (
-		<div className="rounded-lg border border-[#cfd5ce] bg-white/80 p-4 shadow-[0_12px_30px_rgba(22,27,29,0.06)] backdrop-blur-xl backdrop-saturate-150">
+		<div className="rounded-xl border border-[#cfd5ce] bg-white/80 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_2px_6px_rgba(22,27,29,0.06),0_16px_34px_rgba(22,27,29,0.09)] backdrop-blur-xl backdrop-saturate-150 transition duration-200 hover:-translate-y-0.5 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_3px_8px_rgba(22,27,29,0.08),0_22px_44px_rgba(22,27,29,0.13)] motion-reduce:transform-none motion-reduce:transition-none">
 			<div className="flex items-start justify-between gap-3">
 				<div>
 					<p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#58635f]">
@@ -86,7 +87,9 @@ function Metric({
 					</p>
 					<p className="mt-2 text-sm text-[var(--muted)]">{detail}</p>
 				</div>
-				<span className={`mt-1 h-12 w-2 rounded-full ${toneClass}`} />
+				<span
+					className={`mt-1 h-12 w-2 rounded-full ${toneClass} shadow-[0_2px_6px_rgba(0,0,0,0.18)]`}
+				/>
 			</div>
 		</div>
 	);
@@ -138,22 +141,17 @@ export default async function ProjectsPage({
 	).length;
 
 	return (
-		<main className="mx-auto max-w-[1520px] space-y-5">
-			<section className="overflow-hidden rounded-[22px] border border-[#1f2b2d] bg-[radial-gradient(circle_at_top_left,_rgba(74,88,92,0.34),transparent_38%),linear-gradient(135deg,#1a2124_0%,#171d1f_45%,#12181a_100%)] text-white shadow-[0_28px_64px_rgba(18,24,27,0.22),inset_0_1px_0_rgba(255,255,255,0.05)]">
-				<div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-end">
-					<div>
-						<div className="mb-4 flex w-fit items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-							<FolderKanban aria-hidden="true" size={15} />{" "}
-							{canSeePortfolio ? "Cartera operativa" : "Proyectos asignados"}
-						</div>
-						<h1 className="text-4xl font-semibold tracking-[-0.06em] text-white">
-							Proyectos
-						</h1>
-						<p className="mt-2 max-w-3xl text-sm leading-6 text-white/70">
-							{canSeePortfolio
-								? "Seguimiento central de obras, presupuesto base, responsables y accesos de operación diaria."
-								: "Obras donde participas como responsable o integrante del equipo."}
-						</p>
+		<main className="projects-workspace mx-auto max-w-[1520px] space-y-5">
+			<section className="projects-hero relative overflow-hidden rounded-[22px] border border-[#1f2b2d] bg-[radial-gradient(circle_at_top_left,_rgba(74,88,92,0.34),transparent_38%),linear-gradient(135deg,#1a2124_0%,#171d1f_45%,#12181a_100%)] text-white shadow-[0_28px_64px_rgba(18,24,27,0.24),0_4px_10px_rgba(18,24,27,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]">
+				<div
+					aria-hidden="true"
+					className="pointer-events-none absolute inset-y-0 right-0 w-[46%] opacity-40 [background-image:repeating-linear-gradient(132deg,transparent_0_38px,rgba(255,255,255,0.06)_38px_39px,transparent_39px_78px)] [mask-image:linear-gradient(90deg,transparent,#000_35%)]"
+				/>
+				<div className="relative flex flex-wrap items-center justify-between gap-4 p-5">
+					<div className="flex w-fit items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-white/80 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+						<FolderKanban aria-hidden="true" size={15} />
+						{canSeePortfolio ? "Cartera operativa" : "Proyectos asignados"}
+						<h1 className="sr-only">Proyectos</h1>
 					</div>
 					{canCreate ? (
 						<a
@@ -166,7 +164,7 @@ export default async function ProjectsPage({
 				</div>
 			</section>
 
-			<section className="kpi-grid grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+			<section className="projects-kpis kpi-grid grid gap-3 md:grid-cols-2 xl:grid-cols-4">
 				<Metric
 					detail={`${projects.length} visibles en esta vista`}
 					label="Activos"
@@ -193,8 +191,9 @@ export default async function ProjectsPage({
 				/>
 			</section>
 
-			<form
-				className={`${panelClass} grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_240px_auto]`}
+			<AutoFilterForm
+				action="/projects"
+				className={`${panelClass} projects-filter-panel grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_240px]`}
 			>
 				<div className="relative">
 					<Search
@@ -218,37 +217,30 @@ export default async function ProjectsPage({
 						</option>
 					))}
 				</select>
-				<button
-					className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-md border border-[#cfd5ce] bg-white px-4 text-sm font-semibold text-[#253033] transition hover:bg-[#f5f6f2]"
-					type="submit"
-				>
-					Filtrar
-				</button>
-			</form>
+			</AutoFilterForm>
+			<p className="-mt-2 px-1 text-xs font-medium text-[var(--muted)]">
+				Los resultados se actualizan al cambiar los filtros.
+			</p>
 
-			<section className={`${panelClass} overflow-hidden`}>
-				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#dfe5df] bg-[#f8f7f4] px-5 py-4">
+			<section className={`${panelClass} projects-panel overflow-hidden`}>
+				<div className="projects-panel__header flex flex-wrap items-center justify-between gap-3 border-b border-[#dfe5df] bg-[#f8f7f4] px-5 py-4">
 					<div>
 						<h2 className="text-2xl font-semibold tracking-[-0.04em] text-[#1b2225]">
 							Seguimiento de proyectos
 						</h2>
-						<p className="mt-1 text-sm text-[var(--muted)]">
-							Cada fila concentra estado, avance, presupuesto y accesos
-							principales.
-						</p>
 					</div>
 					<span className="rounded-full border border-[#dfe5df] bg-white px-3 py-1 text-xs font-semibold text-[#46504c] shadow-[0_6px_14px_rgba(16,20,20,0.04)]">
 						{projects.length} resultados
 					</span>
 				</div>
 
-				<div className="divide-y divide-[#e6e9e3] bg-[#f4f3f1]">
+				<div className="projects-list divide-y divide-[#e6e9e3] bg-[#f4f3f1]">
 					{projects.map((project) => {
 						const progress = project.progressPercentage.toNumber();
 						const risk = statusRisk(project.status, progress);
 						return (
 							<article
-								className="grid gap-4 border-b border-[#e4e8e1] bg-white/70 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_18px_26px_rgba(17,24,39,0.06)] 2xl:grid-cols-[minmax(280px,1fr)_210px_180px_430px] 2xl:items-center"
+								className="projects-list__row grid gap-4 border-b border-[#e4e8e1] bg-white/70 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_18px_26px_rgba(17,24,39,0.06)] 2xl:grid-cols-[minmax(280px,1fr)_210px_180px_430px] 2xl:items-center"
 								key={project.id}
 							>
 								<div className="min-w-0">
@@ -283,7 +275,7 @@ export default async function ProjectsPage({
 									</div>
 								</div>
 
-								<div className="rounded-xl bg-[#f8faf8] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+								<div className="projects-list__fact rounded-xl bg-[#f8faf8] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
 									<p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#58635f]">
 										Responsable
 									</p>
@@ -297,7 +289,7 @@ export default async function ProjectsPage({
 									</p>
 								</div>
 
-								<div className="rounded-xl bg-[#f8faf8] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+								<div className="projects-list__fact rounded-xl bg-[#f8faf8] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
 									<p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#58635f]">
 										Presupuesto
 									</p>

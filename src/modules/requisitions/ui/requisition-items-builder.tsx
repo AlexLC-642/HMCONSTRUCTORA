@@ -19,6 +19,8 @@ type DraftItem = {
 	quantity: string;
 	estimatedCost: string;
 	budgetLineItemId: string;
+	outsideBudget: boolean;
+	outsideBudgetReason: string;
 	scheduleActivityId: string;
 	catalogNewMaterial: boolean;
 	minimumStock: string;
@@ -45,6 +47,8 @@ function emptyItem(id: number): DraftItem {
 		quantity: "1",
 		estimatedCost: "0",
 		budgetLineItemId: "",
+		outsideBudget: false,
+		outsideBudgetReason: "",
 		scheduleActivityId: "",
 		catalogNewMaterial: false,
 		minimumStock: "0",
@@ -284,18 +288,21 @@ export function RequisitionItemsBuilder({
 									<>
 										<label className="requisition-line__resource">
 											<span className="requisitions-field-label">
-												Partida presupuestaria (opcional)
+												Control presupuestario
 											</span>
 											<select
 												className="requisitions-input"
 												onChange={(event) =>
 													update(item.id, {
 														budgetLineItemId: event.target.value,
+														outsideBudget: false,
+														outsideBudgetReason: "",
 													})
 												}
+												disabled={item.outsideBudget}
 												value={item.budgetLineItemId}
 											>
-												<option value="">Sin partida relacionada</option>
+												<option value="">Seleccionar partida</option>
 												{budgetMaterials.map((plan) => (
 													<option key={plan.id} value={plan.budgetLineItemId}>
 														{plan.name} · {plan.pending} {plan.unit} pendientes
@@ -303,6 +310,40 @@ export function RequisitionItemsBuilder({
 												))}
 											</select>
 										</label>
+										<div className="requisition-line__budget-control">
+											<label className="requisition-line__check">
+												<input
+													checked={item.outsideBudget}
+													onChange={(event) =>
+														update(item.id, {
+															outsideBudget: event.target.checked,
+															budgetLineItemId: "",
+														})
+													}
+													type="checkbox"
+												/>
+												<span>
+													<strong>Fuera de presupuesto</strong>
+													<small>
+														Se autorizará como una excepción trazable.
+													</small>
+												</span>
+											</label>
+											{item.outsideBudget ? (
+												<textarea
+													className="requisitions-textarea"
+													minLength={10}
+													onChange={(event) =>
+														update(item.id, {
+															outsideBudgetReason: event.target.value,
+														})
+													}
+													placeholder="Motivo, necesidad e impacto esperado"
+													required
+													value={item.outsideBudgetReason}
+												/>
+											) : null}
+										</div>
 										<label className="requisition-line__resource">
 											<span className="requisitions-field-label">
 												Actividad del cronograma (opcional)

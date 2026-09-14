@@ -64,6 +64,14 @@ const nextConfig: NextConfig = {
 	experimental: {
 		authInterrupts: true,
 		useOffline: true,
+		// Document uploads (Server Actions in src/modules/documents) already
+		// enforce an 80 MB per-file limit in storage.ts, and the upload form
+		// now accepts several files in one submission - Next's own default
+		// Server Action body limit (1 MB) would silently reject any of those
+		// well before that check ever runs, so it has to be raised to match.
+		serverActions: {
+			bodySizeLimit: "320mb",
+		},
 	},
 	async headers() {
 		return [

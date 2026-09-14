@@ -15,7 +15,7 @@ import {
 	moneyCompact,
 	moneyFull,
 	percent,
-	pp,
+	progressGap,
 	shortDate,
 } from "@/shared/ui/charts/format";
 import { classifyProgressGap } from "../../domain/risk";
@@ -164,16 +164,15 @@ export function PortfolioSCurve({
 		};
 	}, [metrics, isEmpty]);
 
-	const latest = metrics.timeline.at(-1);
-	const real = latest?.real ?? metrics.realProgressAverage;
-	const planned = hasPlanning(metrics)
-		? (latest?.planned ?? metrics.plannedProgressAverage)
-		: null;
+	// The chart shows the full schedule, but the summary compares only the
+	// values calculated for today. Using the final timeline point made every
+	// active project look 100% planned even when its end date was still ahead.
+	const real = metrics.realProgressAverage;
+	const planned = hasPlanning(metrics) ? metrics.plannedProgressAverage : null;
 	const financial =
-		latest?.financial ??
-		(metrics.approvedBudgetTotal > 0
+		metrics.approvedBudgetTotal > 0
 			? (metrics.spentTotal / metrics.approvedBudgetTotal) * 100
-			: null);
+			: null;
 	const gap = planned === null || real === null ? null : real - planned;
 	const gapColor =
 		gap === null
@@ -185,7 +184,7 @@ export function PortfolioSCurve({
 			{isEmpty ? (
 				<EmptyChart
 					height={360}
-					message="Aun no hay suficiente planificacion para trazar la curva S."
+					message="Aún no hay suficiente planificación para trazar la curva S."
 				/>
 			) : (
 				<EChart className="h-[360px] w-full" option={option} />
@@ -206,7 +205,7 @@ export function PortfolioSCurve({
 					label="Financiero"
 					value={financial === null ? "Sin datos" : percent(financial)}
 				/>
-				<ChartMetric color={gapColor} label="Brecha" value={pp(gap)} />
+				<ChartMetric color={gapColor} label="Estado" value={progressGap(gap)} />
 			</div>
 		</div>
 	);
@@ -480,7 +479,7 @@ export function ProgressVarianceChart({
 			},
 			{
 				key: "line",
-				label: "En linea",
+				label: "Al día",
 				color: hmChartColors.blue,
 				projects: projects.filter(
 					(project) =>
@@ -585,7 +584,7 @@ export function ProgressVarianceChart({
 										{project.code}
 									</span>
 									<strong className="text-sm tabular-nums" style={{ color }}>
-										{pp(gap)}
+										{progressGap(gap)}
 									</strong>
 								</div>
 								<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e4e8e1]">

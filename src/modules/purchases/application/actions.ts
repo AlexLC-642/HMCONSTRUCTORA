@@ -119,6 +119,7 @@ export async function createPurchaseOrderAction(
 	const parsed = purchaseOrderInputSchema.safeParse({
 		requisitionId: value(formData, "requisitionId"),
 		projectId: value(formData, "projectId"),
+		budgetExceptionReason: value(formData, "budgetExceptionReason"),
 		warehouseId: value(formData, "warehouseId"),
 		supplierId: value(formData, "supplierId"),
 		issueDate: value(formData, "issueDate"),

@@ -1111,6 +1111,23 @@ function DirectPurchaseForm({
 								))}
 							</select>
 						</label>
+						{projectId ? (
+							<label className="md:col-span-2">
+								<span>Justificación fuera de presupuesto</span>
+								<textarea
+									aria-invalid={Boolean(errorFor("budgetExceptionReason"))}
+									minLength={10}
+									name="budgetExceptionReason"
+									placeholder="Motivo de la compra directa y necesidad para el proyecto"
+									required
+								/>
+								{errorFor("budgetExceptionReason") ? (
+									<small className="purchases-field-error">
+										{errorFor("budgetExceptionReason")}
+									</small>
+								) : null}
+							</label>
+						) : null}
 						<PaymentConditionFields
 							creditAvailable={Boolean(projectId)}
 							errorFor={errorFor}
@@ -1595,12 +1612,10 @@ export function PurchasesWorkspace({
 						<div className="purchases-hero__icon">
 							<ShoppingCart aria-hidden="true" size={24} />
 						</div>
-						<div>
-							<h1>Compras</h1>
-							<p>
-								Registra compras directas o atiende solicitudes autorizadas y
-								controla cada recepción.
-							</p>
+						<div className="purchases-hero__context">
+							<h1 className="sr-only">Compras</h1>
+							<strong>Inicia una operación</strong>
+							<span>Compra directa o desde una solicitud autorizada.</span>
 						</div>
 					</div>
 					{canManage ? (

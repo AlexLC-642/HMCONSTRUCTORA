@@ -403,6 +403,10 @@ export async function createPurchaseOrder(
 				taxPercentage,
 				taxAmount,
 				total: subtotal.add(taxAmount),
+				budgetExceptionReason:
+					!requisition && projectId
+						? nullable(parsed.budgetExceptionReason)
+						: null,
 				notes: nullable(parsed.notes),
 				createdById: context.userId,
 				items: { create: orderItems },
@@ -418,6 +422,7 @@ export async function createPurchaseOrder(
 					number: order.number,
 					requisitionId: requisition?.id ?? null,
 					origin: requisition ? "REQUISITION" : "DIRECT",
+					budgetException: Boolean(!requisition && projectId),
 					paymentType: parsed.paymentType,
 					supplierId: supplier.id,
 					total: order.total.toString(),

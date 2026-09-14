@@ -142,6 +142,27 @@ describe("purchase validation", () => {
 		).toBe(false);
 	});
 
+	it("requires justification when a direct purchase is assigned to a project", () => {
+		const directProjectPurchase = {
+			...validOrder,
+			requisitionId: "",
+			warehouseId: "warehouse-1",
+			projectId: "project-1",
+			items: [{ materialId: "material-1", quantity: 2, unitCost: 50 }],
+		};
+
+		expect(
+			purchaseOrderInputSchema.safeParse(directProjectPurchase).success,
+		).toBe(false);
+		expect(
+			purchaseOrderInputSchema.safeParse({
+				...directProjectPurchase,
+				budgetExceptionReason:
+					"Compra urgente no contemplada en el presupuesto aprobado.",
+			}).success,
+		).toBe(true);
+	});
+
 	it("requires a positive received quantity and delivery reference", () => {
 		const receipt = {
 			purchaseOrderId: "order-1",

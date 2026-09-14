@@ -8,6 +8,8 @@ export async function getProjectProgressWorkspace(projectId: string) {
 		reports,
 		inventoryResources,
 		warehouses,
+		projectDeliveries,
+		projectConsumptions,
 	] = await Promise.all([
 		prisma.project.findUnique({
 			where: { id: projectId },
@@ -48,7 +50,75 @@ export async function getProjectProgressWorkspace(projectId: string) {
 			select: { id: true, code: true, name: true },
 			orderBy: { name: "asc" },
 		}),
+		prisma.stockMovement.findMany({
+			where: { projectId, type: "OUT", dailyReportMaterialId: null },
+			select: { materialId: true, warehouseId: true, quantity: true },
+		}),
+		prisma.dailyReportMaterial.findMany({
+			where: {
+				dailyReport: {
+					projectId,
+					status: { in: ["APPROVED", "PUBLISHED"] },
+				},
+				materialId: { not: null },
+				warehouseId: { not: null },
+			},
+			select: {
+				materialId: true,
+				warehouseId: true,
+				quantityUsed: true,
+				wasteQuantity: true,
+				returnedQuantity: true,
+			},
+		}),
 	]);
+
+	const deliveredByLocation = new Map<string, number>();
+	for (const movement of projectDeliveries) {
+		const key = `${movement.materialId}:${movement.warehouseId}`;
+		deliveredByLocation.set(
+			key,
+			(deliveredByLocation.get(key) ?? 0) + movement.quantity.toNumber(),
+		);
+	}
+	const consumedByLocation = new Map<string, number>();
+	for (const entry of projectConsumptions) {
+		if (!entry.materialId || !entry.warehouseId) continue;
+		const key = `${entry.materialId}:${entry.warehouseId}`;
+		consumedByLocation.set(
+			key,
+			(consumedByLocation.get(key) ?? 0) +
+				entry.quantityUsed.toNumber() +
+				entry.wasteQuantity.toNumber() +
+				entry.returnedQuantity.toNumber(),
+		);
+	}
+	const materialById = new Map(
+		inventoryResources.map((material) => [material.id, material]),
+	);
+	const warehouseById = new Map(
+		warehouses.map((warehouse) => [warehouse.id, warehouse]),
+	);
+	const projectResources = Array.from(deliveredByLocation.entries())
+		.map(([key, delivered]) => {
+			const [materialId, warehouseId] = key.split(":");
+			const material = materialById.get(materialId);
+			const warehouse = warehouseById.get(warehouseId);
+			const available = delivered - (consumedByLocation.get(key) ?? 0);
+			if (!material || !warehouse || available <= 0) return null;
+			return {
+				...material,
+				warehouseId,
+				warehouseCode: warehouse.code,
+				warehouseName: warehouse.name,
+				delivered,
+				available,
+			};
+		})
+		.filter((resource): resource is NonNullable<typeof resource> =>
+			Boolean(resource),
+		)
+		.sort((left, right) => left.name.localeCompare(right.name, "es"));
 
 	const enrichedSchedule = schedule
 		? {
@@ -66,8 +136,7 @@ export async function getProjectProgressWorkspace(projectId: string) {
 		schedule: enrichedSchedule,
 		latestReport,
 		reports,
-		inventoryResources,
-		warehouses,
+		inventoryResources: projectResources,
 	};
 }
 

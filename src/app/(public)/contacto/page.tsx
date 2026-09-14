@@ -4,6 +4,11 @@ import Image from "next/image";
 import { submitWebsiteInquiryAction } from "@/modules/website/application/actions";
 import { getPublicWebsiteContent } from "@/modules/website/application/queries";
 import {
+	getGmailComposeLink,
+	getSocialContact,
+	getWhatsAppLink,
+} from "@/modules/website/domain/contact-links";
+import {
 	websiteDefaults,
 	withDefault,
 } from "@/modules/website/domain/defaults";
@@ -71,6 +76,11 @@ export default async function ContactoPage({
 		settings?.instagramUrl,
 		websiteDefaults.instagramUrl,
 	);
+	const primaryWhatsApp = getWhatsAppLink(phonePrimary);
+	const secondaryWhatsApp = getWhatsAppLink(phoneSecondary);
+	const gmailCompose = getGmailComposeLink(email);
+	const facebook = getSocialContact("facebook", facebookUrl);
+	const instagram = getSocialContact("instagram", instagramUrl);
 
 	return (
 		<>
@@ -106,17 +116,40 @@ export default async function ContactoPage({
 					<div className="public-contact__item">
 						<Phone aria-hidden="true" size={18} />
 						<div>
-							<a href={`tel:${phonePrimary.replace(/[^+\d]/g, "")}`}>
-								{phonePrimary}
-							</a>
-							<a href={`tel:${phoneSecondary.replace(/[^+\d]/g, "")}`}>
-								{phoneSecondary}
-							</a>
+							{primaryWhatsApp ? (
+								<a
+									aria-label={`Escribir por WhatsApp al ${phonePrimary}`}
+									href={primaryWhatsApp}
+									rel="noreferrer"
+									target="_blank"
+								>
+									{phonePrimary}
+								</a>
+							) : null}
+							{secondaryWhatsApp ? (
+								<a
+									aria-label={`Escribir por WhatsApp al ${phoneSecondary}`}
+									href={secondaryWhatsApp}
+									rel="noreferrer"
+									target="_blank"
+								>
+									{phoneSecondary}
+								</a>
+							) : null}
 						</div>
 					</div>
 					<div className="public-contact__item">
 						<Mail aria-hidden="true" size={18} />
-						<a href={`mailto:${email}`}>{email}</a>
+						{gmailCompose ? (
+							<a
+								aria-label={`Redactar correo para ${email} en Gmail`}
+								href={gmailCompose}
+								rel="noreferrer"
+								target="_blank"
+							>
+								{email}
+							</a>
+						) : null}
 					</div>
 					<div className="public-contact__item">
 						<MapPin aria-hidden="true" size={18} />
@@ -131,11 +164,23 @@ export default async function ContactoPage({
 					</div>
 					<div className="public-contact__item">
 						<FacebookIcon size={18} />
-						<span>{facebookUrl}</span>
+						{facebook?.href ? (
+							<a href={facebook.href} rel="noreferrer" target="_blank">
+								{facebook.label}
+							</a>
+						) : (
+							<span>{facebook?.label}</span>
+						)}
 					</div>
 					<div className="public-contact__item">
 						<InstagramIcon size={18} />
-						<span>{instagramUrl}</span>
+						{instagram?.href ? (
+							<a href={instagram.href} rel="noreferrer" target="_blank">
+								{instagram.label}
+							</a>
+						) : (
+							<span>{instagram?.label}</span>
+						)}
 					</div>
 				</div>
 

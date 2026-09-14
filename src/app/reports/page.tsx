@@ -222,21 +222,15 @@ export default async function ReportsPage({
 	return (
 		<main className="mx-auto max-w-[1480px] space-y-5">
 			<section className="reports-hero">
-				<div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-					<div className="max-w-2xl">
+				<div className="relative z-10 flex flex-wrap items-center justify-between gap-6">
+					<div className="flex items-center gap-4">
 						<span className="reports-hero__icon">
 							<FileBarChart2 aria-hidden="true" size={23} />
 						</span>
-						<p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-[#ef9ba3]">
+						<p className="text-xs font-bold uppercase tracking-[0.22em] text-[#ef9ba3]">
 							Control documental
 						</p>
-						<h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-white sm:text-4xl">
-							Informes de obra
-						</h1>
-						<p className="mt-2 max-w-xl text-sm leading-6 text-[#c9d0ce]">
-							Consulta avances diarios, evidencias y archivos de cada proyecto
-							desde un solo lugar.
-						</p>
+						<h1 className="sr-only">Informes de obra</h1>
 					</div>
 					<a
 						className="reports-primary-action focus-ring"
@@ -477,80 +471,136 @@ export default async function ReportsPage({
 
 function DailyReportsTable({ reports }: { reports: DailyReportRow[] }) {
 	return (
-		<div className="reports-scrollbar overflow-x-auto">
-			<table className="reports-table min-w-[980px]">
-				<thead>
-					<tr>
-						<th>Informe</th>
-						<th>Proyecto</th>
-						<th>Fecha</th>
-						<th>Responsable</th>
-						<th>Estado</th>
-						<th>Evidencias</th>
-						<th className="text-right">Acciones</th>
-					</tr>
-				</thead>
-				<tbody>
-					{reports.map((report) => (
-						<tr key={report.id}>
-							<td>
+		<>
+			<div className="reports-scrollbar hidden overflow-x-auto md:block">
+				<table className="reports-table min-w-[980px]">
+					<thead>
+						<tr>
+							<th>Informe</th>
+							<th>Proyecto</th>
+							<th>Fecha</th>
+							<th>Responsable</th>
+							<th>Estado</th>
+							<th>Evidencias</th>
+							<th className="text-right">Acciones</th>
+						</tr>
+					</thead>
+					<tbody>
+						{reports.map((report) => (
+							<tr key={report.id}>
+								<td>
+									<p className="font-bold text-[#172021]">
+										{report.reportNumber}
+									</p>
+									<span className="reports-origin">Registro interno</span>
+								</td>
+								<td>
+									<p className="font-semibold text-[#172021]">
+										{report.project.code}
+									</p>
+									<p className="mt-0.5 max-w-[230px] truncate text-xs text-[#6a7671]">
+										{report.project.name}
+									</p>
+								</td>
+								<td>
+									<span className="inline-flex items-center gap-2 text-xs font-medium text-[#46534f]">
+										<CalendarDays size={14} />
+										{new Date(report.reportDate).toLocaleDateString("es-GT", {
+											dateStyle: "medium",
+										})}
+									</span>
+								</td>
+								<td className="text-xs font-semibold text-[#34413d]">
+									{report.siteManager}
+								</td>
+								<td>
+									<ReportStatus
+										label={reportStatusLabels[report.status] ?? "Sin estado"}
+										status={report.status}
+									/>
+								</td>
+								<td className="text-xs font-semibold text-[#52605b]">
+									{report.mediaEntries.length}{" "}
+									{report.mediaEntries.length === 1
+										? "evidencia"
+										: "evidencias"}
+								</td>
+								<td>
+									<div className="flex justify-end gap-2">
+										<a
+											className="reports-row-action focus-ring"
+											href={`/projects/${report.projectId}/progress/reports/${report.id}`}
+										>
+											<Eye size={14} /> Ver
+										</a>
+										<a
+											className="reports-row-action reports-row-action--dark focus-ring"
+											href={`/projects/${report.projectId}/progress/reports/${report.id}/print`}
+											rel="noopener noreferrer"
+											target="_blank"
+										>
+											<FileText size={14} /> PDF
+										</a>
+									</div>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<div className="grid gap-3 p-3 md:hidden">
+				{reports.map((report) => (
+					<div
+						className="rounded-2xl border border-[#dfe4df] bg-[#f9faf8] p-4"
+						key={report.id}
+					>
+						<div className="flex items-start justify-between gap-3">
+							<div className="min-w-0">
 								<p className="font-bold text-[#172021]">
 									{report.reportNumber}
 								</p>
-								<span className="reports-origin">Registro interno</span>
-							</td>
-							<td>
-								<p className="font-semibold text-[#172021]">
-									{report.project.code}
+								<p className="mt-0.5 truncate text-xs text-[#6a7671]">
+									{report.project.code} · {report.project.name}
 								</p>
-								<p className="mt-0.5 max-w-[230px] truncate text-xs text-[#6a7671]">
-									{report.project.name}
-								</p>
-							</td>
-							<td>
-								<span className="inline-flex items-center gap-2 text-xs font-medium text-[#46534f]">
-									<CalendarDays size={14} />
-									{new Date(report.reportDate).toLocaleDateString("es-GT", {
-										dateStyle: "medium",
-									})}
-								</span>
-							</td>
-							<td className="text-xs font-semibold text-[#34413d]">
-								{report.siteManager}
-							</td>
-							<td>
-								<ReportStatus
-									label={reportStatusLabels[report.status] ?? "Sin estado"}
-									status={report.status}
-								/>
-							</td>
-							<td className="text-xs font-semibold text-[#52605b]">
+							</div>
+							<ReportStatus
+								label={reportStatusLabels[report.status] ?? "Sin estado"}
+								status={report.status}
+							/>
+						</div>
+						<div className="mt-2 flex flex-wrap items-center gap-3 text-xs font-medium text-[#46534f]">
+							<span className="inline-flex items-center gap-1.5">
+								<CalendarDays size={13} />
+								{new Date(report.reportDate).toLocaleDateString("es-GT", {
+									dateStyle: "medium",
+								})}
+							</span>
+							<span>{report.siteManager}</span>
+							<span>
 								{report.mediaEntries.length}{" "}
 								{report.mediaEntries.length === 1 ? "evidencia" : "evidencias"}
-							</td>
-							<td>
-								<div className="flex justify-end gap-2">
-									<a
-										className="reports-row-action focus-ring"
-										href={`/projects/${report.projectId}/progress/reports/${report.id}`}
-									>
-										<Eye size={14} /> Ver
-									</a>
-									<a
-										className="reports-row-action reports-row-action--dark focus-ring"
-										href={`/projects/${report.projectId}/progress/reports/${report.id}/print`}
-										rel="noopener noreferrer"
-										target="_blank"
-									>
-										<FileText size={14} /> PDF
-									</a>
-								</div>
-							</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
-		</div>
+							</span>
+						</div>
+						<div className="mt-3 flex gap-2">
+							<a
+								className="reports-row-action focus-ring flex-1 justify-center"
+								href={`/projects/${report.projectId}/progress/reports/${report.id}`}
+							>
+								<Eye size={14} /> Ver
+							</a>
+							<a
+								className="reports-row-action reports-row-action--dark focus-ring flex-1 justify-center"
+								href={`/projects/${report.projectId}/progress/reports/${report.id}/print`}
+								rel="noopener noreferrer"
+								target="_blank"
+							>
+								<FileText size={14} /> PDF
+							</a>
+						</div>
+					</div>
+				))}
+			</div>
+		</>
 	);
 }
 
@@ -562,86 +612,140 @@ function ManualReportsTable({
 	params: ReportsSearch;
 }) {
 	return (
-		<div className="reports-scrollbar overflow-x-auto">
-			<table className="reports-table min-w-[980px]">
-				<thead>
-					<tr>
-						<th>Informe</th>
-						<th>Proyecto</th>
-						<th>Fecha</th>
-						<th>Autor</th>
-						<th>Versión</th>
-						<th>Origen</th>
-						<th className="text-right">Acciones</th>
-					</tr>
-				</thead>
-				<tbody>
-					{documents.map((document) => {
-						const latest = document.versions[0];
-						const date = latest
-							? new Date(latest.createdAt)
-							: new Date(document.createdAt);
-						return (
-							<tr key={document.id}>
-								<td>
-									<p className="max-w-[280px] truncate font-bold text-[#172021]">
-										{document.title}
-									</p>
-									{document.description ? (
-										<p className="mt-0.5 max-w-[280px] truncate text-xs text-[#6a7671]">
-											{document.description}
+		<>
+			<div className="reports-scrollbar hidden overflow-x-auto md:block">
+				<table className="reports-table min-w-[980px]">
+					<thead>
+						<tr>
+							<th>Informe</th>
+							<th>Proyecto</th>
+							<th>Fecha</th>
+							<th>Autor</th>
+							<th>Versión</th>
+							<th>Origen</th>
+							<th className="text-right">Acciones</th>
+						</tr>
+					</thead>
+					<tbody>
+						{documents.map((document) => {
+							const latest = document.versions[0];
+							const date = latest
+								? new Date(latest.createdAt)
+								: new Date(document.createdAt);
+							return (
+								<tr key={document.id}>
+									<td>
+										<p className="max-w-[280px] truncate font-bold text-[#172021]">
+											{document.title}
 										</p>
-									) : null}
-								</td>
-								<td>
-									<p className="font-semibold text-[#172021]">
-										{document.project.code}
-									</p>
-									<p className="mt-0.5 max-w-[220px] truncate text-xs text-[#6a7671]">
-										{document.project.name}
-									</p>
-								</td>
-								<td className="text-xs font-medium text-[#46534f]">
-									{dateFormatter.format(date)}
-								</td>
-								<td className="text-xs font-semibold text-[#34413d]">
-									{latest?.uploadedBy?.name ||
-										document.author?.name ||
-										"Sin autor"}
-								</td>
-								<td>
-									<span className="reports-version">
-										v{latest?.versionNumber ?? 1}
-									</span>
-								</td>
-								<td>
-									<span className="reports-origin">Archivo</span>
-								</td>
-								<td>
-									<div className="flex justify-end gap-2">
-										<a
-											className="reports-row-action focus-ring"
-											href={reportsHref(params, { preview: document.id })}
-										>
-											<Eye size={14} /> Ver
-										</a>
-										{latest ? (
-											<a
-												className="reports-row-action reports-row-action--dark focus-ring"
-												download
-												href={latest.publicUrl}
-											>
-												<Download size={14} /> Descargar
-											</a>
+										{document.description ? (
+											<p className="mt-0.5 max-w-[280px] truncate text-xs text-[#6a7671]">
+												{document.description}
+											</p>
 										) : null}
-									</div>
-								</td>
-							</tr>
-						);
-					})}
-				</tbody>
-			</table>
-		</div>
+									</td>
+									<td>
+										<p className="font-semibold text-[#172021]">
+											{document.project.code}
+										</p>
+										<p className="mt-0.5 max-w-[220px] truncate text-xs text-[#6a7671]">
+											{document.project.name}
+										</p>
+									</td>
+									<td className="text-xs font-medium text-[#46534f]">
+										{dateFormatter.format(date)}
+									</td>
+									<td className="text-xs font-semibold text-[#34413d]">
+										{latest?.uploadedBy?.name ||
+											document.author?.name ||
+											"Sin autor"}
+									</td>
+									<td>
+										<span className="reports-version">
+											v{latest?.versionNumber ?? 1}
+										</span>
+									</td>
+									<td>
+										<span className="reports-origin">Archivo</span>
+									</td>
+									<td>
+										<div className="flex justify-end gap-2">
+											<a
+												className="reports-row-action focus-ring"
+												href={reportsHref(params, { preview: document.id })}
+											>
+												<Eye size={14} /> Ver
+											</a>
+											{latest ? (
+												<a
+													className="reports-row-action reports-row-action--dark focus-ring"
+													download
+													href={latest.publicUrl}
+												>
+													<Download size={14} /> Descargar
+												</a>
+											) : null}
+										</div>
+									</td>
+								</tr>
+							);
+						})}
+					</tbody>
+				</table>
+			</div>
+			<div className="grid gap-3 p-3 md:hidden">
+				{documents.map((document) => {
+					const latest = document.versions[0];
+					const date = latest
+						? new Date(latest.createdAt)
+						: new Date(document.createdAt);
+					return (
+						<div
+							className="rounded-2xl border border-[#dfe4df] bg-[#f9faf8] p-4"
+							key={document.id}
+						>
+							<p className="truncate font-bold text-[#172021]">
+								{document.title}
+							</p>
+							{document.description ? (
+								<p className="mt-0.5 truncate text-xs text-[#6a7671]">
+									{document.description}
+								</p>
+							) : null}
+							<p className="mt-2 text-xs text-[#6a7671]">
+								{document.project.code} · {document.project.name}
+							</p>
+							<div className="mt-2 flex flex-wrap items-center gap-2">
+								<span className="reports-version">
+									v{latest?.versionNumber ?? 1}
+								</span>
+								<span className="reports-origin">Archivo</span>
+								<span className="text-xs font-medium text-[#46534f]">
+									{dateFormatter.format(date)}
+								</span>
+							</div>
+							<div className="mt-3 flex gap-2">
+								<a
+									className="reports-row-action focus-ring flex-1 justify-center"
+									href={reportsHref(params, { preview: document.id })}
+								>
+									<Eye size={14} /> Ver
+								</a>
+								{latest ? (
+									<a
+										className="reports-row-action reports-row-action--dark focus-ring flex-1 justify-center"
+										download
+										href={latest.publicUrl}
+									>
+										<Download size={14} /> Descargar
+									</a>
+								) : null}
+							</div>
+						</div>
+					);
+				})}
+			</div>
+		</>
 	);
 }
 

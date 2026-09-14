@@ -244,7 +244,6 @@ export function RequisitionCreateDialog({
 								/>
 							</label>
 						</div>
-						<input name="requestedBy" type="hidden" value={requesterName} />
 						<div className="requisitions-requester mt-4">
 							<span className="requisitions-requester__avatar">
 								<UserRound aria-hidden="true" size={16} />

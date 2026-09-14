@@ -1,29 +1,36 @@
 import { Prisma } from "@prisma/client";
 import {
-	budgetUnitLabel,
-	persistedLaborLineUsesJornadas,
-} from "@/modules/budgets/domain/units";
-import {
 	Activity,
 	BarChart3,
 	CalendarDays,
 	Camera,
 	CheckCircle2,
+	ClipboardSignature,
 	Clock3,
+	FileArchive,
 	FileText,
+	FileVideo,
 	FolderArchive,
+	FolderKanban,
 	HardHat,
 	Hourglass,
+	ImageIcon,
 	LockKeyhole,
 	type LucideIcon,
 	PackageCheck,
+	ReceiptText,
 	ShieldCheck,
 	TrendingUp,
 	WalletCards,
 } from "lucide-react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import {
+	budgetUnitLabel,
+	persistedLaborLineUsesJornadas,
+} from "@/modules/budgets/domain/units";
 import { getClientPortalByToken } from "@/modules/client-portal/application/service";
+import { PortalDocumentPreviewModal } from "@/modules/client-portal/ui/portal-document-preview-modal";
 import { PortalProgressCharts } from "@/modules/client-portal/ui/portal-progress-charts";
 import {
 	type PortalTabKey,
@@ -34,6 +41,8 @@ import {
 	type scheduleActivityStatuses,
 	scheduleActivityStatusLabels,
 } from "@/modules/schedules/domain/validation";
+import { ThemeToggle } from "@/shared/components/theme-toggle";
+import { requestIp } from "@/shared/lib/request-ip";
 
 const ZERO = new Prisma.Decimal(0);
 const currencyFormatter = new Intl.NumberFormat("es-GT", {
@@ -159,17 +168,30 @@ function activityStatus(status: string) {
 }
 
 function statusTone(status: string) {
-	if (status === "COMPLETED") return "bg-[#2563eb]";
-	if (status === "IN_PROGRESS") return "bg-[#1f7a5a]";
-	if (status === "BLOCKED") return "bg-[#d01f35]";
-	return "bg-[#f2b600]";
+	if (status === "COMPLETED") return "bg-[var(--info)]";
+	if (status === "IN_PROGRESS") return "bg-[var(--success)]";
+	if (status === "BLOCKED") return "bg-[var(--danger)]";
+	return "bg-[var(--warning)]";
 }
 
 function statusColor(status: string) {
-	if (status === "COMPLETED") return "#2563eb";
-	if (status === "IN_PROGRESS") return "#1f7a5a";
-	if (status === "BLOCKED") return "#d01f35";
-	return "#f2b600";
+	if (status === "COMPLETED") return "var(--info)";
+	if (status === "IN_PROGRESS") return "var(--success)";
+	if (status === "BLOCKED") return "var(--danger)";
+	return "var(--warning)";
+}
+
+function folderIcon(categoryKey: string): LucideIcon {
+	if (categoryKey === "contratos") return ClipboardSignature;
+	if (categoryKey === "planos") return FileText;
+	if (categoryKey === "renders") return FileVideo;
+	if (categoryKey === "comprobantes") return ReceiptText;
+	if (categoryKey === "permisos") return ShieldCheck;
+	if (categoryKey === "evidencias") return ImageIcon;
+	if (categoryKey === "presupuestos" || categoryKey === "estados-cuenta")
+		return WalletCards;
+	if (categoryKey === "informes") return FileArchive;
+	return FolderKanban;
 }
 
 function normalizeTab(value?: string | string[]) {
@@ -184,15 +206,26 @@ export default async function ClientPortalPage({
 	searchParams,
 }: {
 	params: Promise<{ token: string }>;
-	searchParams: Promise<{ tab?: string | string[] }>;
+	searchParams: Promise<{
+		tab?: string | string[];
+		preview?: string | string[];
+		category?: string | string[];
+	}>;
 }) {
 	const [{ token }, query] = await Promise.all([params, searchParams]);
-	const workspace = await getClientPortalByToken(token);
+	const ipAddress = await requestIp();
+	const workspace = await getClientPortalByToken(token, ipAddress);
 
 	if (!workspace) notFound();
 
 	const activeTab = normalizeTab(query.tab);
-	const { project, approvedBudget, schedule, stats } = workspace;
+	const previewId = Array.isArray(query.preview)
+		? query.preview[0]
+		: query.preview;
+	const categoryId = Array.isArray(query.category)
+		? query.category[0]
+		: query.category;
+	const { project, approvedBudget, budgetChanges, schedule, stats } = workspace;
 	const activities = schedule?.activities ?? [];
 	const latestReport = project.dailyReports[0] ?? null;
 	const reportActivities = latestReport?.activities ?? [];
@@ -282,16 +315,59 @@ export default async function ClientPortalPage({
 		{
 			name: "Completadas",
 			value: statusCounts.COMPLETED ?? 0,
-			color: "#2563eb",
+			status: "COMPLETED" as const,
 		},
 		{
 			name: "En proceso",
 			value: statusCounts.IN_PROGRESS ?? 0,
-			color: "#1f7a5a",
+			status: "IN_PROGRESS" as const,
 		},
-		{ name: "Pendientes", value: statusCounts.PENDING ?? 0, color: "#f2b600" },
-		{ name: "Bloqueadas", value: statusCounts.BLOCKED ?? 0, color: "#d01f35" },
+		{
+			name: "Pendientes",
+			value: statusCounts.PENDING ?? 0,
+			status: "PENDING" as const,
+		},
+		{
+			name: "Bloqueadas",
+			value: statusCounts.BLOCKED ?? 0,
+			status: "BLOCKED" as const,
+		},
 	];
+	const previewDocument = previewId
+		? (project.documents.find((document) => document.id === previewId) ?? null)
+		: null;
+	const documentFolders = Array.from(
+		project.documents
+			.reduce(
+				(folders, document) => {
+					const existing = folders.get(document.category.id);
+					if (existing) {
+						existing.documents.push(document);
+					} else {
+						folders.set(document.category.id, {
+							id: document.category.id,
+							name: document.category.name,
+							key: document.category.key,
+							documents: [document],
+						});
+					}
+					return folders;
+				},
+				new Map<
+					string,
+					{
+						id: string;
+						name: string;
+						key: string;
+						documents: typeof project.documents;
+					}
+				>(),
+			)
+			.values(),
+	).sort((a, b) => a.name.localeCompare(b.name));
+	const activeFolder = categoryId
+		? (documentFolders.find((folder) => folder.id === categoryId) ?? null)
+		: null;
 	const tabs = [
 		{
 			key: "summary" as const,
@@ -328,11 +404,11 @@ export default async function ClientPortalPage({
 	];
 
 	return (
-		<main className="portal-shell min-h-screen text-[#101618]">
-			<section className="border-b border-[#d7d9d2] bg-white/92 backdrop-blur">
+		<main className="portal-shell min-h-screen text-[var(--foreground)]">
+			<section className="portal-topbar">
 				<div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5">
 					<div className="flex items-center gap-4">
-						<div className="relative size-16 overflow-hidden rounded-xl border border-[#d7d9d2] bg-white shadow-[0_16px_35px_rgba(37,48,51,0.12)]">
+						<div className="portal-brand-mark relative size-16 overflow-hidden rounded-xl">
 							<Image
 								alt="Logo del sistema"
 								className="object-contain p-2"
@@ -342,19 +418,22 @@ export default async function ClientPortalPage({
 								src="/brand/logo.png"
 							/>
 						</div>
-						<div>
+						<div className="portal-project-identity">
 							<p className="text-sm font-semibold text-[var(--brand-red)]">
-								Sistema interno
+								Seguimiento del proyecto
 							</p>
 							<h1 className="text-2xl font-semibold tracking-[-0.02em]">
 								{project.name}
 							</h1>
 						</div>
 					</div>
-					<span className="inline-flex items-center gap-2 rounded-full border border-[#b7dfcc] bg-[#edf9f2] px-4 py-2 text-sm font-medium text-[var(--success)] shadow-sm">
-						<LockKeyhole aria-hidden="true" size={15} />
-						Portal privado
-					</span>
+					<div className="flex items-center gap-3">
+						<span className="portal-private-badge">
+							<LockKeyhole aria-hidden="true" size={15} />
+							Portal privado
+						</span>
+						<ThemeToggle />
+					</div>
 				</div>
 			</section>
 
@@ -373,27 +452,27 @@ export default async function ClientPortalPage({
 										<h2 className="text-3xl font-semibold tracking-[-0.03em]">
 											Estado del proyecto
 										</h2>
-										<div className="mt-5 h-3 overflow-hidden rounded-full bg-[#e2e5df]">
+										<div className="mt-5 h-3 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--foreground)_10%,var(--surface))]">
 											<div
 												className="h-full rounded-full bg-[var(--success)] shadow-[0_8px_18px_rgba(31,122,90,0.24)]"
 												style={{ width: percent(stats.progress) }}
 											/>
 										</div>
-										<div className="mt-3 flex justify-between text-sm text-[#52615f]">
+										<div className="mt-3 flex justify-between text-sm text-[var(--muted)]">
 											<span>Avance acumulado</span>
-											<strong className="text-[#101618]">
+											<strong className="text-[var(--foreground)]">
 												{percent(stats.progress)}
 											</strong>
 										</div>
 									</div>
-									<div className="rounded-2xl bg-[#f3f0ec] p-5 shadow-inner">
-										<p className="text-xs font-semibold uppercase text-[#596765]">
+									<div className="rounded-2xl bg-[color-mix(in_srgb,var(--foreground)_5%,var(--surface))] p-5 shadow-inner">
+										<p className="text-xs font-semibold uppercase text-[var(--muted)]">
 											Presupuesto aprobado
 										</p>
 										<p className="mt-2 text-3xl font-semibold">
 											{money(stats.budget)}
 										</p>
-										<p className="mt-4 text-xs uppercase tracking-[0.16em] text-[#596765]">
+										<p className="mt-4 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
 											Informes publicados
 										</p>
 										<p className="mt-1 text-2xl font-semibold">
@@ -429,35 +508,27 @@ export default async function ClientPortalPage({
 
 						<section className="kpi-grid grid gap-4 md:grid-cols-2 xl:grid-cols-4">
 							<Metric
-								accent="#2563eb"
+								accent="var(--info)"
 								icon={CheckCircle2}
-								ink="#2563eb"
 								label="Completadas"
-								tint="#e7edfd"
 								value={stats.completed}
 							/>
 							<Metric
-								accent="#1f7a5a"
+								accent="var(--success)"
 								icon={Activity}
-								ink="#1f7a5a"
 								label="En proceso"
-								tint="#e5f3ec"
 								value={stats.inProgress}
 							/>
 							<Metric
-								accent="#f2b600"
+								accent="var(--warning)"
 								icon={Hourglass}
-								ink="#a5720a"
 								label="Pendientes"
-								tint="#fdf3d9"
 								value={stats.pending}
 							/>
 							<Metric
-								accent="#d01f35"
+								accent="var(--brand-red)"
 								icon={FileText}
-								ink="#b91c2c"
 								label="Documentos visibles"
-								tint="#fbe3e7"
 								value={stats.documents}
 							/>
 						</section>
@@ -519,26 +590,41 @@ export default async function ClientPortalPage({
 				) : null}
 
 				{activeTab === "budget" ? (
-					<section className="portal-card">
-						<SectionHeader
-							icon={WalletCards}
-							title="Presupuesto aprobado"
-							detail={
-								approvedBudget
-									? `Version ${approvedBudget.versionNumber}`
-									: "Sin version aprobada"
-							}
-						/>
-						{approvedBudget ? (
-							<BudgetPreview
-								budget={approvedBudget}
-								projectName={project.name}
-								projectLocation={project.location ?? project.code}
+					<div className="space-y-5">
+						<section className="portal-card">
+							<SectionHeader
+								icon={WalletCards}
+								title="Presupuesto aprobado"
+								detail={
+									approvedBudget
+										? `Version ${approvedBudget.versionNumber}`
+										: "Sin version aprobada"
+								}
 							/>
-						) : (
-							<EmptyState text="No hay presupuesto aprobado visible para este portal." />
-						)}
-					</section>
+							{approvedBudget ? (
+								<BudgetSummary
+									budget={approvedBudget}
+									budgetChanges={budgetChanges}
+								/>
+							) : (
+								<EmptyState text="No hay presupuesto aprobado visible para este portal." />
+							)}
+						</section>
+						{approvedBudget ? (
+							<section className="portal-card">
+								<SectionHeader
+									icon={FileText}
+									title="Detalle por renglon"
+									detail="Materiales y mano de obra de cada partida."
+								/>
+								<BudgetPreview
+									budget={approvedBudget}
+									projectName={project.name}
+									projectLocation={project.location ?? project.code}
+								/>
+							</section>
+						) : null}
+					</div>
 				) : null}
 
 				{activeTab === "schedule" ? (
@@ -718,50 +804,234 @@ export default async function ClientPortalPage({
 
 				{activeTab === "documents" ? (
 					<section className="portal-card">
-						<SectionHeader
-							icon={FolderArchive}
-							title="Documentos disponibles"
-							detail={`${project.documents.length} visibles`}
-						/>
-						<div className="mt-4 divide-y divide-[#d7d9d2]">
-							{project.documents.map((document) => {
-								const latest = document.versions[0];
-								return (
-									<div
-										className="flex flex-wrap items-center justify-between gap-4 py-4"
-										key={document.id}
+						{activeFolder ? (
+							<>
+								<div className="flex flex-wrap items-center justify-between gap-3">
+									<SectionHeader
+										icon={folderIcon(activeFolder.key)}
+										title={activeFolder.name}
+										detail={`${activeFolder.documents.length} documento${activeFolder.documents.length === 1 ? "" : "s"}`}
+									/>
+									<a
+										className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold shadow-sm transition hover:bg-[color-mix(in_srgb,var(--foreground)_5%,var(--surface))]"
+										href={`/portal/${token}?tab=documents`}
 									>
-										<div className="flex items-center gap-3">
-											<span className="grid size-10 place-items-center rounded-xl bg-[#fff1f1] text-[var(--brand-red)]">
-												<FileText aria-hidden="true" size={18} />
-											</span>
-											<div>
-												<p className="font-semibold">{document.title}</p>
-												<p className="text-sm text-[#596765]">
-													{document.category.name}
-												</p>
-											</div>
-										</div>
-										{latest ? (
-											<a
-												className="rounded-lg border border-[#d7d9d2] px-4 py-2 text-sm font-semibold shadow-sm hover:bg-[#f4f0ed]"
-												href={latest.publicUrl}
-												download
+										Volver a carpetas
+									</a>
+								</div>
+								<div className="mt-4 divide-y divide-[var(--border)]">
+									{activeFolder.documents.map((document) => {
+										const latest = document.versions[0];
+										const isImage =
+											latest?.mimeType.startsWith("image/") ?? false;
+										const isVideo =
+											latest?.mimeType.startsWith("video/") ?? false;
+										return (
+											<div
+												className="flex flex-wrap items-center justify-between gap-4 py-4"
+												key={document.id}
 											>
-												Descargar
-											</a>
-										) : null}
+												<div className="flex items-center gap-3">
+													{isImage && latest ? (
+														// biome-ignore lint/performance/noImgElement: small list thumbnail, not the Next/Image optimized path.
+														<img
+															alt={document.title}
+															className="size-11 shrink-0 rounded-xl object-cover"
+															src={latest.publicUrl}
+														/>
+													) : (
+														<span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[color-mix(in_srgb,var(--brand-red)_12%,var(--surface))] text-[var(--brand-red)]">
+															{isVideo ? (
+																<FileVideo aria-hidden="true" size={18} />
+															) : (
+																<FileText aria-hidden="true" size={18} />
+															)}
+														</span>
+													)}
+													<div>
+														<p className="font-semibold">{document.title}</p>
+														<p className="text-sm text-[var(--muted)]">
+															{document.category.name}
+														</p>
+													</div>
+												</div>
+												{latest ? (
+													<div className="flex items-center gap-2">
+														<a
+															className="rounded-lg border border-[var(--border)] px-4 py-2 text-sm font-semibold shadow-sm transition hover:bg-[color-mix(in_srgb,var(--foreground)_5%,var(--surface))]"
+															href={`/portal/${token}?tab=documents&category=${activeFolder.id}&preview=${document.id}`}
+														>
+															Ver
+														</a>
+														<a
+															className="rounded-lg bg-[var(--brand-red)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#b51d2a]"
+															download
+															href={latest.publicUrl}
+														>
+															Descargar
+														</a>
+													</div>
+												) : null}
+											</div>
+										);
+									})}
+								</div>
+							</>
+						) : (
+							<>
+								<SectionHeader
+									icon={FolderArchive}
+									title="Documentos disponibles"
+									detail={`${project.documents.length} visibles en ${documentFolders.length} carpeta${documentFolders.length === 1 ? "" : "s"}`}
+								/>
+								{documentFolders.length > 0 ? (
+									<div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+										{documentFolders.map((folder) => {
+											const Icon = folderIcon(folder.key);
+											return (
+												<a
+													className="group flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--foreground)_3%,var(--surface))] p-4 shadow-[0_10px_26px_rgba(37,48,51,0.06)] transition hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--brand-red)_35%,var(--border))] hover:shadow-[0_16px_36px_rgba(37,48,51,0.12)]"
+													href={`/portal/${token}?tab=documents&category=${folder.id}`}
+													key={folder.id}
+												>
+													<span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-[color-mix(in_srgb,var(--brand-red)_14%,var(--surface))] text-[var(--brand-red)]">
+														<Icon aria-hidden="true" size={26} />
+													</span>
+													<div className="min-w-0">
+														<p className="truncate font-semibold">
+															{folder.name}
+														</p>
+														<p className="text-sm text-[var(--muted)]">
+															{folder.documents.length} documento
+															{folder.documents.length === 1 ? "" : "s"}
+														</p>
+													</div>
+												</a>
+											);
+										})}
 									</div>
-								);
-							})}
-							{project.documents.length === 0 ? (
-								<EmptyState text="Sin documentos visibles para el cliente." />
-							) : null}
-						</div>
+								) : (
+									<EmptyState text="Sin documentos visibles para el cliente." />
+								)}
+							</>
+						)}
 					</section>
 				) : null}
 			</section>
+
+			{previewDocument ? (
+				<PortalDocumentPreviewModal
+					categoryName={previewDocument.category.name}
+					closeHref={`/portal/${token}?tab=documents`}
+					title={previewDocument.title}
+					version={previewDocument.versions[0] ?? null}
+				/>
+			) : null}
 		</main>
+	);
+}
+
+function BudgetSummary({
+	budget,
+	budgetChanges,
+}: {
+	budget: NonNullable<
+		Awaited<ReturnType<typeof getClientPortalByToken>>
+	>["approvedBudget"];
+	budgetChanges: NonNullable<
+		Awaited<ReturnType<typeof getClientPortalByToken>>
+	>["budgetChanges"];
+}) {
+	if (!budget) return null;
+
+	const directBase = budget.lineSubtotal.add(budget.siteManagerCost);
+	const currentBudget = budget.grandTotal.add(budgetChanges.total);
+	const extraRows = [
+		[
+			"Administración",
+			budget.administrationPercentage,
+			budget.administrationAmount,
+		],
+		["Utilidad", budget.profitPercentage, budget.profitAmount],
+		["IVA", budget.vatPercentage, budget.vatAmount],
+		["Financiamiento", budget.financingPercentage, budget.financingAmount],
+	] as const;
+
+	return (
+		// Same fixed light table as the PDF ("Vista PDF" on the internal budget
+		// page) on purpose - the client already knows this exact layout, so the
+		// portal mirrors it verbatim instead of a different-looking summary.
+		// Left-aligned in the portal (unlike the print sheet) since this is the
+		// first thing the client should read on the tab, not a corner detail.
+		<div className="mt-5 mr-auto w-full max-w-[520px] bg-white p-1 text-xs text-black">
+			<h3 className="border-2 border-[#172023] bg-[#172023] px-3 py-2 text-center font-bold uppercase tracking-[0.08em] text-white">
+				Resumen financiero
+			</h3>
+			<table className="w-full border-collapse">
+				<tbody>
+					<tr>
+						<td className="border border-black px-2 py-1">
+							Total de renglones
+						</td>
+						<td className="border border-black px-2 py-1 text-right">
+							{money(budget.lineSubtotal)}
+						</td>
+					</tr>
+					<tr>
+						<td className="border border-black px-2 py-1">Encargado de obra</td>
+						<td className="border border-black px-2 py-1 text-right">
+							{money(budget.siteManagerCost)}
+						</td>
+					</tr>
+					<tr className="bg-[#eef2ef] font-semibold">
+						<td className="border border-black px-2 py-1">Base directa</td>
+						<td className="border border-black px-2 py-1 text-right">
+							{money(directBase)}
+						</td>
+					</tr>
+					<tr>
+						<td className="border border-black px-2 py-1">
+							Imprevistos {budget.contingencyPercentage.toString()}%
+						</td>
+						<td className="border border-black px-2 py-1 text-right">
+							{money(budget.contingencyAmount)}
+						</td>
+					</tr>
+					<tr className="bg-[#eef2ef] font-semibold">
+						<td className="border border-black px-2 py-1">Subtotal</td>
+						<td className="border border-black px-2 py-1 text-right">
+							{money(budget.subtotal)}
+						</td>
+					</tr>
+					{extraRows.map(([label, percentage, amount]) => (
+						<tr key={label}>
+							<td className="border border-black px-2 py-1">
+								{label} {percentage.toString()}%
+							</td>
+							<td className="border border-black px-2 py-1 text-right">
+								{money(amount)}
+							</td>
+						</tr>
+					))}
+					<tr>
+						<td className="border border-black px-2 py-1">
+							Variaciones autorizadas
+						</td>
+						<td className="border border-black bg-[#fff0b8] px-2 py-1 text-right">
+							{money(budgetChanges.total)}
+						</td>
+					</tr>
+					<tr>
+						<td className="border-2 border-[#172023] bg-[#d5eee1] px-3 py-2 font-bold uppercase">
+							Presupuesto vigente
+						</td>
+						<td className="border-2 border-[#172023] bg-[#d5eee1] px-3 py-2 text-right text-sm font-bold">
+							{money(currentBudget)}
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
 	);
 }
 
@@ -780,7 +1050,10 @@ function BudgetPreview({
 
 	return (
 		<div className="mt-5 overflow-x-auto">
-			<div className="min-w-[960px] space-y-5">
+			{/* Fixed light + black text on purpose, like /print: this mimics the
+			    real paper budget sheet clients already know, so it never follows
+			    the portal's light/dark toggle. */}
+			<div className="min-w-[960px] space-y-5 bg-white p-1 text-black">
 				<div className="border-2 border-black text-center text-xs uppercase">
 					<p>Nombre del proyecto:</p>
 					<h3 className="border-t border-black bg-[#d9d9d9] py-1 text-base font-bold">
@@ -936,16 +1209,31 @@ function SchedulePreview({
 	scheduleStart: Date;
 	weeks: Array<{ key: string; label: string; days: Date[] }>;
 }) {
+	// table-fixed divides leftover width evenly across day columns - with no
+	// explicit width per day, a long schedule (many days) compresses them to
+	// unreadable slivers. Giving each day a real min-width and growing the
+	// table's own min-width with it keeps every day column legible; it just
+	// scrolls further on long schedules instead of squeezing.
+	const dayColumnWidth = 26;
+	const fixedColumnsWidth = 56 + 360 + 150 + 110;
+	const tableMinWidth = fixedColumnsWidth + days.length * dayColumnWidth;
+
 	return (
-		<div className="mt-5 overflow-x-auto">
-			<table className="w-full min-w-[1100px] table-fixed border-collapse text-[11px]">
+		<div className="mt-5 overflow-x-auto bg-white p-1 text-black">
+			<table
+				className="w-full table-fixed border-collapse text-[11px]"
+				style={{ minWidth: `${tableMinWidth}px` }}
+			>
 				<colgroup>
 					<col className="w-[56px]" />
 					<col className="w-[360px]" />
 					<col className="w-[150px]" />
 					<col className="w-[110px]" />
 					{days.map((day) => (
-						<col key={`col-${day.toISOString()}`} />
+						<col
+							key={`col-${day.toISOString()}`}
+							style={{ width: dayColumnWidth }}
+						/>
 					))}
 				</colgroup>
 				<thead>
@@ -1038,9 +1326,9 @@ function DataRow({
 }) {
 	return (
 		<div
-			className={`flex justify-between gap-4 ${last ? "" : "border-b border-[#e2e5df] pb-2"}`}
+			className={`flex justify-between gap-4 ${last ? "" : "border-b border-[var(--border)] pb-2"}`}
 		>
-			<dt className="text-[#596765]">{label}</dt>
+			<dt className="text-[var(--muted)]">{label}</dt>
 			<dd className="text-right font-medium">{value}</dd>
 		</div>
 	);
@@ -1051,29 +1339,30 @@ function Metric({
 	value,
 	icon: Icon,
 	accent,
-	tint,
-	ink,
 }: {
 	label: string;
 	value: number;
 	icon: LucideIcon;
 	accent: string;
-	tint: string;
-	ink: string;
 }) {
 	return (
 		<article className="portal-card portal-metric relative overflow-hidden p-5">
 			<span
 				className="absolute inset-x-0 top-0 h-[3px]"
-				style={{ background: `linear-gradient(90deg, ${accent} 0%, transparent 100%)` }}
+				style={{
+					background: `linear-gradient(90deg, ${accent} 0%, transparent 100%)`,
+				}}
 			/>
 			<div className="flex items-center justify-between gap-3">
-				<p className="text-xs font-bold uppercase tracking-[0.14em] text-[#596765]">
+				<p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted)]">
 					{label}
 				</p>
 				<span
 					className="grid size-10 shrink-0 place-items-center rounded-xl"
-					style={{ backgroundColor: tint, color: ink }}
+					style={{
+						backgroundColor: `color-mix(in srgb, ${accent} 16%, var(--surface))`,
+						color: accent,
+					}}
 				>
 					<Icon aria-hidden="true" size={18} />
 				</span>
@@ -1093,12 +1382,12 @@ function SummaryTile({
 	detail: string;
 }) {
 	return (
-		<div className="rounded-2xl border border-[#d7d9d2] bg-[#f9faf7] p-4 shadow-[0_10px_26px_rgba(37,48,51,0.06)]">
-			<p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#596765]">
+		<div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--foreground)_3%,var(--surface))] p-4 shadow-[0_10px_26px_rgba(37,48,51,0.06)]">
+			<p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
 				{label}
 			</p>
 			<p className="mt-2 text-2xl font-semibold">{value}</p>
-			<p className="mt-2 text-sm text-[#52615f]">{detail}</p>
+			<p className="mt-2 text-sm text-[var(--muted)]">{detail}</p>
 		</div>
 	);
 }
@@ -1122,29 +1411,29 @@ function ActivityMonitor({
 }) {
 	const change = Math.max(0, current - previous);
 	return (
-		<div className="rounded-xl border border-[#d7d9d2] bg-white/80 p-4 shadow-[0_10px_24px_rgba(37,48,51,0.05)] backdrop-blur-xl backdrop-saturate-150">
+		<div className="rounded-xl border border-[var(--border)] bg-[var(--glass-surface)] p-4 shadow-[0_10px_24px_rgba(37,48,51,0.05)] backdrop-blur-xl backdrop-saturate-150">
 			<div className="flex flex-wrap items-start justify-between gap-3">
 				<div>
 					<p className="font-semibold">{name}</p>
-					<p className="mt-1 text-sm text-[#52615f]">
+					<p className="mt-1 text-sm text-[var(--muted)]">
 						{activityStatus(status)} - Hoy {today.toFixed(2)} {unit ?? ""}
 					</p>
 				</div>
 				<div className="text-right">
 					<p className="text-lg font-semibold">{percent(current)}</p>
-					<p className="text-xs font-semibold text-[#1f7a5a]">
+					<p className="text-xs font-semibold text-[var(--success)]">
 						+{percent(change)}
 					</p>
 				</div>
 			</div>
 			<div className="mt-4 space-y-2">
-				<div className="h-2.5 overflow-hidden rounded-full bg-[#e3e6e0]">
+				<div className="h-2.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--foreground)_10%,var(--surface))]">
 					<div
-						className="h-full rounded-full bg-[#d01f35]"
+						className="h-full rounded-full bg-[var(--danger)]"
 						style={{ width: percent(previous) }}
 					/>
 				</div>
-				<div className="h-3 overflow-hidden rounded-full bg-[#e3e6e0]">
+				<div className="h-3 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--foreground)_10%,var(--surface))]">
 					<div
 						className="h-full rounded-full"
 						style={{
@@ -1155,7 +1444,7 @@ function ActivityMonitor({
 				</div>
 			</div>
 			{issues ? (
-				<p className="mt-3 rounded-lg bg-[#fff4d6] px-3 py-2 text-sm text-[#7a4d00]">
+				<p className="mt-3 rounded-lg bg-[color-mix(in_srgb,var(--warning)_18%,var(--surface))] px-3 py-2 text-sm text-[var(--warning)]">
 					{issues}
 				</p>
 			) : null}
@@ -1175,13 +1464,13 @@ function ResourceLine({
 	detail: string;
 }) {
 	return (
-		<div className="flex items-center gap-3 rounded-xl bg-[#f4f5f2] p-4">
-			<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-[#1f7a5a] shadow-sm">
+		<div className="flex items-center gap-3 rounded-xl bg-[color-mix(in_srgb,var(--foreground)_4%,var(--surface))] p-4">
+			<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--surface)] text-[var(--success)] shadow-sm">
 				<Icon aria-hidden="true" size={18} />
 			</span>
 			<div className="min-w-0 flex-1">
 				<p className="text-sm font-semibold">{label}</p>
-				<p className="text-xs text-[#52615f]">{detail}</p>
+				<p className="text-xs text-[var(--muted)]">{detail}</p>
 			</div>
 			<strong className="text-right">{value}</strong>
 		</div>
@@ -1200,12 +1489,12 @@ function SectionHeader({
 	return (
 		<div className="flex flex-wrap items-center justify-between gap-3">
 			<div className="flex items-center gap-3">
-				<span className="grid size-10 place-items-center rounded-xl bg-[#fff1f1] text-[var(--brand-red)] shadow-sm">
+				<span className="grid size-10 place-items-center rounded-xl bg-[color-mix(in_srgb,var(--brand-red)_12%,var(--surface))] text-[var(--brand-red)] shadow-sm">
 					<Icon aria-hidden="true" size={19} />
 				</span>
 				<div>
 					<h2 className="text-xl font-semibold">{title}</h2>
-					<p className="text-sm text-[#596765]">{detail}</p>
+					<p className="text-sm text-[var(--muted)]">{detail}</p>
 				</div>
 			</div>
 		</div>
@@ -1213,5 +1502,7 @@ function SectionHeader({
 }
 
 function EmptyState({ text }: { text: string }) {
-	return <p className="py-10 text-center text-sm text-[#596765]">{text}</p>;
+	return (
+		<p className="py-10 text-center text-sm text-[var(--muted)]">{text}</p>
+	);
 }

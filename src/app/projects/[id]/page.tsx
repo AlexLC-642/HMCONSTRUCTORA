@@ -34,7 +34,7 @@ import {
 	moneyCompact,
 	moneyFull,
 	percent,
-	pp,
+	progressGap,
 } from "@/shared/ui/charts/format";
 
 const dateFormatter = new Intl.DateTimeFormat("es-GT", { dateStyle: "medium" });
@@ -326,8 +326,8 @@ export default async function ProjectDetailPage({
 			title: "Avance real",
 			value: percent(dashboard.progress.real),
 			detail: hasPlanning
-				? `Plan ${percent(dashboard.progress.planned)} | ${pp(dashboard.progress.gap)}`
-				: "Sin planificacion",
+				? `Plan para hoy: ${percent(dashboard.progress.planned)} · ${progressGap(dashboard.progress.gap)}`
+				: "Sin planificación",
 			href: `/projects/${id}/progress`,
 			icon: Gauge,
 			tone: "var(--brand-red)",
@@ -695,10 +695,12 @@ export default async function ProjectDetailPage({
 					</div>
 					<div className="mt-5 rounded-xl border border-[var(--border)] bg-[#fbfaf6] p-4">
 						<p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted)]">
-							Brecha avance vs plan
+							Estado frente al plan
 						</p>
 						<p className="mt-1 text-2xl font-semibold">
-							{hasPlanning ? pp(dashboard.progress.gap) : "Sin planificacion"}
+							{hasPlanning
+								? progressGap(dashboard.progress.gap)
+								: "Sin planificación"}
 						</p>
 					</div>
 				</article>

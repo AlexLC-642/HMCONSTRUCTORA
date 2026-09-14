@@ -8,15 +8,15 @@ import {
 	ChevronRight,
 	ClipboardList,
 	HardHat,
+	type LucideIcon,
 	Save,
 	Send,
-	type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
 import type { FormEvent } from "react";
-import type { getProjectProgressWorkspace } from "../application/queries";
+import { useState } from "react";
 import { scheduleActivityStatusLabels } from "@/modules/schedules/domain/validation";
 import { OfflineDailyReportDraft } from "@/shared/offline/daily-report-draft";
+import type { getProjectProgressWorkspace } from "../application/queries";
 import { ActivityProgressFields } from "./activity-progress-fields";
 import { EvidenceUploadFields } from "./evidence-upload-fields";
 import { ResourcesUsedFields } from "./resource-used-fields";
@@ -723,7 +723,9 @@ export function DailyReportForm({ workspace, action }: DailyReportFormProps) {
 										</p>
 										<dl className="mt-3 grid gap-3 text-sm">
 											<div className="flex justify-between gap-3 border-b border-[var(--border)] pb-2">
-												<dt className="text-[var(--muted)]">Meta de la actividad</dt>
+												<dt className="text-[var(--muted)]">
+													Meta de la actividad
+												</dt>
 												<dd className="font-semibold tabular-nums">
 													{row.contractedQuantity} {row.unit || "%"}
 												</dd>
@@ -789,7 +791,6 @@ export function DailyReportForm({ workspace, action }: DailyReportFormProps) {
 					initialLabor={labor}
 					initialMaterials={materials}
 					resources={workspace.inventoryResources}
-					warehouses={workspace.warehouses}
 				/>
 			</details>
 

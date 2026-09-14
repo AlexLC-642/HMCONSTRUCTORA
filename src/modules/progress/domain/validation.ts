@@ -73,18 +73,22 @@ const dailyReportMaterialInputSchema = z
 		position: z.coerce.number().int().min(1),
 	})
 	.superRefine((entry, context) => {
-		if (Number(entry.quantityUsed) <= 0) return;
+		const totalMovement =
+			Number(entry.quantityUsed) +
+			Number(entry.wasteQuantity) +
+			Number(entry.returnedQuantity);
+		if (totalMovement <= 0) return;
 		if (!entry.materialId)
 			context.addIssue({
 				code: "custom",
 				path: ["materialId"],
-				message: "Seleccione el material del inventario.",
+				message: "Seleccione un material disponible en la obra.",
 			});
 		if (!entry.warehouseId)
 			context.addIssue({
 				code: "custom",
 				path: ["warehouseId"],
-				message: "Seleccione la bodega de salida.",
+				message: "El material debe conservar el origen de su entrega.",
 			});
 	});
 

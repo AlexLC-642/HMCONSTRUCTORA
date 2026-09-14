@@ -2,10 +2,10 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 export const inventoryInputClass =
-	"focus-ring h-12 w-full rounded-xl border border-[#c9d0cc] bg-white px-3.5 text-sm text-[#17201f] shadow-[inset_0_1px_2px_rgba(19,31,29,0.04)] outline-none transition placeholder:text-[#7a8580] hover:border-[#aeb9b3] focus:border-[#c8202f] focus:ring-4 focus:ring-[#c8202f]/10 disabled:cursor-not-allowed disabled:bg-[#eef1ed] disabled:text-[#68736e]";
+	"focus-ring h-12 w-full rounded-xl border border-[#c9d0cc] bg-white px-3.5 text-sm text-[#17201f] shadow-[inset_0_1px_2px_rgba(19,31,29,0.04)] outline-none transition placeholder:text-[#7a8580] hover:border-[#aeb9b3] focus:border-[#4b5a56] focus:ring-4 focus:ring-[#253033]/10 disabled:cursor-not-allowed disabled:bg-[#eef1ed] disabled:text-[#68736e]";
 
 export const inventoryTextareaClass =
-	"focus-ring min-h-24 w-full resize-y rounded-xl border border-[#c9d0cc] bg-white p-3.5 text-sm text-[#17201f] shadow-[inset_0_1px_2px_rgba(19,31,29,0.04)] outline-none transition placeholder:text-[#7a8580] hover:border-[#aeb9b3] focus:border-[#c8202f] focus:ring-4 focus:ring-[#c8202f]/10";
+	"focus-ring min-h-24 w-full resize-y rounded-xl border border-[#c9d0cc] bg-white p-3.5 text-sm text-[#17201f] shadow-[inset_0_1px_2px_rgba(19,31,29,0.04)] outline-none transition placeholder:text-[#7a8580] hover:border-[#aeb9b3] focus:border-[#4b5a56] focus:ring-4 focus:ring-[#253033]/10";
 
 export const inventoryPrimaryButtonClass =
 	"inventory-primary-action focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#c8202f] px-4 text-sm font-bold text-white shadow-[0_12px_26px_rgba(160,20,35,0.24)] transition hover:-translate-y-0.5 hover:bg-[#af1c29] hover:shadow-[0_16px_32px_rgba(160,20,35,0.3)] disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transform-none motion-reduce:transition-none";

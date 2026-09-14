@@ -43,7 +43,7 @@ import { RoleChecklist } from "@/modules/users/ui/role-checklist";
 import { UserStatusToggle } from "@/modules/users/ui/user-status-toggle";
 
 const fieldClass =
-	"focus-ring h-11 w-full rounded-lg border border-[#cfd4ce] bg-white px-3 text-sm text-[#111719] transition placeholder:text-[#7c8681] hover:border-[#9ea8a2]";
+	"focus-ring h-11 w-full rounded-lg border border-[#cfd4ce] bg-white px-3 text-sm text-[#111719] shadow-[inset_0_1px_2px_rgba(19,31,29,0.04)] transition placeholder:text-[#7c8681] hover:border-[#9ea8a2]";
 const permissionLabels: Record<string, string> = {
 	"avance.aprobar": "Aprobar avances",
 	"avance.crear": "Crear avances diarios",
@@ -123,25 +123,32 @@ function Stat({
 			bar: "bg-[#cf2435]",
 			icon: "bg-[#fde9eb] text-[#b52130]",
 			value: "text-[#b52130]",
+			accent: "#cf2435",
 		},
 		green: {
 			bar: "bg-[#23835f]",
 			icon: "bg-[#e5f5ed] text-[#176c4b]",
 			value: "text-[#176c4b]",
+			accent: "#23835f",
 		},
 		amber: {
 			bar: "bg-[#b77912]",
 			icon: "bg-[#fff2d6] text-[#895b0d]",
 			value: "text-[#895b0d]",
+			accent: "#b77912",
 		},
 		steel: {
 			bar: "bg-[#30383b]",
 			icon: "bg-[#e9ece9] text-[#30383b]",
 			value: "text-[#111719]",
+			accent: "#30383b",
 		},
 	}[tone];
 	return (
-		<article className="access-kpi group relative overflow-hidden rounded-2xl bg-white p-5 shadow-[0_16px_40px_rgba(25,31,33,0.11),0_2px_8px_rgba(25,31,33,0.05)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_54px_rgba(25,31,33,0.15),0_3px_10px_rgba(25,31,33,0.06)] motion-reduce:transform-none motion-reduce:transition-none">
+		<article
+			className="access-kpi group relative overflow-hidden rounded-2xl p-5 shadow-[0_16px_40px_rgba(25,31,33,0.11),0_2px_8px_rgba(25,31,33,0.05)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_54px_rgba(25,31,33,0.15),0_3px_10px_rgba(25,31,33,0.06)] motion-reduce:transform-none motion-reduce:transition-none"
+			style={{ "--kpi-accent": tones.accent } as React.CSSProperties}
+		>
 			<div className="flex items-start justify-between gap-4">
 				<div>
 					<p className="text-xs font-bold uppercase tracking-[0.12em] text-[#65706b]">
@@ -614,240 +621,245 @@ export default async function UsersPage() {
 														</label>
 													</nav>
 													<div className="user-management-panels">
-													{canManageUsers && canManageAccount ? (
-														<form
-															action={updateAction}
-															className="manage-user-form grid gap-4"
-														>
-															<input
-																name="active"
-																type="hidden"
-																value={internalUser.status}
-															/>
-															<div
-																className="user-account-editor panel-datos grid gap-4 rounded-xl bg-white p-4 shadow-[0_10px_28px_rgba(25,31,33,0.08)]"
-																id={`account-${internalUser.id}`}
+														{canManageUsers && canManageAccount ? (
+															<form
+																action={updateAction}
+																className="manage-user-form grid gap-4"
 															>
-																<div className="flex items-center gap-2 border-b border-[#e1e4df] pb-3">
-																	<UserRound aria-hidden="true" size={17} />
-																	<h3 className="font-bold">
-																		Datos de la cuenta
-																	</h3>
-																</div>
-																<label className="grid gap-1.5">
-																	<FieldLabel>Nombre completo</FieldLabel>
-																	<input
-																		autoComplete="name"
-																		className={fieldClass}
-																		defaultValue={internalUser.name}
-																		minLength={3}
-																		name="name"
-																		required
-																	/>
-																</label>
-																<label className="grid gap-1.5">
-																	<FieldLabel>Usuario del correo</FieldLabel>
-																	<div className="user-email-field flex h-11 overflow-hidden rounded-lg border border-[#cfd4ce] bg-white">
+																<input
+																	name="active"
+																	type="hidden"
+																	value={internalUser.status}
+																/>
+																<div
+																	className="user-account-editor panel-datos grid gap-4 rounded-xl bg-white p-4 shadow-[0_10px_28px_rgba(25,31,33,0.08)] sm:grid-cols-2"
+																	id={`account-${internalUser.id}`}
+																>
+																	<div className="flex items-center gap-3 border-b border-[#e1e4df] pb-3 sm:col-span-2">
+																		<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#edf0ec] text-[#30383b]">
+																			<UserRound aria-hidden="true" size={17} />
+																		</span>
+																		<h3 className="font-bold">
+																			Datos de la cuenta
+																		</h3>
+																	</div>
+																	<label className="grid gap-1.5">
+																		<FieldLabel>Nombre completo</FieldLabel>
 																		<input
-																			aria-label="Usuario del correo corporativo"
-																			autoComplete="username"
-																			className="min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
-																			defaultValue={companyEmailUser(
-																				internalUser.email,
-																			)}
-																			name="email"
+																			autoComplete="name"
+																			className={fieldClass}
+																			defaultValue={internalUser.name}
+																			minLength={3}
+																			name="name"
 																			required
 																		/>
-																		<span className="flex shrink-0 items-center border-l border-[#dde1dc] bg-[#f1f3ef] px-3 text-xs font-bold">
-																			@{COMPANY_EMAIL_DOMAIN}
+																	</label>
+																	<label className="grid gap-1.5">
+																		<FieldLabel>Teléfono</FieldLabel>
+																		<input
+																			autoComplete="tel-national"
+																			className={`${fieldClass} tabular-nums`}
+																			defaultValue={internalUser.phone ?? ""}
+																			inputMode="numeric"
+																			maxLength={8}
+																			minLength={8}
+																			name="phone"
+																			pattern="[0-9]{8}"
+																			placeholder="55551234"
+																		/>
+																		<span className="text-xs text-[#65706b]">
+																			8 dígitos, sin espacios ni guiones.
 																		</span>
-																	</div>
-																</label>
-																<label className="grid gap-1.5">
-																	<FieldLabel>Teléfono</FieldLabel>
-																	<input
-																		autoComplete="tel-national"
-																		className={`${fieldClass} tabular-nums`}
-																		defaultValue={internalUser.phone ?? ""}
-																		inputMode="numeric"
-																		maxLength={8}
-																		minLength={8}
-																		name="phone"
-																		pattern="[0-9]{8}"
-																		placeholder="55551234"
-																	/>
-																	<span className="text-xs text-[#65706b]">
-																		8 dígitos, sin espacios ni guiones.
-																	</span>
-																</label>
-															</div>
-															<div
-																className="user-role-editor panel-roles"
-																id={`roles-${internalUser.id}`}
-															>
-																{targetIsSuperAdministrator ? (
-																	<div className="grid gap-2 rounded-xl bg-[#fff4d8] p-4 text-[#81550b]">
-																		<div className="flex items-center gap-2 text-sm font-bold">
-																			<ShieldCheck
-																				aria-hidden="true"
-																				size={16}
-																			/>{" "}
-																			Roles protegidos
-																		</div>
-																		<p className="text-xs leading-5">
-																			La cuenta principal utiliza únicamente el
-																			rol Superadministrador.
-																		</p>
-																		{internalUser.roles.map(({ roleId }) => (
+																	</label>
+																	<label className="grid gap-1.5 sm:col-span-2">
+																		<FieldLabel>Usuario del correo</FieldLabel>
+																		<div className="user-email-field flex h-11 overflow-hidden rounded-lg border border-[#cfd4ce] bg-white">
 																			<input
-																				key={roleId}
-																				name="roleIds"
-																				type="hidden"
-																				value={roleId}
+																				aria-label="Usuario del correo corporativo"
+																				autoComplete="username"
+																				className="min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
+																				defaultValue={companyEmailUser(
+																					internalUser.email,
+																				)}
+																				name="email"
+																				required
 																			/>
-																		))}
-																	</div>
-																) : (
-																	<RoleChecklist
-																		disabledRoleKeys={
-																			currentUserIsSuperAdministrator
-																				? []
-																				: [
-																						"administrador",
-																						"superadministrador",
-																					]
-																		}
-																		hasSuperAdministrator={
-																			hasSuperAdministrator
-																		}
-																		initialSelectedIds={[...selectedRoleIds]}
-																		roles={roles.map((role) => ({
-																			id: role.id,
-																			key: role.key,
-																			name: role.name,
-																			description: role.description,
-																			permissionCount: role.permissions.length,
-																		}))}
-																	/>
-																)}
-															</div>
-															<button
-																className="panel-footer-button focus-ring h-11 rounded-lg bg-[#202629] px-5 text-sm font-bold text-white transition hover:bg-[#0f1315]"
-																type="submit"
-															>
-																Guardar cambios
-															</button>
-														</form>
-													) : (
-														<div className="panel-datos panel-roles flex items-start gap-3 rounded-xl bg-[#eaf4ef] p-4 text-[#245c49]">
-															<ShieldCheck
-																aria-hidden="true"
-																className="mt-0.5 shrink-0"
-																size={18}
-															/>
-															<p className="text-sm leading-5">
-																<strong className="block text-[#173f32]">
-																	Tu rol está protegido
-																</strong>
-																Solo el superadministrador puede modificar tu
-																rol o estado de acceso.
-															</p>
-														</div>
-													)}
-													<div
-														className="user-security-grid panel-seguridad"
-														id={`security-${internalUser.id}`}
-													>
-														<div className="user-security-section">
-															<div className="mb-3 flex items-center gap-2">
-																<KeyRound aria-hidden="true" size={17} />
-																<h3 className="font-bold">
-																	Cambiar contraseña
-																</h3>
-															</div>
-															<form
-																action={resetAction}
-																className="grid gap-3 sm:grid-cols-[1fr_auto]"
-															>
-																<label className="grid gap-1.5">
-																	<span className="sr-only">
-																		Nueva contraseña
-																	</span>
-																	<input
-																		autoComplete="new-password"
-																		className={fieldClass}
-																		name="password"
-																		minLength={10}
-																		required
-																		placeholder="Nueva contraseña (mínimo 10 caracteres)"
-																		type="password"
-																	/>
-																</label>
+																			<span className="flex shrink-0 items-center border-l border-[#dde1dc] bg-[#f1f3ef] px-3 text-xs font-bold">
+																				@{COMPANY_EMAIL_DOMAIN}
+																			</span>
+																		</div>
+																	</label>
+																</div>
+																<div
+																	className="user-role-editor panel-roles"
+																	id={`roles-${internalUser.id}`}
+																>
+																	{targetIsSuperAdministrator ? (
+																		<div className="grid gap-2 rounded-xl bg-[#fff4d8] p-4 text-[#81550b]">
+																			<div className="flex items-center gap-2 text-sm font-bold">
+																				<ShieldCheck
+																					aria-hidden="true"
+																					size={16}
+																				/>{" "}
+																				Roles protegidos
+																			</div>
+																			<p className="text-xs leading-5">
+																				La cuenta principal utiliza únicamente
+																				el rol Superadministrador.
+																			</p>
+																			{internalUser.roles.map(({ roleId }) => (
+																				<input
+																					key={roleId}
+																					name="roleIds"
+																					type="hidden"
+																					value={roleId}
+																				/>
+																			))}
+																		</div>
+																	) : (
+																		<RoleChecklist
+																			disabledRoleKeys={
+																				currentUserIsSuperAdministrator
+																					? []
+																					: [
+																							"administrador",
+																							"superadministrador",
+																						]
+																			}
+																			hasSuperAdministrator={
+																				hasSuperAdministrator
+																			}
+																			initialSelectedIds={[...selectedRoleIds]}
+																			roles={roles.map((role) => ({
+																				id: role.id,
+																				key: role.key,
+																				name: role.name,
+																				description: role.description,
+																				permissionCount:
+																					role.permissions.length,
+																			}))}
+																		/>
+																	)}
+																</div>
 																<button
-																	className="focus-ring h-11 rounded-lg border border-[#cfd4ce] px-4 text-sm font-bold transition hover:bg-[#f7f6f2]"
+																	className="panel-footer-button focus-ring h-11 rounded-lg bg-[#202629] px-5 text-sm font-bold text-white transition hover:bg-[#0f1315]"
 																	type="submit"
 																>
-																	Actualizar
+																	Guardar cambios
 																</button>
 															</form>
-														</div>
-														<div className="user-security-section">
-															<div className="flex items-start gap-3">
-																<span
-																	className={`grid size-10 shrink-0 place-items-center rounded-xl ${internalUser.passkeys.length > 0 ? "bg-[#e7f4ed] text-[#176c4b]" : "bg-[#eef0ec] text-[#5f6964]"}`}
-																>
-																	<DevicePasskeyMark size={22} />
-																</span>
-																<div>
-																	<h3 className="font-bold">Huella o patrón</h3>
-																	<p className="mt-1 text-sm leading-5 text-[#65706b]">
-																		Permite entrar usando la seguridad del
-																		teléfono o computadora.
-																	</p>
-																</div>
+														) : (
+															<div className="panel-datos panel-roles flex items-start gap-3 rounded-xl bg-[#eaf4ef] p-4 text-[#245c49]">
+																<ShieldCheck
+																	aria-hidden="true"
+																	className="mt-0.5 shrink-0"
+																	size={18}
+																/>
+																<p className="text-sm leading-5">
+																	<strong className="block text-[#173f32]">
+																		Tu rol está protegido
+																	</strong>
+																	Solo el superadministrador puede modificar tu
+																	rol o estado de acceso.
+																</p>
 															</div>
-															<div className="mt-4 rounded-xl bg-[#f3f5f1] p-4">
-																<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+														)}
+														<div
+															className="user-security-grid panel-seguridad"
+															id={`security-${internalUser.id}`}
+														>
+															<div className="user-security-section">
+																<div className="mb-3 flex items-center gap-2">
+																	<KeyRound aria-hidden="true" size={17} />
+																	<h3 className="font-bold">
+																		Cambiar contraseña
+																	</h3>
+																</div>
+																<form
+																	action={resetAction}
+																	className="grid gap-3 sm:grid-cols-[1fr_auto]"
+																>
+																	<label className="grid gap-1.5">
+																		<span className="sr-only">
+																			Nueva contraseña
+																		</span>
+																		<input
+																			autoComplete="new-password"
+																			className={fieldClass}
+																			name="password"
+																			minLength={10}
+																			required
+																			placeholder="Nueva contraseña (mínimo 10 caracteres)"
+																			type="password"
+																		/>
+																	</label>
+																	<button
+																		className="focus-ring h-11 rounded-lg border border-[#cfd4ce] px-4 text-sm font-bold transition hover:bg-[#f7f6f2]"
+																		type="submit"
+																	>
+																		Actualizar
+																	</button>
+																</form>
+															</div>
+															<div className="user-security-section">
+																<div className="flex items-start gap-3">
+																	<span
+																		className={`grid size-10 shrink-0 place-items-center rounded-xl ${internalUser.passkeys.length > 0 ? "bg-[#e7f4ed] text-[#176c4b]" : "bg-[#eef0ec] text-[#5f6964]"}`}
+																	>
+																		<DevicePasskeyMark size={22} />
+																	</span>
 																	<div>
-																		<p className="text-sm font-bold text-[#26302c]">
-																			{internalUser.passkeys.length > 0
-																				? `${internalUser.passkeys.length} equipo${internalUser.passkeys.length === 1 ? " vinculado" : "s vinculados"}`
-																				: "Sin activar"}
-																		</p>
-																		<p className="mt-1 text-xs leading-5 text-[#65706b]">
-																			{latestPasskeyUse
-																				? `Último acceso: ${formatAccessDate(latestPasskeyUse)}`
-																				: internalUser.passkeys.length > 0
-																					? "Todavía no se ha utilizado."
-																					: currentUser.id === internalUser.id
-																						? "Actívalo desde este equipo para vincular su huella, rostro, PIN o patrón."
-																						: "El usuario debe activarlo al iniciar sesión desde su propio equipo."}
+																		<h3 className="font-bold">
+																			Huella o patrón
+																		</h3>
+																		<p className="mt-1 text-sm leading-5 text-[#65706b]">
+																			Permite entrar usando la seguridad del
+																			teléfono o computadora.
 																		</p>
 																	</div>
-																	{(canManageAccount || isOwnAccount) &&
-																	internalUser.passkeys.length > 0 ? (
-																		<form action={revokePasskeysAction}>
-																			<RevokePasskeysButton />
-																		</form>
+																</div>
+																<div className="mt-4 rounded-xl bg-[#f3f5f1] p-4">
+																	<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+																		<div>
+																			<p className="text-sm font-bold text-[#26302c]">
+																				{internalUser.passkeys.length > 0
+																					? `${internalUser.passkeys.length} equipo${internalUser.passkeys.length === 1 ? " vinculado" : "s vinculados"}`
+																					: "Sin activar"}
+																			</p>
+																			<p className="mt-1 text-xs leading-5 text-[#65706b]">
+																				{latestPasskeyUse
+																					? `Último acceso: ${formatAccessDate(latestPasskeyUse)}`
+																					: internalUser.passkeys.length > 0
+																						? "Todavía no se ha utilizado."
+																						: currentUser.id === internalUser.id
+																							? "Actívalo desde este equipo para vincular su huella, rostro, PIN o patrón."
+																							: "El usuario debe activarlo al iniciar sesión desde su propio equipo."}
+																			</p>
+																		</div>
+																		{(canManageAccount || isOwnAccount) &&
+																		internalUser.passkeys.length > 0 ? (
+																			<form action={revokePasskeysAction}>
+																				<RevokePasskeysButton />
+																			</form>
+																		) : null}
+																	</div>
+																	{currentUser.id === internalUser.id ? (
+																		<Link
+																			className="focus-ring mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-[#202629] px-3 text-sm font-bold !text-white transition hover:bg-[#101416]"
+																			href={"/account/security" as Route}
+																			style={{ color: "#ffffff" }}
+																		>
+																			<DevicePasskeyMark
+																				className="text-white"
+																				size={17}
+																			/>{" "}
+																			Configurar mi equipo
+																		</Link>
 																	) : null}
 																</div>
-																{currentUser.id === internalUser.id ? (
-																	<Link
-																		className="focus-ring mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-[#202629] px-3 text-sm font-bold !text-white transition hover:bg-[#101416]"
-																		href={"/account/security" as Route}
-																		style={{ color: "#ffffff" }}
-																	>
-																		<DevicePasskeyMark
-																			className="text-white"
-																			size={17}
-																		/>{" "}
-																		Configurar mi equipo
-																	</Link>
-																) : null}
 															</div>
 														</div>
 													</div>
-												</div>
 												</div>
 											</ManagementDialog>
 										) : (

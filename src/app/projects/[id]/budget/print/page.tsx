@@ -1,7 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/modules/auth/application/authorization";
-import { getProjectBudget } from "@/modules/budgets/application/queries";
+import {
+	getApprovedBudgetChanges,
+	getProjectBudget,
+} from "@/modules/budgets/application/queries";
 import {
 	budgetUnitLabel,
 	persistedLaborLineUsesJornadas,
@@ -76,7 +79,10 @@ export default async function BudgetPrintPage({
 }) {
 	await requirePermission("presupuesto.ver");
 	const { id } = await params;
-	const budget = await getProjectBudget(id);
+	const [budget, budgetChanges] = await Promise.all([
+		getProjectBudget(id),
+		getApprovedBudgetChanges(id),
+	]);
 	const version =
 		budget?.versions.find((item) => item.status === "APPROVED") ??
 		budget?.versions[0];
@@ -89,9 +95,7 @@ export default async function BudgetPrintPage({
 		contingencyPercentage: decimalOrZero(version.contingencyPercentage),
 		contingencyAmount: decimalOrZero(version.contingencyAmount),
 		subtotal: decimalOrZero(version.subtotal),
-		administrationPercentage: decimalOrZero(
-			version.administrationPercentage,
-		),
+		administrationPercentage: decimalOrZero(version.administrationPercentage),
 		administrationAmount: decimalOrZero(version.administrationAmount),
 		profitPercentage: decimalOrZero(version.profitPercentage),
 		profitAmount: decimalOrZero(version.profitAmount),
@@ -102,6 +106,7 @@ export default async function BudgetPrintPage({
 		grandTotal: decimalOrZero(version.grandTotal),
 	};
 	const directBase = financial.lineSubtotal.add(financial.siteManagerCost);
+	const currentBudget = financial.grandTotal.add(budgetChanges.total);
 
 	return (
 		<>
@@ -118,7 +123,9 @@ export default async function BudgetPrintPage({
 									Control de obra
 								</p>
 							</div>
-							<p className="font-bold tracking-[0.08em]">Presupuesto integrado</p>
+							<p className="font-bold tracking-[0.08em]">
+								Presupuesto integrado
+							</p>
 						</div>
 						<p className="px-3 py-1 text-center text-[9px] font-semibold tracking-[0.12em] text-[#52605b]">
 							Nombre del proyecto
@@ -291,7 +298,9 @@ export default async function BudgetPrintPage({
 								</td>
 							</tr>
 							<tr>
-								<td className="border border-black px-2 py-1">Encargado de obra</td>
+								<td className="border border-black px-2 py-1">
+									Encargado de obra
+								</td>
 								<td className="border border-black px-2 py-1 text-right">
 									{money(financial.siteManagerCost)}
 								</td>
@@ -323,7 +332,11 @@ export default async function BudgetPrintPage({
 										financial.administrationPercentage,
 										financial.administrationAmount,
 									],
-									["Utilidad", financial.profitPercentage, financial.profitAmount],
+									[
+										"Utilidad",
+										financial.profitPercentage,
+										financial.profitAmount,
+									],
 									["IVA", financial.vatPercentage, financial.vatAmount],
 									[
 										"Financiamiento",
@@ -342,11 +355,19 @@ export default async function BudgetPrintPage({
 								</tr>
 							))}
 							<tr>
+								<td className="border border-black px-2 py-1">
+									Variaciones autorizadas
+								</td>
+								<td className="border border-black bg-[#fff0b8] px-2 py-1 text-right">
+									{money(budgetChanges.total)}
+								</td>
+							</tr>
+							<tr>
 								<td className="border-2 border-[#172023] bg-[#d5eee1] px-3 py-2 font-bold uppercase">
-									Total general
+									Presupuesto vigente
 								</td>
 								<td className="border-2 border-[#172023] bg-[#d5eee1] px-3 py-2 text-right text-sm font-bold">
-									{money(financial.grandTotal)}
+									{money(currentBudget)}
 								</td>
 							</tr>
 						</tbody>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateDailyReportActivity } from "@/modules/progress/application/calculations";
+import { dailyReportInputSchema } from "@/modules/progress/domain/validation";
 
 describe("daily progress calculations", () => {
   it("calculates accumulated quantity and new progress", () => {
@@ -83,4 +84,42 @@ describe("daily progress calculations", () => {
     expect(result.accumulatedQuantity.toString()).toBe("45");
     expect(result.newProgress.toString()).toBe("84.91");
   });
+});
+
+describe("materiales usados en obra", () => {
+	const report = {
+		reportNumber: "INF-20260913-01",
+		reportDate: "2026-09-13",
+		siteManager: "Encargado",
+		activities: [
+			{
+				activityCode: "1",
+				activityName: "Muro",
+				workDescription: "Avance del día",
+				contractedQuantity: "100",
+				previousQuantity: "0",
+				todayQuantity: "10",
+				previousProgress: "0",
+				status: "IN_PROGRESS",
+				position: 1,
+			},
+		],
+	};
+
+	it("requiere que todo consumo provenga de una entrega a la obra", () => {
+		const result = dailyReportInputSchema.safeParse({
+			...report,
+			materialEntries: [
+				{
+					materialName: "Cemento",
+					quantityUsed: "2",
+					wasteQuantity: "0",
+					returnedQuantity: "0",
+					position: 1,
+				},
+			],
+		});
+
+		expect(result.success).toBe(false);
+	});
 });

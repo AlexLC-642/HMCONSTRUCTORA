@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import {
 	Calendar,
 	Download,
@@ -12,12 +11,17 @@ import {
 } from "lucide-react";
 import type { DocumentPreviewData } from "@/modules/documents/application/queries";
 import { documentFileUrl } from "@/modules/documents/domain/catalog";
+import { ZoomableImage } from "./zoomable-image";
 
 interface DocumentPreviewModalProps {
 	document: DocumentPreviewData;
 	closeHref?: string;
 	onClose?: () => void;
 	variant?: "default" | "receipt";
+	// The project card repeats info already visible on the page (breadcrumb,
+	// hero) when this modal opens from a project-scoped documents view -
+	// callers with that context pass false to avoid the duplication.
+	showProjectCard?: boolean;
 }
 
 function formatBytes(value: number) {
@@ -48,6 +52,7 @@ export function DocumentPreviewModal({
 	closeHref,
 	onClose,
 	variant = "default",
+	showProjectCard = true,
 }: DocumentPreviewModalProps) {
 	const safeVersion = document.version;
 	const tagsList = document.tags
@@ -72,13 +77,32 @@ export function DocumentPreviewModal({
 
 	return (
 		<div className="documents-preview-backdrop">
-			<section className={`documents-preview-modal ${variant === "receipt" ? "documents-preview-modal--receipt" : ""}`}>
+			<section
+				className={`documents-preview-modal ${variant === "receipt" ? "documents-preview-modal--receipt" : ""}`}
+			>
 				<div className="flex min-h-0 flex-1 flex-col bg-[#e9ede9]">
 					<header className="flex items-center justify-between gap-3 border-b border-[#dfe3dc] bg-white px-4 py-3 xl:hidden">
 						<h2 className="min-w-0 truncate text-base font-semibold">
 							{document.title}
 						</h2>
-						{onClose ? <button aria-label="Cerrar vista previa" className="grid h-10 w-10 place-items-center rounded-lg border border-[#cfd5ce] bg-white hover:bg-[#f4f0ed]" onClick={onClose} type="button"><X aria-hidden="true" size={18} /></button> : <a aria-label="Cerrar vista previa" className="grid h-10 w-10 place-items-center rounded-lg border border-[#cfd5ce] bg-white hover:bg-[#f4f0ed]" href={closeHref}><X aria-hidden="true" size={18} /></a>}
+						{onClose ? (
+							<button
+								aria-label="Cerrar vista previa"
+								className="grid h-10 w-10 place-items-center rounded-lg border border-[#cfd5ce] bg-white hover:bg-[#f4f0ed]"
+								onClick={onClose}
+								type="button"
+							>
+								<X aria-hidden="true" size={18} />
+							</button>
+						) : (
+							<a
+								aria-label="Cerrar vista previa"
+								className="grid h-10 w-10 place-items-center rounded-lg border border-[#cfd5ce] bg-white hover:bg-[#f4f0ed]"
+								href={closeHref}
+							>
+								<X aria-hidden="true" size={18} />
+							</a>
+						)}
 					</header>
 
 					<div className="grid min-h-0 flex-1 place-items-center p-4">
@@ -96,14 +120,10 @@ export function DocumentPreviewModal({
 								</p>
 							</div>
 						) : isImage ? (
-							<div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl border border-[#dfe3dc] bg-[#f3f5f3] p-3">
-								<Image
+							<div className="relative h-full w-full overflow-hidden rounded-xl border border-[#dfe3dc] bg-[#f3f5f3] p-3">
+								<ZoomableImage
 									alt={document.title}
-									className="max-h-full max-w-full rounded-lg object-contain shadow-md"
-									height={1200}
 									src={documentFileUrl(safeVersion.id)}
-									unoptimized
-									width={1200}
 								/>
 							</div>
 						) : isVideo ? (
@@ -163,22 +183,41 @@ export function DocumentPreviewModal({
 								{document.title}
 							</h2>
 						</div>
-						{onClose ? <button aria-label="Cerrar vista previa" className="documents-upload-close focus-ring" onClick={onClose} type="button"><X aria-hidden="true" size={16} /></button> : <a aria-label="Cerrar vista previa" className="documents-upload-close focus-ring" href={closeHref}><X aria-hidden="true" size={16} /></a>}
+						{onClose ? (
+							<button
+								aria-label="Cerrar vista previa"
+								className="documents-upload-close focus-ring"
+								onClick={onClose}
+								type="button"
+							>
+								<X aria-hidden="true" size={16} />
+							</button>
+						) : (
+							<a
+								aria-label="Cerrar vista previa"
+								className="documents-upload-close focus-ring"
+								href={closeHref}
+							>
+								<X aria-hidden="true" size={16} />
+							</a>
+						)}
 					</header>
 
 					<div className="flex-1 space-y-5 overflow-y-auto p-5">
-						<div className="rounded-xl border border-[#dfe3dc] bg-[#fbfbf8] p-3">
-							<div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-								<FolderKanban size={14} />
-								Proyecto
+						{showProjectCard ? (
+							<div className="rounded-xl border border-[#dfe3dc] bg-[#fbfbf8] p-3">
+								<div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+									<FolderKanban size={14} />
+									Proyecto
+								</div>
+								<p className="mt-2 text-sm font-bold text-[var(--foreground)]">
+									{document.project.code}
+								</p>
+								<p className="text-xs text-[var(--muted)]">
+									{document.project.name}
+								</p>
 							</div>
-							<p className="mt-2 text-sm font-bold text-[var(--foreground)]">
-								{document.project.code}
-							</p>
-							<p className="text-xs text-[var(--muted)]">
-								{document.project.name}
-							</p>
-						</div>
+						) : null}
 
 						<div className="space-y-3">
 							<div className="grid grid-cols-2 gap-4 border-b border-[var(--border)] pb-3">
@@ -315,7 +354,22 @@ export function DocumentPreviewModal({
 						) : (
 							<span className="text-sm text-[var(--muted)]">Sin archivo</span>
 						)}
-						{onClose ? <button className="documents-primary-action focus-ring" onClick={onClose} type="button">Cerrar</button> : <a className="documents-primary-action focus-ring" href={closeHref}>Cerrar</a>}
+						{onClose ? (
+							<button
+								className="documents-primary-action focus-ring"
+								onClick={onClose}
+								type="button"
+							>
+								Cerrar
+							</button>
+						) : (
+							<a
+								className="documents-primary-action focus-ring"
+								href={closeHref}
+							>
+								Cerrar
+							</a>
+						)}
 					</footer>
 				</aside>
 			</section>

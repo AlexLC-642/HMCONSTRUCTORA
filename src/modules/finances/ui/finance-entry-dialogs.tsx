@@ -72,7 +72,7 @@ function ModalShell({
 	}, [onClose]);
 
 	return (
-		<div className="fixed inset-0 z-[80] grid place-items-center bg-[#0d1415]/65 p-3 backdrop-blur-[3px] sm:p-6">
+		<div className="fixed inset-0 z-[80] grid place-items-center bg-[#0d1415]/65 p-4 backdrop-blur-[3px] sm:p-6">
 			<button
 				aria-label="Cerrar ventana"
 				className="absolute inset-0 cursor-default"

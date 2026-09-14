@@ -1,13 +1,13 @@
-import { Prisma, type StockMovementType } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+import { Prisma, type StockMovementType } from "@prisma/client";
 import { prisma } from "@/shared/lib/prisma";
 import {
-	inventoryMaterialInputSchema,
-	inventoryMaterialUpdateInputSchema,
-	stockMovementInputSchema,
 	type InventoryMaterialInput,
 	type InventoryMaterialUpdateInput,
+	inventoryMaterialInputSchema,
+	inventoryMaterialUpdateInputSchema,
 	type StockMovementInput,
+	stockMovementInputSchema,
 	type WarehouseInput,
 	warehouseInputSchema,
 } from "../domain/validation";
@@ -495,6 +495,8 @@ export async function consumeInventoryForDailyReport(
 		materialName: string;
 		warehouse: string | null;
 		quantityUsed: Prisma.Decimal;
+		wasteQuantity: Prisma.Decimal;
+		returnedQuantity: Prisma.Decimal;
 		unit: string | null;
 		notes: string | null;
 		materialId: string | null;
@@ -503,27 +505,24 @@ export async function consumeInventoryForDailyReport(
 	context: InventoryContext,
 ) {
 	for (const entry of materialEntries) {
-		if (entry.quantityUsed.lte(0)) continue;
+		const siteExit = entry.quantityUsed
+			.add(entry.wasteQuantity)
+			.add(entry.returnedQuantity);
+		if (siteExit.lte(0)) continue;
 		if (!entry.materialName.trim())
 			throw new Error("Cada consumo necesita un material.");
-		if (!entry.warehouse?.trim())
-			throw new Error(`Indique la bodega del material ${entry.materialName}.`);
+		if (!entry.materialId)
+			throw new Error(
+				`El material ${entry.materialName} no está vinculado al inventario.`,
+			);
+		if (!entry.warehouseId)
+			throw new Error(
+				`El material ${entry.materialName} no tiene una entrega de obra vinculada.`,
+			);
 
 		const [material, warehouse] = await Promise.all([
-			entry.materialId
-				? tx.inventoryMaterial.findUnique({ where: { id: entry.materialId } })
-				: tx.inventoryMaterial.findFirst({
-						where: {
-							OR: [{ code: entry.materialName }, { name: entry.materialName }],
-						},
-					}),
-			entry.warehouseId
-				? tx.warehouse.findUnique({ where: { id: entry.warehouseId } })
-				: tx.warehouse.findFirst({
-						where: {
-							OR: [{ code: entry.warehouse }, { name: entry.warehouse }],
-						},
-					}),
+			tx.inventoryMaterial.findUnique({ where: { id: entry.materialId } }),
+			tx.warehouse.findUnique({ where: { id: entry.warehouseId } }),
 		]);
 
 		if (!material)
@@ -535,23 +534,65 @@ export async function consumeInventoryForDailyReport(
 				`La bodega ${entry.warehouse} no existe o está inactiva.`,
 			);
 
-		await recordStockMovementInTransaction(
-			tx,
-			{
-				materialId: material.id,
-				warehouseId: warehouse.id,
-				projectId,
-				type: "OUT",
-				quantity: entry.quantityUsed.toNumber(),
-				unitCost: 0,
-				reference: `Informe diario ${reportNumber}`,
-				notes:
-					entry.notes ??
-					`Consumo registrado en el informe diario. Unidad: ${entry.unit ?? material.unit}`,
-				dailyReportMaterialId: entry.id,
-				idempotencyKey: `daily-report-material:${entry.id}:out`,
-			},
-			context,
-		);
+		const [deliveryTotals, previousUsage] = await Promise.all([
+			tx.stockMovement.aggregate({
+				where: {
+					projectId,
+					materialId: material.id,
+					warehouseId: warehouse.id,
+					type: "OUT",
+					dailyReportMaterialId: null,
+				},
+				_sum: { quantity: true },
+			}),
+			tx.dailyReportMaterial.aggregate({
+				where: {
+					id: { not: entry.id },
+					materialId: material.id,
+					warehouseId: warehouse.id,
+					dailyReport: {
+						projectId,
+						status: { in: ["APPROVED", "PUBLISHED"] },
+					},
+				},
+				_sum: {
+					quantityUsed: true,
+					wasteQuantity: true,
+					returnedQuantity: true,
+				},
+			}),
+		]);
+		const delivered = deliveryTotals._sum.quantity ?? new Prisma.Decimal(0);
+		const previouslyUsed = (
+			previousUsage._sum.quantityUsed ?? new Prisma.Decimal(0)
+		)
+			.add(previousUsage._sum.wasteQuantity ?? new Prisma.Decimal(0))
+			.add(previousUsage._sum.returnedQuantity ?? new Prisma.Decimal(0));
+		const availableAtProject = delivered.sub(previouslyUsed);
+		if (siteExit.gt(availableAtProject)) {
+			throw new Error(
+				`El consumo de ${entry.materialName} supera lo disponible en obra (${availableAtProject.toFixed(2)} ${entry.unit ?? material.unit}).`,
+			);
+		}
+
+		// La entrega ya descontó la bodega. Solo una devolución vuelve a ingresar.
+		if (entry.returnedQuantity.gt(0)) {
+			await recordStockMovementInTransaction(
+				tx,
+				{
+					materialId: material.id,
+					warehouseId: warehouse.id,
+					projectId,
+					type: "RETURN",
+					quantity: entry.returnedQuantity.toNumber(),
+					unitCost: 0,
+					reference: `Devolución ${reportNumber}`,
+					notes: entry.notes ?? "Devolución de material desde la obra.",
+					dailyReportMaterialId: entry.id,
+					idempotencyKey: `daily-report-material:${entry.id}:return`,
+				},
+				context,
+			);
+		}
 	}
 }

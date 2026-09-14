@@ -121,7 +121,7 @@ export default async function DailyReportDetailPage({
 					/>
 					<Info label="Clima" value={report.weather ?? "Sin registro"} />
 				</div>
-				<div className="overflow-x-auto">
+				<div className="hidden overflow-x-auto md:block">
 					<table className="w-full min-w-[920px] border-collapse text-sm">
 						<thead className="bg-[#f4f5f2] text-xs uppercase text-[var(--muted)]">
 							<tr>
@@ -159,6 +159,45 @@ export default async function DailyReportDetailPage({
 							))}
 						</tbody>
 					</table>
+				</div>
+				<div className="grid gap-3 p-4 md:hidden">
+					{report.activities.map((activity) => (
+						<div
+							className="rounded-2xl border border-[var(--border)] bg-[#f9faf8] p-4"
+							key={activity.id}
+						>
+							<div className="flex items-start justify-between gap-3">
+								<div className="min-w-0">
+									<p className="font-semibold">{activity.activityCode}</p>
+									<p className="text-sm text-[var(--foreground)]">
+										{activity.activityName}
+									</p>
+								</div>
+								<span className="shrink-0 text-xs font-semibold text-[var(--muted)]">
+									{scheduleActivityStatusLabels[activity.status]}
+								</span>
+							</div>
+							{activity.workDescription ? (
+								<p className="mt-2 text-xs text-[var(--muted)]">
+									{activity.workDescription}
+								</p>
+							) : null}
+							<dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--muted)]">
+								<div>
+									<dt>Hoy</dt>
+									<dd className="mt-1 font-bold tabular-nums text-[var(--foreground)]">
+										{decimalText(activity.todayQuantity)} {activity.unit ?? ""}
+									</dd>
+								</div>
+								<div>
+									<dt>Acumulado</dt>
+									<dd className="mt-1 font-bold tabular-nums text-[var(--foreground)]">
+										{decimalText(activity.newProgress)}%
+									</dd>
+								</div>
+							</dl>
+						</div>
+					))}
 				</div>
 			</section>
 
@@ -287,30 +326,52 @@ function SimpleTable({
 				{title}
 			</h2>
 			{rows.length ? (
-				<div className="overflow-x-auto">
-					<table className="w-full min-w-[520px] border-collapse text-sm">
-						<thead className="bg-[#f4f5f2] text-xs uppercase text-[var(--muted)]">
-							<tr>
-								{columns.map((column) => (
-									<th className="px-5 py-3 text-left" key={column}>
-										{column}
-									</th>
-								))}
-							</tr>
-						</thead>
-						<tbody>
-							{rows.map((row) => (
-								<tr className="border-t border-[var(--border)]" key={row.id}>
-									{row.cells.map((cell) => (
-										<td className="px-5 py-4" key={`${row.id}-${cell}`}>
-											{cell}
-										</td>
+				<>
+					<div className="hidden overflow-x-auto md:block">
+						<table className="w-full min-w-[520px] border-collapse text-sm">
+							<thead className="bg-[#f4f5f2] text-xs uppercase text-[var(--muted)]">
+								<tr>
+									{columns.map((column) => (
+										<th className="px-5 py-3 text-left" key={column}>
+											{column}
+										</th>
 									))}
 								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
+							</thead>
+							<tbody>
+								{rows.map((row) => (
+									<tr className="border-t border-[var(--border)]" key={row.id}>
+										{row.cells.map((cell) => (
+											<td className="px-5 py-4" key={`${row.id}-${cell}`}>
+												{cell}
+											</td>
+										))}
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+					<div className="grid gap-3 p-4 md:hidden">
+						{rows.map((row) => (
+							<div
+								className="rounded-2xl border border-[var(--border)] bg-[#f9faf8] p-4"
+								key={row.id}
+							>
+								<strong className="block">{row.cells[0]}</strong>
+								<dl className="mt-2 grid grid-cols-3 gap-2 text-xs text-[var(--muted)]">
+									{columns.slice(1).map((column, index) => (
+										<div key={column}>
+											<dt>{column}</dt>
+											<dd className="mt-1 font-bold text-[var(--foreground)]">
+												{row.cells[index + 1]}
+											</dd>
+										</div>
+									))}
+								</dl>
+							</div>
+						))}
+					</div>
+				</>
 			) : (
 				<p className="px-5 py-8 text-sm text-[var(--muted)]">{empty}</p>
 			)}
