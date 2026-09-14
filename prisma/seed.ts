@@ -9,13 +9,33 @@ import {
 } from "../src/modules/roles/domain/permissions";
 import { prisma } from "../src/shared/lib/prisma";
 
-const adminEmail = `admin@${COMPANY_EMAIL_DOMAIN}`;
+const isProduction = process.env.NODE_ENV === "production";
+const adminEmail = (
+	process.env.ADMIN_EMAIL ?? `admin@${COMPANY_EMAIL_DOMAIN}`
+).toLowerCase();
+const adminName =
+	process.env.ADMIN_NAME?.trim() || "Administrador HM Constructora";
+const adminPassword =
+	process.env.ADMIN_PASSWORD ?? (isProduction ? undefined : "Admin12345!");
+const seedDemoData = process.env.SEED_DEMO_DATA === "true" || !isProduction;
 const legacyAdminEmails = [
 	"admin@constructorahm.local",
 	"admin@hmcontructora.com",
 ];
 
 async function main() {
+	if (!adminEmail.endsWith(`@${COMPANY_EMAIL_DOMAIN}`)) {
+		throw new Error(
+			`ADMIN_EMAIL debe pertenecer al dominio @${COMPANY_EMAIL_DOMAIN}.`,
+		);
+	}
+
+	if (!adminPassword || adminPassword.length < 12) {
+		throw new Error(
+			"ADMIN_PASSWORD es obligatoria y debe tener al menos 12 caracteres.",
+		);
+	}
+
 	for (const permission of initialPermissions) {
 		await prisma.permission.upsert({
 			where: { key: permission.key },
@@ -67,7 +87,6 @@ async function main() {
 		where: { key: "superadministrador" },
 	});
 
-	const passwordHash = await hashPassword("Admin12345!");
 	const existingAdmin = await prisma.user.findUnique({
 		where: { email: adminEmail },
 	});
@@ -80,8 +99,7 @@ async function main() {
 		? await prisma.user.update({
 				where: { id: existingAdmin.id },
 				data: {
-					name: "Administrador HM Constructora",
-					passwordHash,
+					name: adminName,
 					status: "ACTIVE",
 				},
 			})
@@ -90,16 +108,16 @@ async function main() {
 					where: { id: legacyAdmins[0].id },
 					data: {
 						email: adminEmail,
-						name: "Administrador HM Constructora",
-						passwordHash,
+						name: adminName,
+						passwordHash: await hashPassword(adminPassword),
 						status: "ACTIVE",
 					},
 				})
 			: await prisma.user.create({
 					data: {
 						email: adminEmail,
-						name: "Administrador HM Constructora",
-						passwordHash,
+						name: adminName,
+						passwordHash: await hashPassword(adminPassword),
 					},
 				});
 
@@ -131,12 +149,10 @@ async function main() {
 		},
 	});
 
-	await prisma.userRole.deleteMany({
-		where: {
-			roleId: superAdmin.id,
-			userId: { not: adminUser.id },
-		},
-	});
+	if (!seedDemoData) {
+		console.info(`Administrador preparado: ${adminEmail}`);
+		return;
+	}
 
 	const client = await prisma.client.upsert({
 		where: { id: "seed-client-remodelacion" },
