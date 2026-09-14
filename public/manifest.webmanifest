@@ -1,24 +1,24 @@
 {
-  "name": "HM Constructora",
-  "short_name": "HM Constructora",
-  "description": "Sistema interno de gestion de proyectos de construccion",
-  "start_url": "/dashboard",
-  "scope": "/",
-  "display": "standalone",
-  "background_color": "#f7f8f5",
-  "theme_color": "#1f6b4f",
-  "icons": [
-    {
-      "src": "/brand/logo.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "/brand/logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ]
+	"name": "HM Constructora",
+	"short_name": "HM Constructora",
+	"description": "Sistema interno de gestion de proyectos de construccion",
+	"start_url": "/dashboard",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#f7f8f5",
+	"theme_color": "#1f6b4f",
+	"icons": [
+		{
+			"src": "/icon-192",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any maskable"
+		},
+		{
+			"src": "/icon-512",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any maskable"
+		}
+	]
 }

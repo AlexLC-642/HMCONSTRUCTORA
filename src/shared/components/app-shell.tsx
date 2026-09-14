@@ -19,6 +19,7 @@ import { logoutAction } from "@/modules/auth/application/actions";
 import type { AuthenticatedUser } from "@/modules/auth/domain/types";
 import { DevicePasskeyMark } from "@/modules/auth/ui/device-passkey-mark";
 import type { SystemNotification } from "@/modules/notifications/domain/types";
+import { PwaInstallButton } from "@/shared/offline/pwa-install-button";
 import { PwaRuntime } from "@/shared/offline/pwa-runtime";
 import { displayUserName } from "@/shared/utils/display-user-name";
 import { InlineScript } from "./inline-script";
@@ -271,6 +272,7 @@ export function AppShell({
 								<span className="app-shell-mobile-title">Control de obra</span>
 							</div>
 							<div className="app-shell-actions ml-auto flex items-center gap-3">
+								<PwaInstallButton />
 								<PwaRuntime />
 								<ThemeToggle />
 

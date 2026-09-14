@@ -4774,6 +4774,46 @@
 	background: currentColor;
 }
 
+.pwa-install-popover {
+	position: absolute;
+	right: 0;
+	top: calc(100% + 0.5rem);
+	z-index: 60;
+	width: 15.5rem;
+	border-radius: 12px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	box-shadow: 0 20px 45px rgba(20, 25, 27, 0.18);
+	padding: 0.85rem 0.95rem;
+	color: var(--foreground);
+}
+
+.pwa-install-popover__title {
+	margin: 0;
+	font-size: 0.78rem;
+	font-weight: 700;
+}
+
+.pwa-install-popover ol {
+	margin: 0.6rem 0 0;
+	padding-left: 1.1rem;
+	display: grid;
+	gap: 0.45rem;
+	font-size: 0.76rem;
+	line-height: 1.45;
+	color: var(--muted);
+}
+
+.pwa-install-popover ol li {
+	display: list-item;
+}
+
+.pwa-install-popover ol svg {
+	display: inline;
+	vertical-align: -2px;
+	margin: 0 0.1rem;
+}
+
 @media (min-width: 1024px) {
 	.app-shell-sidebar {
 		z-index: 45;

@@ -30,8 +30,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 			<div className="login-bottom-band" aria-hidden="true" />
 			<div className="login-red-wash" aria-hidden="true" />
 
-			<section className="relative grid min-h-screen grid-rows-[auto_1fr_auto] px-6 py-8 sm:px-10 lg:grid-cols-[1.02fr_0.98fr] lg:grid-rows-[auto_1fr_auto] lg:px-16">
-				<header className="login-brand-mark flex items-center gap-4 lg:col-span-2">
+			<section className="relative grid min-h-screen px-6 py-8 sm:px-10 lg:grid-cols-[1.02fr_0.98fr] lg:grid-rows-[auto_1fr_auto] lg:px-16">
+				<header className="login-brand-mark order-1 flex items-center gap-4 lg:order-none lg:col-span-2">
 					<div className="relative grid size-[74px] shrink-0 place-items-center rounded-lg border border-[#cfd3cf] bg-white shadow-[0_12px_32px_rgba(20,25,27,0.14)] sm:size-[86px]">
 						<Image
 							alt="Logo del sistema"
@@ -49,7 +49,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 					</div>
 				</header>
 
-				<section className="flex max-w-2xl flex-col justify-center py-14 lg:py-0">
+				<section className="order-3 flex max-w-2xl flex-col justify-center py-8 lg:order-none lg:py-0">
 					<p className="login-kicker text-sm font-bold uppercase tracking-[0.34em] text-[var(--brand-red)]">
 						Control de obra
 					</p>
@@ -66,24 +66,24 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 					</div>
 				</section>
 
-				<section className="flex items-center justify-center pb-16 lg:pb-0">
-					<div className="login-card w-full max-w-[500px] rounded-xl p-8 sm:p-10">
-						<div className="mb-8 flex items-center gap-5">
-							<div className="relative grid size-[82px] shrink-0 place-items-center rounded-xl border border-[#d7d9d6] bg-white shadow-[0_14px_34px_rgba(20,25,27,0.15)]">
+				<section className="order-2 flex items-center justify-center py-6 lg:order-none lg:py-0">
+					<div className="login-card w-full max-w-[500px] rounded-xl p-6 sm:p-8 lg:p-10">
+						<div className="mb-6 flex items-center gap-4 sm:mb-8 sm:gap-5">
+							<div className="relative grid size-[64px] shrink-0 place-items-center rounded-xl border border-[#d7d9d6] bg-white shadow-[0_14px_34px_rgba(20,25,27,0.15)] sm:size-[82px]">
 								<Image
 									alt="Logo del sistema"
-									className="object-contain p-2.5"
+									className="object-contain p-2"
 									fill
 									priority
-									sizes="82px"
+									sizes="(min-width: 640px) 82px, 64px"
 									src="/brand/logo.png"
 								/>
 							</div>
-							<div>
+							<div className="min-w-0">
 								<p className="text-xs font-bold uppercase tracking-[0.32em] text-[var(--brand-red)]">
 									Acceso autorizado
 								</p>
-								<h3 className="mt-3 text-3xl font-semibold tracking-[-0.02em]">
+								<h3 className="mt-2 text-2xl font-semibold tracking-[-0.02em] sm:mt-3 sm:text-3xl">
 									Iniciar sesion
 								</h3>
 							</div>
@@ -138,7 +138,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 					</div>
 				</section>
 
-				<footer className="pb-4 text-xs uppercase tracking-[0.34em] text-[#5e6865] lg:col-span-2">
+				<footer className="order-4 pb-4 text-xs uppercase tracking-[0.34em] text-[#5e6865] lg:order-none lg:col-span-2">
 					Sistema interno
 				</footer>
 			</section>

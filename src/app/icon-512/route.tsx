@@ -2,27 +2,21 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
-export const size = {
-	width: 64,
-	height: 64,
-};
-
-export const contentType = "image/png";
-
+// Same composition as icon-192/route.tsx, scaled 8x from the 64px favicon
+// base instead of up from the 192px version, so both stay crisp at their
+// own resolution rather than one being a blurry upscale of the other.
 const logoData = await readFile(
 	join(process.cwd(), "public", "brand", "logo.png"),
 	"base64",
 );
 const logoSrc = `data:image/png;base64,${logoData}`;
 
-export default function Icon() {
+export async function GET() {
 	return new ImageResponse(
 		<div
 			style={{
 				alignItems: "center",
 				background: "#172023",
-				border: "1px solid rgba(255,255,255,0.14)",
-				borderRadius: 14,
 				display: "flex",
 				height: "100%",
 				justifyContent: "center",
@@ -33,29 +27,28 @@ export default function Icon() {
 			<div
 				style={{
 					display: "flex",
-					height: 30,
+					height: 239,
 					overflow: "hidden",
 					position: "relative",
-					width: 54,
+					width: 430,
 				}}
 			>
+				{/** biome-ignore lint/performance/noImgElement: ImageResponse (Satori) only accepts a plain <img>, not next/image. */}
 				<img
 					alt=""
-					height="57"
+					height="451"
 					src={logoSrc}
 					style={{
-						height: 57,
-						left: -4,
+						height: 451,
+						left: -32,
 						position: "absolute",
-						top: -8,
-						width: 62,
+						top: -64,
+						width: 491,
 					}}
-					width="62"
+					width="491"
 				/>
 			</div>
 		</div>,
-		{
-			...size,
-		},
+		{ width: 512, height: 512 },
 	);
 }
