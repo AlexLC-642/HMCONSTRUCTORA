@@ -953,6 +953,7 @@ function DirectPurchaseForm({
 	);
 	const errorFor = (field: string) => state.errors?.[field]?.[0];
 	const nextKey = useRef(2);
+	const pendingLineFocusKey = useRef<number | null>(null);
 	const [tax, setTax] = useState(0);
 	const [projectId, setProjectId] = useState("");
 	const [lines, setLines] = useState<DirectLine[]>([
@@ -966,6 +967,18 @@ function DirectPurchaseForm({
 		setLines((current) =>
 			current.map((line) => (line.key === key ? { ...line, ...change } : line)),
 		);
+	const canAddLine = data.materials.length > lines.length;
+	const addLine = () => {
+		if (!canAddLine) return;
+		const key = nextKey.current;
+		nextKey.current += 1;
+		pendingLineFocusKey.current = key;
+		setLines((current) => [
+			...current,
+			{ key, materialId: "", quantity: 1, unitCost: 0 },
+		]);
+	};
+
 	const serializedItems = JSON.stringify(
 		lines.map((line) => {
 			return {
@@ -1192,25 +1205,25 @@ function DirectPurchaseForm({
 							<h3>Artículos de la compra</h3>
 							<p>Selecciona artículos existentes del catálogo de Inventario.</p>
 						</div>
-						<button
-							className="purchases-inline-action focus-ring"
-							disabled={data.materials.length === 0}
-							onClick={() => {
-								setLines((current) => [
-									...current,
-									{
-										key: nextKey.current,
-										materialId: "",
-										quantity: 1,
-										unitCost: 0,
-									},
-								]);
-								nextKey.current += 1;
-							}}
-							type="button"
-						>
-							<Plus size={16} /> Agregar renglón
-						</button>
+						<div className="purchases-order-lines__actions">
+							<span aria-live="polite" className="purchases-order-lines__count">
+								{lines.length} {lines.length === 1 ? "artículo" : "artículos"}
+							</span>
+							<button
+								aria-label="Agregar otro artículo a la compra"
+								className="purchases-order-lines__add focus-ring"
+								disabled={!canAddLine}
+								onClick={addLine}
+								title={
+									canAddLine
+										? "Agregar otro artículo"
+										: "Todos los artículos disponibles ya fueron agregados"
+								}
+								type="button"
+							>
+								<Plus aria-hidden="true" size={17} /> Agregar artículo
+							</button>
+						</div>
 					</div>
 					{errorFor("items") ? (
 						<p className="purchases-field-error" role="alert">
@@ -1244,6 +1257,16 @@ function DirectPurchaseForm({
 												});
 											}}
 											required
+											ref={(node) => {
+												if (!node || pendingLineFocusKey.current !== line.key)
+													return;
+												pendingLineFocusKey.current = null;
+												node.focus({ preventScroll: true });
+												node.scrollIntoView({
+													behavior: "smooth",
+													block: "nearest",
+												});
+											}}
 											value={line.materialId}
 										>
 											<option value="">Seleccionar artículo</option>
