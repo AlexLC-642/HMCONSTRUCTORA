@@ -25,14 +25,43 @@ import {
 } from "@/shared/ui/charts/format";
 import {
 	ActivityStatusChart,
+	AlertsStatRow,
 	CashFlowChart,
 	FinancialControlChart,
 	PortfolioSCurve,
 	ProgressVarianceChart,
-	ProjectProgressChart,
+	StockBarChart,
 } from "./dashboard-charts";
 import { PortfolioTable } from "./portfolio-table";
 import type { DashboardMetricsView, DashboardProjectRow } from "./types";
+
+type KpiIcon = React.ComponentType<{ size?: number; "aria-hidden"?: boolean }>;
+
+type KpiCardBase = {
+	title: string;
+	value: React.ReactNode;
+	detail: string;
+	icon: KpiIcon;
+	tone: string;
+	href: string;
+};
+
+type KpiCard =
+	| (KpiCardBase & {
+			variant: "trend";
+			data: number[];
+			delta: number | null;
+			deltaLabel: string;
+	  })
+	| (KpiCardBase & {
+			variant: "composition";
+			segments: Array<{
+				label: string;
+				value: number;
+				share: number;
+				color: string;
+			}>;
+	  });
 
 function clamp(value: number) {
 	return Math.max(0, Math.min(100, value));
@@ -50,11 +79,23 @@ function riskRank(risk: string) {
 	return 2;
 }
 
-function trendData(value: number) {
-	const base = Math.max(8, value || 12);
-	return [0.48, 0.54, 0.5, 0.62, 0.58, 0.68, 0.63, 0.72, 0.67, 0.77, 0.71].map(
-		(item) => base * item,
-	);
+function cumulative(values: number[]) {
+	let running = 0;
+	return values.map((value) => {
+		running += value;
+		return running;
+	});
+}
+
+// Month-over-month (or point-over-point) change, not cumulative growth -
+// a cumulative series almost always "improves", which hides the metric
+// actually going backwards recently.
+function seriesDelta(values: number[]) {
+	if (values.length < 2) return null;
+	const previous = values[values.length - 2];
+	const current = values[values.length - 1];
+	if (previous === 0) return current === 0 ? 0 : null;
+	return ((current - previous) / Math.abs(previous)) * 100;
 }
 
 function filteredTimeline(
@@ -317,11 +358,6 @@ export function DashboardWorkspace({
 	const balanceTotal = paidTotal - spentTotal;
 	const execution = budgetTotal > 0 ? (spentTotal / budgetTotal) * 100 : 0;
 	const coverage = spentTotal > 0 ? (paidTotal / spentTotal) * 100 : 0;
-	const criticalAlerts =
-		scopedMetrics.overdueActivities +
-		scopedMetrics.lowStock +
-		scopedMetrics.pendingReports +
-		scopedMetrics.pendingRequirements;
 	const activeFilterCount = [
 		clientFilter !== "all",
 		responsibleFilter !== "all",
@@ -338,18 +374,68 @@ export function DashboardWorkspace({
 		)
 		.slice(0, 5);
 
+	const ganttBounds = useMemo(() => {
+		const starts = scopedMetrics.ganttRows
+			.map((row) => (row.start ? new Date(row.start).getTime() : null))
+			.filter((value): value is number => value !== null);
+		const ends = scopedMetrics.ganttRows
+			.map((row) => (row.end ? new Date(row.end).getTime() : null))
+			.filter((value): value is number => value !== null);
+		if (starts.length === 0 || ends.length === 0) return null;
+		const min = Math.min(...starts);
+		const max = Math.max(...ends);
+		return max > min ? { min, max } : null;
+	}, [scopedMetrics.ganttRows]);
+
 	const advanceGap = average(
 		projects.map((project) => project.realProgress - project.plannedProgress),
 	);
-	const cards = [
+
+	// Recent history for sparklines - derived from the same monthly/timeline
+	// series the other charts already use, not fabricated shapes.
+	const monthlySpent = scopedMetrics.financialFlow.map((row) => row.spent);
+	const monthlyPaid = scopedMetrics.financialFlow.map((row) => row.paid);
+	const spentCumulative = cumulative(monthlySpent);
+	const paidCumulative = cumulative(monthlyPaid);
+	const balanceCumulative = spentCumulative.map(
+		(value, index) => paidCumulative[index] - value,
+	);
+	const progressTrend = scopedMetrics.timeline
+		.map((point) => point.real)
+		.filter((value): value is number => value !== null);
+
+	const statusToneByKey: Record<string, string> = {
+		ACTIVE: "var(--success)",
+		PAUSED: "var(--warning)",
+		CLOSED: "var(--muted)",
+	};
+	const statusLabelByKey: Record<string, string> = {
+		ACTIVE: "Activos",
+		PAUSED: "Pausados",
+		CLOSED: "Cerrados",
+	};
+	const projectsInView = scopedMetrics.statusCounts.reduce(
+		(sum, item) => sum + item.count,
+		0,
+	);
+
+	const cards: KpiCard[] = [
 		{
 			title: "Proyectos activos",
 			value: scopedMetrics.activeProjects,
 			detail: `${projects.length} de ${metrics.totalProjects} visibles`,
 			icon: FolderKanban,
 			tone: "var(--steel)",
-			data: trendData(projects.length),
 			href: "/projects",
+			variant: "composition",
+			segments: scopedMetrics.statusCounts
+				.filter((item) => item.count > 0)
+				.map((item) => ({
+					label: statusLabelByKey[item.status] ?? item.status,
+					value: item.count,
+					share: projectsInView > 0 ? (item.count / projectsInView) * 100 : 0,
+					color: statusToneByKey[item.status] ?? "var(--muted)",
+				})),
 		},
 		{
 			title: "Presupuesto vigente",
@@ -357,8 +443,23 @@ export function DashboardWorkspace({
 			detail: "Aprobado y vigente",
 			icon: WalletCards,
 			tone: "var(--brand-red)",
-			data: trendData(budgetTotal),
 			href: "/projects",
+			variant: "composition",
+			segments: [
+				{
+					label: "Ejecutado",
+					value: Math.min(spentTotal, budgetTotal),
+					share: budgetTotal > 0 ? clamp((spentTotal / budgetTotal) * 100) : 0,
+					color: "var(--brand-red)",
+				},
+				{
+					label: "Disponible",
+					value: Math.max(budgetTotal - spentTotal, 0),
+					share:
+						budgetTotal > 0 ? clamp(100 - (spentTotal / budgetTotal) * 100) : 0,
+					color: "var(--steel)",
+				},
+			],
 		},
 		{
 			title: "Costo ejecutado",
@@ -366,8 +467,11 @@ export function DashboardWorkspace({
 			detail: `${percent(execution)} del presupuesto`,
 			icon: Banknote,
 			tone: "var(--safety)",
-			data: trendData(execution),
 			href: "/finances",
+			variant: "trend",
+			data: spentCumulative,
+			delta: seriesDelta(monthlySpent),
+			deltaLabel: "vs mes anterior",
 		},
 		{
 			title: "Abonado clientes",
@@ -375,8 +479,11 @@ export function DashboardWorkspace({
 			detail: `${percent(coverage)} sobre ejecutado`,
 			icon: WalletCards,
 			tone: "#7C3AED",
-			data: trendData(paidTotal),
 			href: "/finances",
+			variant: "trend",
+			data: paidCumulative,
+			delta: seriesDelta(monthlyPaid),
+			deltaLabel: "vs mes anterior",
 		},
 		{
 			title: "Saldo disponible",
@@ -384,8 +491,11 @@ export function DashboardWorkspace({
 			detail: "Abonado - ejecutado",
 			icon: TrendingUp,
 			tone: balanceTotal < 0 ? "var(--danger)" : "var(--success)",
-			data: trendData(balanceTotal),
 			href: "/finances",
+			variant: "trend",
+			data: balanceCumulative,
+			delta: seriesDelta(balanceCumulative),
+			deltaLabel: "vs mes anterior",
 		},
 		{
 			title: "Avance global",
@@ -393,8 +503,11 @@ export function DashboardWorkspace({
 			detail: `Plan para hoy: ${percent(scopedMetrics.plannedProgressAverage)} · ${progressGap(advanceGap)}`,
 			icon: PackageSearch,
 			tone: "var(--info)",
-			data: trendData(scopedMetrics.realProgressAverage),
 			href: "/projects",
+			variant: "trend",
+			data: progressTrend,
+			delta: seriesDelta(progressTrend),
+			deltaLabel: "vs corte anterior",
 		},
 	];
 
@@ -662,7 +775,7 @@ export function DashboardWorkspace({
 				))}
 			</section>
 
-			<section className="grid gap-4 xl:grid-cols-[1.6fr_0.72fr]">
+			<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.6fr_0.72fr]">
 				<DashboardPanel
 					action={<a href="/projects">Proyectos</a>}
 					subtitle="Comparacion acumulada entre planificacion, avance fisico y ejecucion financiera."
@@ -679,7 +792,7 @@ export function DashboardWorkspace({
 				</DashboardPanel>
 			</section>
 
-			<section className="grid gap-4 xl:grid-cols-[1fr_0.92fr]">
+			<section className="grid gap-4">
 				<DashboardPanel
 					action={<a href="/projects">Ver proyectos</a>}
 					subtitle="Cartera filtrable con desviacion, presupuesto y riesgo."
@@ -687,19 +800,9 @@ export function DashboardWorkspace({
 				>
 					<PortfolioTable onSelect={setSelectedProject} projects={projects} />
 				</DashboardPanel>
-
-				<DashboardPanel
-					subtitle="Distribucion de proyectos por rango de avance."
-					title="Avance por proyecto"
-				>
-					<ProjectProgressChart
-						onSelect={setSelectedProject}
-						projects={projects}
-					/>
-				</DashboardPanel>
 			</section>
 
-			<section className="grid gap-4 xl:grid-cols-[1fr_0.8fr]">
+			<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_0.8fr]">
 				<DashboardPanel
 					subtitle="Muestra cuáles proyectos van al día, adelantados o atrasados según el plan de hoy."
 					title="Estado del avance"
@@ -739,7 +842,7 @@ export function DashboardWorkspace({
 				</DashboardPanel>
 			</section>
 
-			<section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+			<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1.05fr_0.95fr]">
 				<DashboardPanel
 					action={<a href="/finances">Ver finanzas</a>}
 					subtitle="Presupuesto, costo ejecutado y abonos por proyecto."
@@ -755,14 +858,14 @@ export function DashboardWorkspace({
 				</DashboardPanel>
 			</section>
 
-			<section className="grid gap-4 xl:grid-cols-[1fr_0.85fr_0.85fr]">
+			<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_0.85fr_0.85fr]">
 				<DashboardPanel
 					subtitle="Lineas base de inicio y finalizacion por proyecto."
 					title="Cronograma ejecutivo"
 				>
 					<div className="space-y-3">
 						{scopedMetrics.ganttRows.slice(0, 8).map((row) => (
-							<GanttRow key={row.id} row={row} />
+							<GanttRow bounds={ganttBounds} key={row.id} row={row} />
 						))}
 						{scopedMetrics.ganttRows.length === 0 ? (
 							<EmptyLine text="Sin cronogramas registrados." />
@@ -773,11 +876,35 @@ export function DashboardWorkspace({
 					subtitle="Pendientes que necesitan seguimiento."
 					title="Alertas"
 				>
-					<div className="grid gap-2">
+					<AlertsStatRow
+						rows={[
+							{
+								label: "Atrasadas",
+								value: scopedMetrics.overdueActivities,
+								href: "/projects",
+							},
+							{
+								label: "Informes",
+								value: scopedMetrics.pendingReports,
+								href: "/projects",
+							},
+							{
+								label: "Requerimientos",
+								value: scopedMetrics.pendingRequirements,
+								href: "/requisitions",
+							},
+							{
+								label: "Stock bajo",
+								value: scopedMetrics.lowStock,
+								href: "/inventory",
+							},
+						]}
+					/>
+					<div className="mt-4 grid gap-2">
 						{scopedMetrics.operationalAlerts.length > 0 ? (
 							scopedMetrics.operationalAlerts.slice(0, 6).map((alert) => (
 								<a
-									className="focus-ring rounded-xl border border-[var(--border)] bg-white px-3 py-3 shadow-sm hover:bg-[#fff8f2]"
+									className="focus-ring rounded-xl bg-white px-3 py-3 shadow-[0_8px_20px_rgba(37,48,51,0.07)] transition hover:-translate-y-0.5 hover:bg-[#fff8f2] hover:shadow-[0_14px_30px_rgba(37,48,51,0.12)]"
 									href={alert.href}
 									key={`${alert.title}-${alert.detail}`}
 								>
@@ -804,71 +931,20 @@ export function DashboardWorkspace({
 								</a>
 							))
 						) : (
-							<>
-								<AlertLine
-									href="/projects"
-									label="Actividades atrasadas"
-									value={scopedMetrics.overdueActivities}
-								/>
-								<AlertLine
-									href="/projects"
-									label="Informes pendientes"
-									value={scopedMetrics.pendingReports}
-								/>
-								<AlertLine
-									href="/requisitions"
-									label="Requerimientos activos"
-									value={scopedMetrics.pendingRequirements}
-								/>
-								<AlertLine
-									href="/inventory"
-									label="Stock bajo"
-									value={scopedMetrics.lowStock}
-								/>
-								<AlertLine
-									href="/projects"
-									label="Alertas consolidadas"
-									value={criticalAlerts}
-								/>
-							</>
+							<EmptyLine text="Sin pendientes: todo al dia." />
 						)}
 					</div>
 				</DashboardPanel>
 				<DashboardPanel
-					subtitle="Materiales por debajo del minimo."
+					action={<a href="/inventory">Ver inventario</a>}
+					subtitle="Existencia vs. minimo por material."
 					title="Inventario sensible"
 				>
-					<div className="grid gap-2">
-						{metrics.stockAlerts.slice(0, 5).map((stock) => (
-							<div
-								className="rounded-xl border border-[var(--border)] bg-white px-3 py-2"
-								key={`${stock.material}-${stock.unit}`}
-							>
-								<div className="flex justify-between gap-3">
-									<span className="truncate font-medium">{stock.material}</span>
-									<strong
-										className={
-											stock.level === "Critico"
-												? "text-[var(--danger)]"
-												: "text-[var(--warning)]"
-										}
-									>
-										{stock.level}
-									</strong>
-								</div>
-								<p className="text-sm text-[var(--muted)]">
-									{stock.quantity} / {stock.minimum} {stock.unit}
-								</p>
-							</div>
-						))}
-						{metrics.stockAlerts.length === 0 ? (
-							<EmptyLine text="Sin alertas de inventario." />
-						) : null}
-					</div>
+					<StockBarChart rows={metrics.stockAlerts.slice(0, 5)} />
 				</DashboardPanel>
 			</section>
 
-			<section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+			<section className="grid gap-4 md:grid-cols-2 xl:grid-cols-[0.9fr_1.1fr]">
 				<DashboardPanel
 					subtitle="Obras que concentran riesgo o pendientes."
 					title="Seguimiento prioritario"
@@ -876,7 +952,7 @@ export function DashboardWorkspace({
 					<div className="space-y-2">
 						{priorityProjects.map((project) => (
 							<button
-								className="focus-ring w-full rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(37,48,51,0.14)]"
+								className="focus-ring w-full rounded-xl bg-white px-4 py-3 text-left shadow-[0_8px_20px_rgba(37,48,51,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(37,48,51,0.14)]"
 								key={project.id}
 								onClick={() => setSelectedProject(project)}
 								type="button"
@@ -912,7 +988,7 @@ export function DashboardWorkspace({
 					<div className="grid gap-2">
 						{metrics.recentActivity.map((item) => (
 							<a
-								className="focus-ring flex items-start gap-3 rounded-xl border border-[var(--border)] bg-white px-3 py-3 shadow-sm hover:bg-[#fff8f2]"
+								className="focus-ring flex items-start gap-3 rounded-xl bg-white px-3 py-3 shadow-[0_8px_20px_rgba(37,48,51,0.07)] transition hover:-translate-y-0.5 hover:bg-[#fff8f2] hover:shadow-[0_14px_30px_rgba(37,48,51,0.12)]"
 								href={item.href}
 								key={`${item.title}-${item.at}`}
 							>
@@ -937,50 +1013,18 @@ export function DashboardWorkspace({
 				</DashboardPanel>
 			</section>
 
-			<section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+			<section className="grid gap-4">
 				<DashboardPanel
 					subtitle="Atajos compactos para registrar informacion operativa."
 					title="Accesos rapidos"
 				>
-					<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+					<div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
 						<QuickAction href="/projects" label="Nuevo avance" />
 						<QuickAction href="/requisitions" label="Nuevo requerimiento" />
 						<QuickAction href="/finances" label="Registrar gasto" />
 						<QuickAction href="/finances" label="Registrar abono" />
 						<QuickAction href="/documents" label="Subir documento" />
 						<QuickAction href="/inventory" label="Movimiento inventario" />
-					</div>
-				</DashboardPanel>
-				<DashboardPanel
-					subtitle="Informes pendientes y publicados visibles desde proyectos."
-					title="Informes recientes"
-				>
-					<div className="grid gap-2">
-						{metrics.recentActivity
-							.filter((item) => item.title.startsWith("Informe"))
-							.slice(0, 5)
-							.map((item) => (
-								<a
-									className="focus-ring flex items-center justify-between rounded-xl border border-[var(--border)] bg-white px-3 py-3 shadow-sm hover:bg-[#fff8f2]"
-									href={item.href}
-									key={`${item.title}-${item.at}`}
-								>
-									<span>
-										<span className="block font-semibold">{item.title}</span>
-										<span className="block text-sm text-[var(--muted)]">
-											{item.detail}
-										</span>
-									</span>
-									<span className="text-xs text-[var(--muted)]">
-										{shortDate(item.at)}
-									</span>
-								</a>
-							))}
-						{metrics.recentActivity.filter((item) =>
-							item.title.startsWith("Informe"),
-						).length === 0 ? (
-							<EmptyLine text="Sin informes recientes." />
-						) : null}
 					</div>
 				</DashboardPanel>
 			</section>
@@ -1029,32 +1073,8 @@ function DashboardPanel({
 	);
 }
 
-function ExecutiveKpi({
-	data,
-	delay,
-	detail,
-	href,
-	icon: Icon,
-	title,
-	tone,
-	value,
-}: {
-	data: number[];
-	delay: number;
-	detail: string;
-	href: string;
-	icon: React.ComponentType<{ size?: number; "aria-hidden"?: boolean }>;
-	title: string;
-	tone: string;
-	value: React.ReactNode;
-}) {
-	const max = Math.max(...data, 1);
-	const points = data
-		.map(
-			(item, index) =>
-				`${(index / (data.length - 1)) * 132},${48 - (item / max) * 36}`,
-		)
-		.join(" ");
+function ExecutiveKpi({ delay, ...card }: KpiCard & { delay: number }) {
+	const { detail, href, icon: Icon, title, tone, value } = card;
 
 	return (
 		<motion.a
@@ -1065,51 +1085,195 @@ function ExecutiveKpi({
 			initial={{ opacity: 0, y: 10 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ delay, duration: 0.34, ease: [0.16, 1, 0.3, 1] }}
+			whileHover={{ y: -5, scale: 1.012 }}
 			whileTap={{ scale: 0.99 }}
 		>
 			<div className="flex items-start justify-between gap-3">
 				<div className="min-w-0">
-					<p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+					<p className="executive-kpi__title text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
 						{title}
 					</p>
 					<p className="mt-4 truncate text-[clamp(1.55rem,2vw,2rem)] font-semibold tabular-nums">
 						{value}
 					</p>
+					{card.variant === "trend" ? (
+						<div className="mt-1.5">
+							<KpiDelta {...card} />
+						</div>
+					) : null}
 					<p className="mt-2 text-sm text-[var(--muted)]">{detail}</p>
 				</div>
 				<span
-					className="rounded-xl p-3 text-white shadow-[0_10px_24px_rgba(37,48,51,0.18)]"
+					className="executive-kpi__icon rounded-xl p-3 text-white shadow-[0_10px_24px_rgba(37,48,51,0.18)]"
 					style={{ backgroundColor: tone }}
 				>
 					<Icon aria-hidden={true} size={20} />
 				</span>
 			</div>
-			<svg
-				aria-hidden="true"
-				className="mt-4 h-10 w-full"
-				preserveAspectRatio="none"
-				viewBox="0 0 132 52"
-			>
-				<path d="M0 49H132" stroke="rgba(90,102,97,.18)" />
-				<polyline
-					fill="none"
-					points={points}
-					stroke={tone}
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					strokeWidth="3"
-				/>
-			</svg>
+			{card.variant === "trend" ? (
+				<KpiSparkline data={card.data} tone={tone} />
+			) : (
+				<KpiComposition segments={card.segments} />
+			)}
 		</motion.a>
 	);
 }
 
-function GanttRow({ row }: { row: DashboardMetricsView["ganttRows"][number] }) {
+function KpiDelta({
+	delta,
+	deltaLabel,
+}: {
+	delta: number | null;
+	deltaLabel: string;
+}) {
+	if (delta === null || Number.isNaN(delta)) return null;
+	const isFlat = Math.abs(delta) < 0.05;
+	const isUp = delta > 0;
+	return (
+		<span
+			className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
+				isFlat
+					? "bg-[color-mix(in_srgb,var(--muted)_16%,transparent)] text-[var(--muted)]"
+					: isUp
+						? "bg-[color-mix(in_srgb,var(--success)_18%,transparent)] text-[var(--success)]"
+						: "bg-[color-mix(in_srgb,var(--danger)_16%,transparent)] text-[var(--danger)]"
+			}`}
+			title={deltaLabel}
+		>
+			{isFlat ? "•" : isUp ? "▲" : "▼"}
+			{Math.abs(delta).toFixed(1)}%
+		</span>
+	);
+}
+
+function KpiSparkline({ data, tone }: { data: number[]; tone: string }) {
+	if (data.length < 2) {
+		return (
+			<p className="mt-4 h-10 content-center text-xs text-[var(--muted)]">
+				Historial insuficiente para tendencia.
+			</p>
+		);
+	}
+
+	const max = Math.max(...data, 1);
+	const min = Math.min(...data, 0);
+	const range = max - min || 1;
+	const points = data
+		.map(
+			(item, index) =>
+				`${(index / (data.length - 1)) * 132},${48 - ((item - min) / range) * 36}`,
+		)
+		.join(" ");
+
+	return (
+		<svg
+			aria-hidden="true"
+			className="mt-4 h-10 w-full"
+			preserveAspectRatio="none"
+			viewBox="0 0 132 52"
+		>
+			<path d="M0 49H132" stroke="rgba(90,102,97,.18)" />
+			<polyline
+				fill="none"
+				points={points}
+				stroke={tone}
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				strokeWidth="3"
+			/>
+		</svg>
+	);
+}
+
+function KpiComposition({
+	segments,
+}: {
+	segments: Array<{
+		label: string;
+		value: number;
+		share: number;
+		color: string;
+	}>;
+}) {
+	if (
+		segments.length === 0 ||
+		segments.every((segment) => segment.value === 0)
+	) {
+		return (
+			<p className="mt-4 h-10 content-center text-xs text-[var(--muted)]">
+				Sin datos para desglosar.
+			</p>
+		);
+	}
+
+	return (
+		<div className="mt-4">
+			<div className="flex h-2.5 w-full overflow-hidden rounded-full bg-[#e4e8e1]">
+				{segments.map((segment) => (
+					<div
+						key={segment.label}
+						style={{
+							width: `${clamp(segment.share)}%`,
+							backgroundColor: segment.color,
+						}}
+					/>
+				))}
+			</div>
+			<div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+				{segments.map((segment) => (
+					<span
+						key={segment.label}
+						className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)]"
+					>
+						<span
+							className="size-1.5 rounded-full"
+							style={{ backgroundColor: segment.color }}
+						/>
+						{segment.label} · {Math.round(segment.share)}%
+					</span>
+				))}
+			</div>
+		</div>
+	);
+}
+
+function GanttRow({
+	bounds,
+	row,
+}: {
+	bounds: { min: number; max: number } | null;
+	row: DashboardMetricsView["ganttRows"][number];
+}) {
 	const start = row.start ? new Date(row.start) : null;
 	const end = row.end ? new Date(row.end) : null;
+	const span =
+		bounds && start && end
+			? {
+					left: clamp(
+						((start.getTime() - bounds.min) / (bounds.max - bounds.min)) * 100,
+					),
+					width: Math.max(
+						2,
+						clamp(
+							((end.getTime() - start.getTime()) / (bounds.max - bounds.min)) *
+								100,
+						),
+					),
+				}
+			: null;
+	const todayPercent = bounds
+		? clamp(((Date.now() - bounds.min) / (bounds.max - bounds.min)) * 100)
+		: null;
+	const riskColor =
+		row.risk === "Riesgo"
+			? "var(--danger)"
+			: row.risk === "Atencion"
+				? "var(--warning)"
+				: "var(--success)";
+
 	return (
 		<a
-			className="focus-ring block rounded-xl border border-[var(--border)] bg-white px-3 py-3 shadow-sm hover:bg-[#fff8f2]"
+			className="focus-ring block rounded-xl bg-white px-3 py-3 shadow-[0_8px_20px_rgba(37,48,51,0.07)] transition hover:-translate-y-0.5 hover:bg-[#fff8f2] hover:shadow-[0_14px_30px_rgba(37,48,51,0.12)]"
 			href={`/projects/${row.id}/schedule`}
 		>
 			<div className="flex items-center justify-between gap-3">
@@ -1130,46 +1294,35 @@ function GanttRow({ row }: { row: DashboardMetricsView["ganttRows"][number] }) {
 					{end ? shortDate(end.toISOString()) : "Sin fin"}
 				</span>
 			</div>
-			<div className="mt-2 h-2 overflow-hidden rounded-full bg-[#e4e8e1]">
+			{span ? (
+				<div className="relative mt-2 h-2.5 overflow-hidden rounded-full bg-[#e4e8e1]">
+					<div
+						className="absolute inset-y-0 rounded-full"
+						style={{
+							left: `${span.left}%`,
+							width: `${span.width}%`,
+							backgroundColor: riskColor,
+						}}
+					/>
+					{todayPercent !== null ? (
+						<div
+							className="absolute inset-y-0 w-px bg-[#1a1a18]/40"
+							style={{ left: `${todayPercent}%` }}
+							title="Hoy"
+						/>
+					) : null}
+				</div>
+			) : null}
+			<div className="mt-1.5 flex items-center justify-between text-[10px] text-[var(--muted)]">
+				<span>Linea base</span>
+				<span>Avance {clamp(row.progress).toFixed(0)}%</span>
+			</div>
+			<div className="mt-1 h-2 overflow-hidden rounded-full bg-[#e4e8e1]">
 				<div
 					className="h-full rounded-full bg-[var(--brand-red)]"
 					style={{ width: `${clamp(row.progress)}%` }}
 				/>
 			</div>
-		</a>
-	);
-}
-
-function AlertLine({
-	href,
-	label,
-	value,
-}: {
-	href: string;
-	label: string;
-	value: number;
-}) {
-	const active = value > 0;
-	return (
-		<a
-			className="focus-ring flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-white px-3 py-3 shadow-sm hover:bg-[#fff8f2]"
-			href={href}
-		>
-			<span className="flex items-center gap-2 text-sm text-[var(--muted)]">
-				<AlertTriangle
-					aria-hidden="true"
-					className={active ? "text-[var(--danger)]" : "text-[var(--muted)]"}
-					size={16}
-				/>
-				{label}
-			</span>
-			<strong
-				className={
-					active ? "tabular-nums text-[var(--danger)]" : "tabular-nums"
-				}
-			>
-				{value}
-			</strong>
 		</a>
 	);
 }
@@ -1213,12 +1366,18 @@ function BudgetLine({
 function QuickAction({ href, label }: { href: string; label: string }) {
 	return (
 		<a
-			className="focus-ring rounded-xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 hover:bg-[#fff8f2] hover:shadow-[0_16px_34px_rgba(37,48,51,0.12)]"
+			className="focus-ring rounded-xl bg-white px-4 py-3 text-sm font-semibold shadow-[0_8px_20px_rgba(37,48,51,0.07)] transition hover:-translate-y-0.5 hover:bg-[#fff8f2] hover:shadow-[0_16px_34px_rgba(37,48,51,0.12)]"
 			href={href}
 		>
 			+ {label}
 		</a>
 	);
+}
+
+function riskAccent(risk: string) {
+	if (risk === "Riesgo") return "var(--danger)";
+	if (risk === "Atencion") return "var(--warning)";
+	return "var(--success)";
 }
 
 function ProjectDrawer({
@@ -1229,6 +1388,7 @@ function ProjectDrawer({
 	project: DashboardProjectRow;
 }) {
 	const gap = project.realProgress - project.plannedProgress;
+	const accent = riskAccent(project.risk);
 	return (
 		<motion.div
 			className="dashboard-drawer-backdrop"
@@ -1244,37 +1404,80 @@ function ProjectDrawer({
 			/>
 			<motion.aside
 				className="dashboard-drawer"
+				style={{ "--drawer-accent": accent } as React.CSSProperties}
 				initial={{ x: 420 }}
 				animate={{ x: 0 }}
 				exit={{ x: 420 }}
 				transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
 			>
-				<div className="flex items-start justify-between gap-3">
-					<div>
-						<p className="dashboard-eyebrow">{project.code}</p>
-						<h2 className="text-2xl font-semibold">{project.name}</h2>
-						<p className="mt-1 text-sm text-[var(--muted)]">
-							{project.clientName}
-						</p>
+				<div className="dashboard-drawer__banner">
+					<div className="flex items-start justify-between gap-3">
+						<div className="min-w-0">
+							<p className="dashboard-eyebrow">{project.code}</p>
+							<h2 className="text-2xl font-semibold text-balance">
+								{project.name}
+							</h2>
+							<p className="mt-1 text-sm text-[var(--muted)]">
+								{project.clientName}
+							</p>
+						</div>
+						<button
+							className="focus-ring dashboard-drawer__close"
+							onClick={onClose}
+							type="button"
+						>
+							<X size={18} />
+						</button>
 					</div>
-					<button
-						className="focus-ring rounded-full border border-[var(--border)] p-2 hover:bg-[#f6f3ef]"
-						onClick={onClose}
-						type="button"
+					<span
+						className="dashboard-drawer__risk-badge"
+						style={{ color: accent, borderColor: accent }}
 					>
-						<X size={18} />
-					</button>
+						<span
+							className="size-1.5 rounded-full"
+							style={{ backgroundColor: accent }}
+						/>
+						{project.risk}
+					</span>
 				</div>
-				<div className="mt-6 grid grid-cols-2 gap-3">
-					<DrawerMetric
-						label="Avance real"
-						value={percent(project.realProgress)}
+
+				<div className="mt-2 grid gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
+					<DrawerProgressRing
+						accent={accent}
+						planned={project.plannedProgress}
+						real={project.realProgress}
 					/>
-					<DrawerMetric label="Plan" value={percent(project.plannedProgress)} />
-					<DrawerMetric
-						label="Estado frente al plan"
-						value={progressGap(gap)}
-					/>
+					<div className="grid gap-2 text-sm">
+						<div className="flex items-center justify-between gap-3">
+							<span className="text-[var(--muted)]">Avance real</span>
+							<strong className="tabular-nums">
+								{percent(project.realProgress)}
+							</strong>
+						</div>
+						<div className="flex items-center justify-between gap-3">
+							<span className="text-[var(--muted)]">Plan para hoy</span>
+							<strong className="tabular-nums">
+								{percent(project.plannedProgress)}
+							</strong>
+						</div>
+						<div
+							className="mt-1 flex items-center justify-between gap-3 rounded-lg px-2.5 py-1.5"
+							style={{
+								backgroundColor:
+									"color-mix(in srgb, var(--drawer-accent) 12%, transparent)",
+							}}
+						>
+							<span className="font-medium" style={{ color: accent }}>
+								Estado frente al plan
+							</span>
+							<strong className="tabular-nums" style={{ color: accent }}>
+								{progressGap(gap)}
+							</strong>
+						</div>
+					</div>
+				</div>
+
+				<div className="mt-5 grid grid-cols-3 gap-3">
 					<DrawerMetric
 						label="Presupuesto"
 						value={moneyCompact(project.budgetTotal)}
@@ -1282,7 +1485,7 @@ function ProjectDrawer({
 					<DrawerMetric label="Ejecutado" value={moneyCompact(project.spent)} />
 					<DrawerMetric label="Saldo" value={moneyCompact(project.balance)} />
 				</div>
-				<div className="mt-6 rounded-xl border border-[var(--border)] bg-[#fbfaf6] p-4">
+				<div className="mt-5 rounded-xl border border-[var(--border)] bg-[#fbfaf6] p-4">
 					<p className="text-sm font-semibold">Lectura operativa</p>
 					<p className="mt-2 text-sm text-[var(--muted)]">
 						{project.risk === "Riesgo"
@@ -1311,9 +1514,85 @@ function ProjectDrawer({
 	);
 }
 
+function DrawerProgressRing({
+	real,
+	planned,
+	accent,
+}: {
+	real: number;
+	planned: number;
+	accent: string;
+}) {
+	const outerRadius = 50;
+	const innerRadius = 36;
+	const outerCircumference = 2 * Math.PI * outerRadius;
+	const innerCircumference = 2 * Math.PI * innerRadius;
+	const realOffset = outerCircumference * (1 - clamp(real) / 100);
+	const plannedOffset = innerCircumference * (1 - clamp(planned) / 100);
+
+	return (
+		<div className="relative mx-auto size-32 shrink-0">
+			<svg
+				aria-hidden="true"
+				className="size-full -rotate-90"
+				viewBox="0 0 120 120"
+			>
+				<circle
+					cx="60"
+					cy="60"
+					fill="none"
+					r={outerRadius}
+					stroke="var(--border)"
+					strokeWidth="10"
+				/>
+				<circle
+					cx="60"
+					cy="60"
+					fill="none"
+					r={innerRadius}
+					stroke="var(--border)"
+					strokeWidth="6"
+				/>
+				<circle
+					cx="60"
+					cy="60"
+					fill="none"
+					r={innerRadius}
+					stroke="var(--steel)"
+					strokeDasharray={innerCircumference}
+					strokeDashoffset={plannedOffset}
+					strokeLinecap="round"
+					strokeWidth="6"
+				/>
+				<circle
+					cx="60"
+					cy="60"
+					fill="none"
+					r={outerRadius}
+					stroke={accent}
+					strokeDasharray={outerCircumference}
+					strokeDashoffset={realOffset}
+					strokeLinecap="round"
+					strokeWidth="10"
+				/>
+			</svg>
+			<div className="pointer-events-none absolute inset-0 grid place-items-center">
+				<div className="text-center">
+					<p className="text-2xl font-semibold tabular-nums">
+						{percent(real, 0)}
+					</p>
+					<p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
+						Real
+					</p>
+				</div>
+			</div>
+		</div>
+	);
+}
+
 function DrawerMetric({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="rounded-xl border border-[var(--border)] bg-white p-3">
+		<div className="rounded-xl bg-white p-3 shadow-[0_8px_20px_rgba(37,48,51,0.07)]">
 			<p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
 				{label}
 			</p>

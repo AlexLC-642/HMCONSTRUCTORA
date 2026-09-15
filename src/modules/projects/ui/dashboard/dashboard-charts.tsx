@@ -6,8 +6,10 @@ import { PieChart as PieChartIcon } from "lucide-react";
 import { useMemo } from "react";
 import {
 	baseGrid,
+	chartTextTokens,
 	chartTooltip,
 	hmChartColors,
+	markShadow,
 	noDataOption,
 } from "@/shared/ui/charts/chart-theme";
 import { EChart } from "@/shared/ui/charts/e-chart";
@@ -18,6 +20,7 @@ import {
 	progressGap,
 	shortDate,
 } from "@/shared/ui/charts/format";
+import { useIsDarkMode } from "@/shared/ui/charts/use-chart-theme";
 import { classifyProgressGap } from "../../domain/risk";
 import type { DashboardMetricsView, DashboardProjectRow } from "./types";
 
@@ -40,10 +43,11 @@ export function PortfolioSCurve({
 }: {
 	metrics: DashboardMetricsView;
 }) {
+	const theme = chartTextTokens(useIsDarkMode());
 	const isEmpty = metrics.timeline.length < 2 || !hasPlanning(metrics);
 	const option = useMemo<EChartsCoreOption>(() => {
 		if (isEmpty)
-			return noDataOption("Sin planificacion suficiente para Curva S.");
+			return noDataOption("Sin planificacion suficiente para Curva S.", theme);
 
 		const labels = metrics.timeline.map((point) => shortDate(point.date));
 		const todayLabel = shortDate(new Date().toISOString());
@@ -59,14 +63,14 @@ export function PortfolioSCurve({
 				icon: "roundRect",
 				itemHeight: 8,
 				itemWidth: 20,
-				textStyle: { color: hmChartColors.muted, fontSize: 12 },
+				textStyle: { color: theme.muted, fontSize: 12 },
 			},
 			tooltip: {
-				...chartTooltip(),
+				...chartTooltip(theme),
 				trigger: "axis",
 				axisPointer: {
 					type: "cross",
-					label: { backgroundColor: hmChartColors.ink },
+					label: { backgroundColor: theme.ink },
 				},
 				formatter: (params: unknown) => {
 					const rows = Array.isArray(params) ? params : [];
@@ -93,8 +97,8 @@ export function PortfolioSCurve({
 				data: labels,
 				boundaryGap: false,
 				axisTick: { show: false },
-				axisLine: { lineStyle: { color: hmChartColors.grid } },
-				axisLabel: { color: hmChartColors.muted, fontSize: 11 },
+				axisLine: { lineStyle: { color: theme.grid } },
+				axisLabel: { color: theme.muted, fontSize: 11 },
 			},
 			yAxis: {
 				type: "value",
@@ -103,10 +107,10 @@ export function PortfolioSCurve({
 				interval: 25,
 				axisLabel: {
 					formatter: "{value}%",
-					color: hmChartColors.muted,
+					color: theme.muted,
 					fontSize: 11,
 				},
-				splitLine: { lineStyle: { color: hmChartColors.grid } },
+				splitLine: { lineStyle: { color: theme.grid } },
 			},
 			series: [
 				{
@@ -162,7 +166,7 @@ export function PortfolioSCurve({
 				},
 			],
 		};
-	}, [metrics, isEmpty]);
+	}, [metrics, isEmpty, theme]);
 
 	// The chart shows the full schedule, but the summary compares only the
 	// values calculated for today. Using the final timeline point made every
@@ -176,7 +180,7 @@ export function PortfolioSCurve({
 	const gap = planned === null || real === null ? null : real - planned;
 	const gapColor =
 		gap === null
-			? hmChartColors.muted
+			? theme.muted
 			: riskColors[classifyProgressGap(gap, metrics.overdueActivities)];
 
 	return (
@@ -216,6 +220,7 @@ export function ActivityStatusChart({
 }: {
 	metrics: DashboardMetricsView;
 }) {
+	const theme = chartTextTokens(useIsDarkMode());
 	const rows = [
 		{ key: "COMPLETED", label: "Completadas", color: hmChartColors.blue },
 		{ key: "IN_PROGRESS", label: "En proceso", color: hmChartColors.green },
@@ -231,11 +236,11 @@ export function ActivityStatusChart({
 	const completed = rows.find((row) => row.key === "COMPLETED")?.value ?? 0;
 
 	const option = useMemo<EChartsCoreOption>(() => {
-		if (total === 0) return noDataOption("Sin actividades registradas.");
+		if (total === 0) return noDataOption("Sin actividades registradas.", theme);
 		return {
 			animationDuration: 650,
 			tooltip: {
-				...chartTooltip(),
+				...chartTooltip(theme),
 				trigger: "item",
 				formatter: "{b}<br/><strong>{c}</strong> actividades ({d}%)",
 			},
@@ -245,7 +250,12 @@ export function ActivityStatusChart({
 					radius: ["62%", "82%"],
 					center: ["50%", "50%"],
 					label: { show: false },
-					itemStyle: { borderColor: "#fff", borderWidth: 3, borderRadius: 5 },
+					itemStyle: {
+						borderColor: theme.surface,
+						borderWidth: 3,
+						borderRadius: 5,
+						...markShadow,
+					},
 					data: rows.map((row) => ({
 						name: row.label,
 						value: row.value,
@@ -254,7 +264,7 @@ export function ActivityStatusChart({
 				},
 			],
 		};
-	}, [rows, total]);
+	}, [rows, total, theme]);
 
 	return (
 		<div className="grid gap-4 md:grid-cols-[12rem_1fr] md:items-center">
@@ -295,178 +305,12 @@ export function ActivityStatusChart({
 	);
 }
 
-export function ProjectProgressChart({
-	projects,
-	onSelect,
-}: {
-	projects: DashboardProjectRow[];
-	onSelect: (project: DashboardProjectRow) => void;
-}) {
-	const bands = useMemo(
-		() => [
-			{
-				key: "start",
-				label: "0-25%",
-				caption: "Arranque",
-				color: hmChartColors.red,
-				projects: projects.filter((project) => project.realProgress < 25),
-			},
-			{
-				key: "build",
-				label: "26-50%",
-				caption: "Ejecucion media",
-				color: hmChartColors.amber,
-				projects: projects.filter(
-					(project) => project.realProgress >= 25 && project.realProgress < 50,
-				),
-			},
-			{
-				key: "advance",
-				label: "51-75%",
-				caption: "Avance alto",
-				color: hmChartColors.green,
-				projects: projects.filter(
-					(project) => project.realProgress >= 50 && project.realProgress < 75,
-				),
-			},
-			{
-				key: "close",
-				label: "76-100%",
-				caption: "Cierre",
-				color: hmChartColors.blue,
-				projects: projects.filter((project) => project.realProgress >= 75),
-			},
-		],
-		[projects],
-	);
-	const total = projects.length;
-	const option = useMemo<EChartsCoreOption>(() => {
-		if (total === 0) return noDataOption("Sin proyectos activos.");
-		return {
-			animationDuration: 650,
-			color: bands.map((band) => band.color),
-			tooltip: {
-				...chartTooltip(),
-				trigger: "item",
-				formatter: (params: unknown) => {
-					if (!params || typeof params !== "object") return "";
-					const item = params as {
-						name?: string;
-						value?: number;
-						percent?: number;
-					};
-					return `<strong>${item.name ?? ""}</strong><br/>${item.value ?? 0} proyectos (${Number(item.percent ?? 0).toFixed(1)}%)`;
-				},
-			},
-			series: [
-				{
-					type: "pie",
-					radius: ["54%", "78%"],
-					center: ["50%", "50%"],
-					label: { show: false },
-					itemStyle: { borderColor: "#fff", borderWidth: 4, borderRadius: 7 },
-					data: bands.map((band) => ({
-						name: band.caption,
-						value: band.projects.length,
-						itemStyle: { color: band.color },
-					})),
-				},
-			],
-		};
-	}, [bands, total]);
-
-	const averageProgress =
-		total === 0
-			? 0
-			: projects.reduce((sum, project) => sum + project.realProgress, 0) /
-				total;
-
-	return (
-		<div className="grid gap-4 md:grid-cols-[14rem_1fr] md:items-center">
-			<div className="relative h-[250px]">
-				{total === 0 ? (
-					<EmptyDonut message="Aun no hay proyectos activos." size={224} />
-				) : (
-					<>
-						<EChart
-							className="h-[250px] w-full"
-							onChartClick={(params) => {
-								const dataIndex =
-									typeof params === "object" && params && "dataIndex" in params
-										? Number((params as { dataIndex: number }).dataIndex)
-										: -1;
-								const project = bands[dataIndex]?.projects[0];
-								if (project) onSelect(project);
-							}}
-							option={option}
-						/>
-						<div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-							<div>
-								<p className="text-3xl font-semibold tabular-nums">
-									{percent(averageProgress)}
-								</p>
-								<p className="text-xs text-[var(--muted)]">Promedio</p>
-							</div>
-						</div>
-					</>
-				)}
-			</div>
-			<div className="grid gap-2">
-				{bands.map((band) => {
-					const firstProject = band.projects[0];
-					const share = total > 0 ? (band.projects.length / total) * 100 : 0;
-					return (
-						<button
-							className="focus-ring rounded-xl border border-[var(--border)] bg-white px-3 py-3 text-left shadow-[0_10px_24px_rgba(37,48,51,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(37,48,51,0.13)] disabled:cursor-default disabled:opacity-60 disabled:hover:translate-y-0"
-							disabled={!firstProject}
-							key={band.key}
-							onClick={() =>
-								firstProject ? onSelect(firstProject) : undefined
-							}
-							type="button"
-						>
-							<div className="flex items-center justify-between gap-3">
-								<span className="flex items-center gap-2 text-sm font-semibold">
-									<span
-										className="size-2.5 rounded-full"
-										style={{ backgroundColor: band.color }}
-									/>
-									{band.caption}
-								</span>
-								<strong className="tabular-nums">{band.projects.length}</strong>
-							</div>
-							<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e4e8e1]">
-								<div
-									className="h-full rounded-full"
-									style={{
-										width: `${clamp(share)}%`,
-										backgroundColor: band.color,
-									}}
-								/>
-							</div>
-							<p className="mt-1 text-xs text-[var(--muted)]">
-								{band.label} de avance
-							</p>
-						</button>
-					);
-				})}
-			</div>
-		</div>
-	);
-}
-
 export function ProgressVarianceChart({
 	projects,
 }: {
 	projects: DashboardProjectRow[];
 }) {
-	const rows = [...projects]
-		.sort(
-			(a, b) =>
-				Math.abs(b.realProgress - b.plannedProgress) -
-				Math.abs(a.realProgress - a.plannedProgress),
-		)
-		.slice(0, 5);
+	const theme = chartTextTokens(useIsDarkMode());
 	const buckets = useMemo(
 		() => [
 			{
@@ -499,12 +343,12 @@ export function ProgressVarianceChart({
 	);
 	const option = useMemo<EChartsCoreOption>(() => {
 		if (projects.length === 0)
-			return noDataOption("Sin proyectos para comparar.");
+			return noDataOption("Sin proyectos para comparar.", theme);
 		return {
 			animationDuration: 650,
 			color: buckets.map((bucket) => bucket.color),
 			tooltip: {
-				...chartTooltip(),
+				...chartTooltip(theme),
 				trigger: "item",
 				formatter: "{b}<br/><strong>{c}</strong> proyectos ({d}%)",
 			},
@@ -514,7 +358,12 @@ export function ProgressVarianceChart({
 					radius: ["58%", "80%"],
 					center: ["50%", "50%"],
 					label: { show: false },
-					itemStyle: { borderColor: "#fff", borderWidth: 4, borderRadius: 7 },
+					itemStyle: {
+						borderColor: theme.surface,
+						borderWidth: 4,
+						borderRadius: 7,
+						...markShadow,
+					},
 					data: buckets.map((bucket) => ({
 						name: bucket.label,
 						value: bucket.projects.length,
@@ -523,7 +372,7 @@ export function ProgressVarianceChart({
 				},
 			],
 		};
-	}, [buckets, projects.length]);
+	}, [buckets, projects.length, theme]);
 
 	return (
 		<div className="grid gap-4 md:grid-cols-[12rem_1fr] md:items-center">
@@ -547,156 +396,200 @@ export function ProgressVarianceChart({
 					</>
 				)}
 			</div>
-			<div className="grid gap-3">
-				<div className="grid grid-cols-3 gap-2">
-					{buckets.map((bucket) => (
+			<div className="grid gap-2.5">
+				{buckets.map((bucket) => {
+					const share =
+						projects.length > 0
+							? (bucket.projects.length / projects.length) * 100
+							: 0;
+					return (
 						<div
-							className="rounded-xl border border-[var(--border)] bg-white px-3 py-3 text-center shadow-[0_10px_24px_rgba(37,48,51,0.08)]"
+							className="rounded-xl border border-[var(--border)] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(37,48,51,0.08)]"
 							key={bucket.key}
 						>
-							<span
-								className="mx-auto block size-2.5 rounded-full"
-								style={{ backgroundColor: bucket.color }}
-							/>
-							<p className="mt-2 text-xs font-semibold text-[var(--muted)]">
-								{bucket.label}
-							</p>
-							<strong className="tabular-nums">{bucket.projects.length}</strong>
-						</div>
-					))}
-				</div>
-				<div className="grid gap-2">
-					{rows.map((project) => {
-						const gap = project.realProgress - project.plannedProgress;
-						const color =
-							gap <= -5
-								? hmChartColors.red
-								: gap < 5
-									? hmChartColors.blue
-									: hmChartColors.green;
-						return (
-							<div
-								className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 shadow-sm"
-								key={project.id}
-							>
-								<div className="flex items-center justify-between gap-3">
-									<span className="truncate text-sm font-semibold">
-										{project.code}
-									</span>
-									<strong className="text-sm tabular-nums" style={{ color }}>
-										{progressGap(gap)}
-									</strong>
-								</div>
-								<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e4e8e1]">
-									<div
-										className="h-full rounded-full"
-										style={{
-											width: `${clamp(Math.abs(gap))}%`,
-											backgroundColor: color,
-										}}
+							<div className="flex items-center justify-between gap-3">
+								<span className="flex items-center gap-2 text-sm font-semibold">
+									<span
+										className="size-2.5 shrink-0 rounded-full"
+										style={{ backgroundColor: bucket.color }}
 									/>
-								</div>
+									{bucket.label}
+								</span>
+								<strong className="tabular-nums">
+									{bucket.projects.length}
+								</strong>
 							</div>
-						);
-					})}
-				</div>
+							<div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e4e8e1]">
+								<div
+									className="h-full rounded-full"
+									style={{ width: `${share}%`, backgroundColor: bucket.color }}
+								/>
+							</div>
+						</div>
+					);
+				})}
 			</div>
 		</div>
 	);
 }
 
+// A "budget usage" bar per project: one stacked bar (Ejecutado + Disponible
+// = 100% of Presupuesto) with a bullet-style tick marking Abonado. Answers
+// the real question - how much of the budget is used, and of that, how much
+// is actually collected - in one bar, and its height scales with row count
+// instead of leaving a mostly-empty 330px canvas for one or two projects.
 export function FinancialControlChart({
 	projects,
 }: {
 	projects: DashboardProjectRow[];
 }) {
+	const theme = chartTextTokens(useIsDarkMode());
 	const rows = [...projects]
 		.sort((a, b) => b.budgetTotal - a.budgetTotal)
 		.slice(0, 8);
+	const height = Math.max(190, rows.length * 60 + 50);
 	const option = useMemo<EChartsCoreOption>(() => {
-		if (rows.length === 0) return noDataOption("Sin datos financieros.");
+		if (rows.length === 0) return noDataOption("Sin datos financieros.", theme);
 		return {
 			animationDuration: 650,
-			grid: { ...baseGrid, left: 96, right: 44 },
-			legend: {
-				top: 0,
-				right: 0,
-				icon: "roundRect",
-				itemHeight: 8,
-				itemWidth: 18,
-				textStyle: { color: hmChartColors.muted },
-			},
+			// The legend lives as HTML above the chart instead (see the
+			// custom row below) so it isn't declared twice.
+			grid: { ...baseGrid, top: 16, left: 96, right: 64 },
 			tooltip: {
-				...chartTooltip(),
+				...chartTooltip(theme),
 				trigger: "axis",
 				axisPointer: { type: "shadow" },
-				valueFormatter: (value: unknown) => moneyFull(Number(value)),
+				formatter: (params: unknown) => {
+					const rowsParams = Array.isArray(params) ? params : [];
+					const first = rowsParams[0];
+					const index =
+						first && typeof first === "object" && "dataIndex" in first
+							? Number((first as { dataIndex: number }).dataIndex)
+							: 0;
+					const row = rows[index];
+					if (!row) return "";
+					return `<strong>${row.code}</strong><br/>Presupuesto: ${moneyFull(row.budgetTotal)}<br/>Ejecutado: ${moneyFull(row.spent)}<br/>Abonado: ${moneyFull(row.paid)}`;
+				},
 			},
 			xAxis: {
 				type: "value",
 				axisLabel: {
 					formatter: (value: number) => moneyCompact(value),
-					color: hmChartColors.muted,
+					color: theme.muted,
 				},
-				splitLine: { lineStyle: { color: hmChartColors.grid } },
+				splitLine: { lineStyle: { color: theme.grid } },
 			},
 			yAxis: {
 				type: "category",
 				data: rows.map((row) => row.code),
 				axisLine: { show: false },
 				axisTick: { show: false },
-				axisLabel: { color: hmChartColors.ink, fontWeight: 700 },
+				axisLabel: { color: theme.ink, fontWeight: 700 },
 			},
 			series: [
 				{
-					name: "Presupuesto",
+					name: "Ejecutado",
 					type: "bar",
-					barWidth: 18,
-					data: rows.map((row) => row.budgetTotal),
+					stack: "budget",
+					barWidth: 22,
+					data: rows.map((row) => row.spent),
 					itemStyle: {
-						color: hmChartColors.concrete,
-						borderRadius: [0, 10, 10, 0],
+						color: hmChartColors.red,
+						borderRadius: [10, 0, 0, 10],
+						...markShadow,
 					},
 				},
 				{
-					name: "Ejecutado",
+					name: "Disponible",
 					type: "bar",
-					barWidth: 18,
-					data: rows.map((row) => row.spent),
-					itemStyle: { color: hmChartColors.red, borderRadius: [0, 10, 10, 0] },
+					stack: "budget",
+					barWidth: 22,
+					data: rows.map((row) => Math.max(row.budgetTotal - row.spent, 0)),
+					itemStyle: {
+						color: theme.concrete,
+						borderRadius: [0, 10, 10, 0],
+					},
+					label: {
+						show: true,
+						position: "right",
+						color: theme.muted,
+						fontSize: 11,
+						fontWeight: 700,
+						formatter: (params: { dataIndex: number }) =>
+							moneyCompact(rows[params.dataIndex]?.budgetTotal ?? 0),
+					},
 				},
 				{
 					name: "Abonado",
-					type: "bar",
-					barWidth: 10,
-					data: rows.map((row) => row.paid),
-					itemStyle: { color: hmChartColors.green, borderRadius: [0, 8, 8, 0] },
+					type: "scatter",
+					symbol: "rect",
+					symbolSize: [4, 30],
+					data: rows.map((row, index) => [row.paid, index]),
+					itemStyle: { color: hmChartColors.green, ...markShadow },
+					tooltip: { show: false },
 				},
 			],
 		};
-	}, [rows]);
+	}, [rows, theme]);
 
 	if (rows.length === 0) {
 		return (
 			<EmptyChart
-				height={330}
+				height={190}
 				message="Aun no hay proyectos con presupuesto para comparar."
 			/>
 		);
 	}
-	return <EChart className="h-[330px] w-full" option={option} />;
+	return (
+		<div>
+			<div className="mb-2 flex flex-wrap items-center gap-4 text-xs text-[var(--muted)]">
+				<span className="inline-flex items-center gap-1.5">
+					<span
+						className="inline-block size-2.5 rounded-sm"
+						style={{ backgroundColor: hmChartColors.red }}
+					/>
+					Ejecutado
+				</span>
+				<span className="inline-flex items-center gap-1.5">
+					<span className="inline-block size-2.5 rounded-sm bg-[var(--border)]" />
+					Disponible (de presupuesto)
+				</span>
+				<span className="inline-flex items-center gap-1.5">
+					<span
+						className="inline-block h-2.5 w-1 rounded-sm"
+						style={{ backgroundColor: hmChartColors.green }}
+					/>
+					Abonado
+				</span>
+			</div>
+			<div style={{ height }}>
+				<EChart className="h-full w-full" option={option} />
+			</div>
+		</div>
+	);
 }
 
 export function CashFlowChart({ metrics }: { metrics: DashboardMetricsView }) {
+	const theme = chartTextTokens(useIsDarkMode());
 	const hasValues = metrics.financialFlow.some(
 		(row) => row.paid > 0 || row.spent > 0,
 	);
+	// Running balance across the 12-month window, so the saldo line reads
+	// as "where the project stands" rather than repeating the two bars.
+	const balanceSeries = useMemo(() => {
+		let running = 0;
+		return metrics.financialFlow.map((row) => {
+			running += row.paid - row.spent;
+			return running;
+		});
+	}, [metrics.financialFlow]);
+
 	const option = useMemo<EChartsCoreOption>(() => {
 		if (!hasValues)
-			return noDataOption("Sin movimientos financieros en el periodo.");
+			return noDataOption("Sin movimientos financieros en el periodo.", theme);
 		return {
 			animationDuration: 650,
-			color: [hmChartColors.green, hmChartColors.red],
+			color: [hmChartColors.green, hmChartColors.red, hmChartColors.blue],
 			grid: baseGrid,
 			legend: {
 				top: 0,
@@ -704,50 +597,63 @@ export function CashFlowChart({ metrics }: { metrics: DashboardMetricsView }) {
 				icon: "roundRect",
 				itemHeight: 8,
 				itemWidth: 18,
-				textStyle: { color: hmChartColors.muted },
+				textStyle: { color: theme.muted },
 			},
 			tooltip: {
-				...chartTooltip(),
+				...chartTooltip(theme),
 				trigger: "axis",
+				axisPointer: { type: "shadow" },
 				valueFormatter: (value: unknown) => moneyFull(Number(value)),
 			},
 			xAxis: {
 				type: "category",
-				boundaryGap: false,
 				data: metrics.financialFlow.map((row) => row.month),
 				axisTick: { show: false },
-				axisLabel: { color: hmChartColors.muted },
+				axisLabel: { color: theme.muted },
 			},
 			yAxis: {
 				type: "value",
 				axisLabel: {
 					formatter: (value: number) => moneyCompact(value),
-					color: hmChartColors.muted,
+					color: theme.muted,
 				},
-				splitLine: { lineStyle: { color: hmChartColors.grid } },
+				splitLine: { lineStyle: { color: theme.grid } },
 			},
 			series: [
 				{
 					name: "Abonado",
-					type: "line",
-					smooth: true,
-					symbolSize: 5,
+					type: "bar",
+					barGap: "10%",
+					barMaxWidth: 22,
 					data: metrics.financialFlow.map((row) => row.paid),
-					areaStyle: { color: "rgba(31,122,91,0.10)" },
-					lineStyle: { width: 3 },
+					itemStyle: {
+						color: hmChartColors.green,
+						borderRadius: [4, 4, 0, 0],
+						...markShadow,
+					},
 				},
 				{
 					name: "Gastado",
+					type: "bar",
+					barMaxWidth: 22,
+					data: metrics.financialFlow.map((row) => row.spent),
+					itemStyle: {
+						color: hmChartColors.red,
+						borderRadius: [4, 4, 0, 0],
+						...markShadow,
+					},
+				},
+				{
+					name: "Saldo acumulado",
 					type: "line",
 					smooth: true,
-					symbolSize: 5,
-					data: metrics.financialFlow.map((row) => row.spent),
-					areaStyle: { color: "rgba(211,33,53,0.08)" },
-					lineStyle: { width: 3 },
+					symbolSize: 6,
+					data: balanceSeries,
+					lineStyle: { width: 3, type: "dashed" },
 				},
 			],
 		};
-	}, [metrics, hasValues]);
+	}, [balanceSeries, metrics, hasValues, theme]);
 
 	if (!hasValues) {
 		return (
@@ -758,6 +664,157 @@ export function CashFlowChart({ metrics }: { metrics: DashboardMetricsView }) {
 		);
 	}
 	return <EChart className="h-[280px] w-full" option={option} />;
+}
+
+// A handful of independent counts (not a trend, not a part-to-whole split)
+// is a stat-tile row, not a bar chart - with mostly-zero values a bar chart
+// renders as near-invisible slivers, while a number reads at zero just fine.
+export function AlertsStatRow({
+	rows,
+}: {
+	rows: Array<{ label: string; value: number; href: string }>;
+}) {
+	return (
+		<div className="grid grid-cols-2 gap-2">
+			{rows.map((row) => (
+				<a
+					className="focus-ring rounded-xl bg-white px-3 py-3 shadow-[0_8px_20px_rgba(37,48,51,0.07)] transition hover:-translate-y-0.5 hover:bg-[#fff8f2] hover:shadow-[0_14px_30px_rgba(37,48,51,0.12)]"
+					href={row.href}
+					key={row.label}
+				>
+					<p
+						className={`text-2xl font-semibold tabular-nums ${
+							row.value > 0 ? "text-[var(--danger)]" : ""
+						}`}
+					>
+						{row.value}
+					</p>
+					<p className="mt-1 truncate text-xs font-medium text-[var(--muted)]">
+						{row.label}
+					</p>
+				</a>
+			))}
+		</div>
+	);
+}
+
+// Existencia vs. minimo is a value-against-a-threshold comparison, not two
+// independent measures - a bullet chart (one bar + a threshold tick) reads
+// that in one glance, instead of two parallel bars of different widths.
+export function StockBarChart({
+	rows,
+}: {
+	rows: Array<{
+		material: string;
+		unit: string;
+		quantity: number;
+		minimum: number;
+		level: string;
+	}>;
+}) {
+	const theme = chartTextTokens(useIsDarkMode());
+	const height = Math.max(140, rows.length * 44 + 24);
+	const option = useMemo<EChartsCoreOption>(() => {
+		if (rows.length === 0)
+			return noDataOption("Sin alertas de inventario.", theme);
+		return {
+			animationDuration: 550,
+			grid: { ...baseGrid, top: 12, right: 40 },
+			tooltip: {
+				...chartTooltip(theme),
+				trigger: "axis",
+				axisPointer: { type: "shadow" },
+				formatter: (params: unknown) => {
+					const rowsParams = Array.isArray(params) ? params : [];
+					const first = rowsParams[0];
+					const index =
+						first && typeof first === "object" && "dataIndex" in first
+							? Number((first as { dataIndex: number }).dataIndex)
+							: 0;
+					const row = rows[index];
+					if (!row) return "";
+					return `<strong>${row.material}</strong><br/>Existencia: ${row.quantity} ${row.unit}<br/>Minimo: ${row.minimum} ${row.unit}`;
+				},
+			},
+			xAxis: {
+				type: "value",
+				axisLabel: { color: theme.muted, fontSize: 11 },
+				splitLine: { lineStyle: { color: theme.grid } },
+			},
+			yAxis: {
+				type: "category",
+				data: rows.map((row) => row.material),
+				axisLine: { show: false },
+				axisTick: { show: false },
+				axisLabel: {
+					color: theme.ink,
+					fontSize: 11,
+					width: 96,
+					overflow: "truncate",
+				},
+			},
+			series: [
+				{
+					name: "Existencia",
+					type: "bar",
+					barWidth: 16,
+					data: rows.map((row) => ({
+						value: row.quantity,
+						itemStyle: {
+							color:
+								row.level === "Critico"
+									? hmChartColors.red
+									: hmChartColors.amber,
+							borderRadius: [0, 4, 4, 0],
+							...markShadow,
+						},
+					})),
+					label: {
+						show: true,
+						position: "right",
+						color: theme.ink,
+						fontSize: 11,
+						fontWeight: 700,
+						formatter: (params: { dataIndex: number }) =>
+							`${rows[params.dataIndex]?.quantity ?? ""} ${rows[params.dataIndex]?.unit ?? ""}`,
+					},
+				},
+				{
+					name: "Minimo",
+					type: "scatter",
+					symbol: "rect",
+					symbolSize: [4, 22],
+					data: rows.map((row, index) => [row.minimum, index]),
+					itemStyle: { color: theme.ink },
+					tooltip: { show: false },
+				},
+			],
+		};
+	}, [rows, theme]);
+
+	if (rows.length === 0) {
+		return <EmptyChart height={140} message="Sin alertas de inventario." />;
+	}
+	return (
+		<div>
+			<div className="mb-2 flex items-center gap-4 text-xs text-[var(--muted)]">
+				<span className="inline-flex items-center gap-1.5">
+					<span
+						className="inline-block size-2.5 rounded-sm"
+						style={{ backgroundColor: hmChartColors.red }}
+					/>
+					Existencia
+				</span>
+				<span className="inline-flex items-center gap-1.5">
+					<span className="inline-block h-2.5 w-1 rounded-sm bg-[var(--foreground)]" />
+					Minimo
+				</span>
+			</div>
+			<div style={{ height }}>
+				<EChart className="h-full w-full" option={option} />
+			</div>
+		</div>
+	);
 }
 
 function ChartMetric({

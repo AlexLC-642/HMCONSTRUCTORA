@@ -7560,10 +7560,15 @@ textarea.focus-ring:focus-visible {
 }
 
 .executive-dashboard {
+	/* A soft, low-alpha shadow on a near-white page barely registers - a
+	   tighter near shadow (short blur, higher alpha) plus the wide ambient
+	   one is what actually reads as "lifted" at this scale. */
 	--panel-shadow:
-		0 22px 52px rgba(37, 48, 51, 0.12), 0 2px 8px rgba(37, 48, 51, 0.06);
+		0 1px 2px rgba(23, 31, 33, 0.06), 0 10px 20px rgba(23, 31, 33, 0.1),
+		0 28px 56px rgba(23, 31, 33, 0.14);
 	--panel-shadow-hover:
-		0 28px 68px rgba(37, 48, 51, 0.16), 0 5px 18px rgba(37, 48, 51, 0.08);
+		0 2px 4px rgba(23, 31, 33, 0.08), 0 14px 28px rgba(23, 31, 33, 0.14),
+		0 36px 72px rgba(23, 31, 33, 0.18);
 }
 
 .dashboard-command-hero {
@@ -7895,6 +7900,9 @@ textarea.focus-ring:focus-visible {
 	background: var(--kpi-accent);
 	content: "";
 	opacity: 0.9;
+	transition:
+		height 220ms cubic-bezier(0.16, 1, 0.3, 1),
+		opacity 220ms ease;
 }
 
 @container dashboard-header (max-width: 48rem) {
@@ -7957,11 +7965,30 @@ textarea.focus-ring:focus-visible {
 		overflow-y: auto;
 	}
 	.executive-dashboard .kpi-grid {
-		grid-template-columns: 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 	.executive-kpi {
 		min-height: 0;
 		padding: 0.85rem;
+	}
+	/* The shared .kpi-grid rule sets overflow-wrap: anywhere so long values
+	   in other modules never overflow a narrow card - but on this all-caps,
+	   letter-spaced title it breaks a single word like "PROYECTOS" into
+	   "PROYECTO" + "S". Word-boundary wrapping is enough here. */
+	.executive-kpi .executive-kpi__title {
+		overflow-wrap: normal;
+		letter-spacing: 0.02em;
+	}
+	/* Two columns halve the card width, so the accent icon square (unlike
+	   every other module's kpi-grid icon, already shrunk by the shared rule
+	   above) needs to give the title room - "Presupuesto" was overflowing
+	   into a mid-word break at the old 44px icon size. */
+	.executive-kpi .executive-kpi__icon {
+		padding: 0.5rem;
+	}
+	.executive-kpi .executive-kpi__icon svg {
+		width: 1rem;
+		height: 1rem;
 	}
 	.executive-kpi svg.mt-4 {
 		height: 2rem;
@@ -8180,9 +8207,10 @@ textarea.focus-ring:focus-visible {
 	padding: 1.15rem;
 	text-decoration: none;
 	transition:
-		transform 180ms ease,
-		box-shadow 180ms ease,
-		border-color 180ms ease;
+		transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1),
+		border-color 220ms ease,
+		background-color 220ms ease;
 }
 
 .executive-kpi::before,
@@ -8201,9 +8229,18 @@ textarea.focus-ring:focus-visible {
 }
 
 .executive-kpi:hover {
-	transform: translateY(-2px);
-	border-color: rgba(200, 32, 47, 0.22);
+	/* The lift itself is driven by Framer Motion's whileHover, not this
+	   transform - motion.a leaves an inline transform style on the element
+	   for its own entrance animation, and inline style always beats a
+	   stylesheet rule no matter the specificity, so a CSS transform here
+	   would silently never apply. Border + shadow still work as plain CSS. */
+	border-color: var(--kpi-accent, var(--brand-red));
 	box-shadow: var(--panel-shadow-hover);
+}
+
+.executive-kpi:hover::after {
+	opacity: 1;
+	height: 4px;
 }
 
 .executive-panel {
@@ -8432,16 +8469,62 @@ textarea.focus-ring:focus-visible {
 	inset: 0 0 0 auto;
 	width: min(440px, 100%);
 	overflow-y: auto;
-	border-left: 1px solid var(--border);
-	background:
-		radial-gradient(
-			circle at 100% 0%,
-			rgba(200, 32, 47, 0.08),
-			transparent 18rem
-		),
-		#fbfaf6;
+	border-left: 1px solid var(--glass-border);
+	background: var(--glass-surface-strong);
 	box-shadow: -28px 0 70px rgba(37, 48, 51, 0.22);
-	padding: 1.35rem;
+	padding: 0 1.35rem 1.35rem;
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+	@media (prefers-reduced-transparency: no-preference) {
+		.dashboard-drawer {
+			backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+			-webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+		}
+	}
+}
+
+.dashboard-drawer__banner {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	margin: 0 -1.35rem;
+	padding: 1.35rem 1.35rem 1rem;
+	background: linear-gradient(
+		165deg,
+		color-mix(in srgb, var(--drawer-accent, var(--brand-red)) 12%, transparent),
+		transparent 70%
+	);
+}
+
+.dashboard-drawer__close {
+	display: grid;
+	flex-shrink: 0;
+	place-items: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: 999px;
+	border: 1px solid var(--glass-border);
+	background: var(--glass-surface);
+}
+
+.dashboard-drawer__close:hover {
+	background: var(--surface);
+}
+
+.dashboard-drawer__risk-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin-top: 0.85rem;
+	padding: 0.3rem 0.7rem;
+	border: 1px solid;
+	border-radius: 999px;
+	font-size: 0.72rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	background: var(--surface);
 }
 
 @media (max-width: 1200px) {
@@ -13480,6 +13563,11 @@ input[id^="tab-seguridad-"]:checked
 		--glass-surface: rgba(19, 26, 29, 0.7);
 		--glass-surface-strong: rgba(16, 22, 25, 0.92);
 		--glass-border: rgba(255, 255, 255, 0.09);
+		/* --glass-dark-highlight already existed as a token (a much dimmer
+		   rim than the light one) but was never actually wired in here, so
+		   every glass surface kept the near-opaque white --glass-highlight
+		   meant for a light background - a bright hairline on dark cards. */
+		--glass-highlight: var(--glass-dark-highlight);
 		background: var(--background);
 		color: var(--foreground);
 	}
@@ -13513,6 +13601,7 @@ input[id^="tab-seguridad-"]:checked
 		--glass-surface: rgba(19, 26, 29, 0.7);
 		--glass-surface-strong: rgba(16, 22, 25, 0.92);
 		--glass-border: rgba(255, 255, 255, 0.09);
+		--glass-highlight: var(--glass-dark-highlight);
 		background: var(--background);
 		color: var(--foreground);
 	}
@@ -16718,6 +16807,19 @@ input[id^="tab-seguridad-"]:checked
 			);
 	}
 
+	/* --panel-shadow/-hover were tuned for a light page (a dark, low-alpha
+	   shadow reads as elevation there). On a dark surface the same shadow is
+	   dark-on-dark and disappears - hovering a KPI card visibly did nothing.
+	   Higher-alpha black shadows restore the same lifted feel here. */
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.executive-dashboard {
+		--panel-shadow:
+			0 22px 52px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.4);
+		--panel-shadow-hover:
+			0 30px 70px rgba(0, 0, 0, 0.65), 0 8px 22px rgba(0, 0, 0, 0.45);
+	}
+
 	:root[data-theme="dark"] .app-shell:not(:has(.print-surface)) .project-hero {
 		background:
 			radial-gradient(
@@ -16797,18 +16899,6 @@ input[id^="tab-seguridad-"]:checked
 		.dashboard-panel-action
 		a:hover {
 		background: #182124;
-	}
-
-	:root[data-theme="dark"]
-		.app-shell:not(:has(.print-surface))
-		.dashboard-drawer {
-		background:
-			radial-gradient(
-				circle at 100% 0%,
-				rgba(200, 32, 47, 0.08),
-				transparent 18rem
-			),
-			#182124;
 	}
 
 	:root[data-theme="dark"] .app-shell:not(:has(.print-surface)) .portal-card {
@@ -18583,6 +18673,30 @@ input[id^="tab-seguridad-"]:checked
 			0 20px 44px -18px rgba(0, 0, 0, 0.6);
 	}
 
+	/* The generic [class*="-kpi"/-panel"] shadow above is a fixed value, not
+	   var(--panel-shadow) - it silently wins over this dashboard's own
+	   deliberately-tuned elevation (including a real :hover lift), so a
+	   hovered KPI card visibly did nothing in dark mode. Reassert the
+	   dashboard's own tokens here (same specificity shape, declared later)
+	   so its hover state actually shows. */
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.executive-dashboard
+		.executive-kpi,
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.executive-dashboard
+		.executive-panel {
+		box-shadow: var(--glass-highlight), var(--panel-shadow);
+	}
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.executive-dashboard
+		.executive-kpi:hover {
+		border-color: var(--kpi-accent, var(--brand-red));
+		box-shadow: var(--panel-shadow-hover);
+	}
+
 	/* Los iconos/insignias pequeños dentro de una tarjeta -metric/-kpi (p.ej.
 	   ".reports-metric__icon") heredan el selector de arriba por el sufijo
 	   compartido; se les quita el aro para que no parezcan mini-tarjetas. */
@@ -18675,6 +18789,29 @@ input[id^="tab-seguridad-"]:checked
 			0 18px 38px rgba(28, 48, 40, 0.105),
 			0 2px 7px rgba(28, 48, 40, 0.04),
 			inset 0 1px 0 #fff;
+	}
+
+	/* Same problem as the dark block above, mirrored for light: this
+	   catch-all's fixed box-shadow outranks .executive-kpi's own
+	   var(--panel-shadow)/-hover (higher specificity, no :hover variant),
+	   so the dashboard's tuned hover shadow never showed in light mode
+	   either. Reassert it here at matching specificity, declared later. */
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.executive-dashboard
+		.executive-kpi,
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.executive-dashboard
+		.executive-panel {
+		box-shadow: var(--glass-highlight), var(--panel-shadow);
+	}
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.executive-dashboard
+		.executive-kpi:hover {
+		border-color: var(--kpi-accent, var(--brand-red));
+		box-shadow: var(--panel-shadow-hover);
 	}
 
 	:root:not([data-theme="dark"])
