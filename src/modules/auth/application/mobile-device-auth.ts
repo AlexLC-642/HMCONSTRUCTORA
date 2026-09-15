@@ -9,6 +9,7 @@ export const mobileEnrollSchema = z.object({
 	password: z.string().min(8).max(256),
 	installationId: z.string().uuid(),
 	deviceName: z.string().trim().min(1).max(120),
+	platform: z.enum(["android", "ios"]).default("android"),
 });
 
 export const mobileTokenSchema = z.object({

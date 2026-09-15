@@ -81,12 +81,14 @@ export async function POST(request: Request) {
 			installationId: parsed.data.installationId,
 			tokenHash: hashMobileDeviceToken(deviceToken),
 			deviceName: parsed.data.deviceName,
+			platform: parsed.data.platform,
 			expiresAt: mobileCredentialExpiration(),
 		},
 		update: {
 			userId: activeUser.id,
 			tokenHash: hashMobileDeviceToken(deviceToken),
 			deviceName: parsed.data.deviceName,
+			platform: parsed.data.platform,
 			expiresAt: mobileCredentialExpiration(),
 			revokedAt: null,
 		},
@@ -98,7 +100,7 @@ export async function POST(request: Request) {
 		action: "CREATE",
 		entityType: "MobileDeviceCredential",
 		entityId: credential.id,
-		metadata: { deviceName: parsed.data.deviceName, platform: "android" },
+		metadata: { deviceName: parsed.data.deviceName, platform: parsed.data.platform },
 		ipAddress,
 	});
 

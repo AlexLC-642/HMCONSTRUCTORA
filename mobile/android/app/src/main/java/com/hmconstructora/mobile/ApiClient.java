@@ -49,7 +49,8 @@ final class ApiClient {
             .put("email", email)
             .put("password", password)
             .put("installationId", installationId)
-            .put("deviceName", Build.MANUFACTURER + " " + Build.MODEL);
+            .put("deviceName", Build.MANUFACTURER + " " + Build.MODEL)
+            .put("platform", "android");
         Response response = post("/api/mobile/auth/enroll", body.toString(), null);
         return new EnrollResult(new JSONObject(response.body).getString("deviceToken"));
     }
