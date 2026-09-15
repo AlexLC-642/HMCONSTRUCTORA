@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="hm_background">#F4F7F6</color>
+    <color name="hm_surface">#FFFFFF</color>
+    <color name="hm_header">#172827</color>
+    <color name="hm_primary">#C91F32</color>
+    <color name="hm_primary_pressed">#A91728</color>
+    <color name="hm_success">#147D64</color>
+    <color name="hm_text">#172120</color>
+    <color name="hm_text_muted">#566461</color>
+    <color name="hm_border">#D8E1DF</color>
+    <color name="hm_error_surface">#FDEBEC</color>
+    <color name="hm_error">#9F1828</color>
+    <color name="white">#FFFFFF</color>
+</resources>

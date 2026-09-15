@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HM Constructora</string>
+    <string name="brand_mark">HM</string>
+    <string name="brand_title">HM Constructora</string>
+    <string name="brand_subtitle">Control de obra</string>
+    <string name="secure_access">Acceso seguro</string>
+    <string name="enroll_title">Vincula este teléfono</string>
+    <string name="enroll_description">Ingresa una sola vez con tu cuenta. Después accederás directamente con la huella registrada en este teléfono.</string>
+    <string name="username_label">Usuario corporativo</string>
+    <string name="username_hint">Ej. admin</string>
+    <string name="password_label">Contraseña</string>
+    <string name="password_hint">Tu contraseña actual</string>
+    <string name="activate_fingerprint">Activar acceso con huella</string>
+    <string name="privacy_note">La app nunca recibe ni guarda tu huella. Android sólo confirma que eres tú.</string>
+    <string name="login_title">Identidad confirmada</string>
+    <string name="login_description">Este teléfono ya está vinculado. Confirma tu huella para abrir el sistema.</string>
+    <string name="login_fingerprint">Entrar con mi huella</string>
+    <string name="change_account">Cambiar cuenta</string>
+    <string name="fingerprint_prompt_title">Acceder a HM Constructora</string>
+    <string name="fingerprint_prompt_subtitle">Coloca tu dedo en el sensor</string>
+    <string name="fingerprint_enroll_title">Confirmar huella</string>
+    <string name="fingerprint_enroll_subtitle">Se usará para proteger el acceso en este teléfono</string>
+    <string name="cancel">Cancelar</string>
+    <string name="loading">Verificando…</string>
+    <string name="no_biometrics">Este teléfono no tiene una huella segura configurada. Registra una huella en Ajustes de Android y vuelve a intentarlo.</string>
+    <string name="biometric_changed">Las huellas del teléfono cambiaron. Por seguridad, vincula nuevamente este dispositivo.</string>
+    <string name="network_error">No se pudo conectar. Verifica tu internet e inténtalo de nuevo.</string>
+    <string name="retry">Reintentar</string>
+</resources>

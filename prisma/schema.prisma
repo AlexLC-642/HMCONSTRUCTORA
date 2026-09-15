@@ -208,6 +208,7 @@ model User {
   uploadedDocumentVersions DocumentVersion[]    @relation("DocumentVersionUploadedBy")
   createdPortalShares      PortalShare[]        @relation("PortalShareCreatedBy")
   passkeys                 UserPasskey[]
+  mobileDeviceCredentials  MobileDeviceCredential[]
   handledWebsiteInquiries  WebsiteInquiry[]     @relation("WebsiteInquiryHandledBy")
 }
 
@@ -225,6 +226,25 @@ model UserPasskey {
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model MobileDeviceCredential {
+  id             String    @id @default(uuid())
+  userId         String
+  installationId String    @unique @db.VarChar(64)
+  tokenHash      String    @unique @db.Char(64)
+  deviceName     String?   @db.VarChar(120)
+  platform       String    @default("android") @db.VarChar(20)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  lastUsedAt     DateTime?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
 }
 
 model Role {
