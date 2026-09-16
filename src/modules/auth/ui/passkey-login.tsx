@@ -84,29 +84,29 @@ export function PasskeyLogin() {
 		return (
 			<div
 				aria-label="Comprobando acceso del dispositivo"
-				className="h-14 animate-pulse rounded-lg bg-[#eef0ec] motion-reduce:animate-none"
+				className="h-[62px] animate-pulse rounded-xl bg-[var(--surface-hover)] motion-reduce:animate-none"
 				role="status"
 			/>
 		);
 	if (!available) return null;
 
 	return (
-		<div className="mt-6 border-t border-[#dde1dc] pt-5">
+		<div>
 			<button
-				className="focus-ring flex min-h-14 w-full items-center justify-center gap-3 rounded-lg border border-[#c9cec9] bg-[#f7f8f5] px-4 text-center text-sm font-bold text-[#182023] transition hover:border-[#202629] hover:bg-white disabled:cursor-wait disabled:opacity-70"
+				className="focus-ring flex min-h-[62px] w-full items-center justify-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)] px-3.5 text-center text-[13px] font-bold text-[var(--foreground)] transition hover:border-[var(--foreground)] hover:bg-[var(--surface)] disabled:cursor-wait disabled:opacity-70"
 				disabled={busy}
 				onClick={authenticate}
 				type="button"
 			>
-				<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#202629] text-white shadow-[0_9px_20px_rgba(25,31,33,0.2)]">
+				<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--graphite)] text-white shadow-[0_9px_20px_rgba(25,31,33,0.2)]">
 					{busy ? (
 						<LoaderCircle
 							aria-hidden="true"
 							className="animate-spin motion-reduce:animate-none"
-							size={19}
+							size={17}
 						/>
 					) : (
-						<DevicePasskeyMark size={23} />
+						<DevicePasskeyMark size={20} />
 					)}
 				</span>
 				<span className="text-left">
@@ -114,7 +114,7 @@ export function PasskeyLogin() {
 						{busy ? "Verificando…" : "Entrar con este dispositivo"}
 					</span>
 					{!busy ? (
-						<span className="mt-0.5 block text-xs font-medium text-[#66716c]">
+						<span className="mt-0.5 block text-[11px] font-medium text-[var(--muted)]">
 							Usa la huella, el PIN o el patrón del teléfono
 						</span>
 					) : null}
@@ -123,7 +123,7 @@ export function PasskeyLogin() {
 			{message ? (
 				<p
 					aria-live="polite"
-					className="mt-3 rounded-lg bg-[#fff1f2] px-3 py-2 text-sm text-[#a81f2d]"
+					className="mt-2.5 rounded-lg bg-[color-mix(in_srgb,var(--danger)_10%,var(--surface))] px-3 py-2 text-[13px] text-[var(--danger)]"
 				>
 					{message}
 				</p>

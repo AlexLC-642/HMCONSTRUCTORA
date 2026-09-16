@@ -1,9 +1,16 @@
-import { Mail } from "lucide-react";
-import Image from "next/image";
+import {
+	ArrowRight,
+	BarChart3,
+	FileText,
+	Mail,
+	ShieldCheck,
+	Users,
+} from "lucide-react";
 import { loginAction } from "@/modules/auth/application/actions";
 import { COMPANY_EMAIL_DOMAIN } from "@/modules/auth/domain/email-domain";
 import { PasskeyLogin } from "@/modules/auth/ui/passkey-login";
 import { PasswordInput } from "@/modules/auth/ui/password-input";
+import { ThemeToggle } from "@/shared/components/theme-toggle";
 
 type LoginPageProps = {
 	searchParams: Promise<{
@@ -20,106 +27,187 @@ function errorMessage(error?: string) {
 	return "";
 }
 
+// Recorta solo el glifo "HM" de public/brand/logo.png (521x479, marca en
+// x:[78,446] y:[100,313]), sin el wordmark "CONSTRUCTORA" que trae debajo -
+// se reusa en el panel oscuro y en la tarjeta en vez de duplicar un asset.
+function HmMark({ height, className }: { height: number; className?: string }) {
+	const scale = height / 213;
+	return (
+		<span
+			className={className}
+			style={{
+				display: "block",
+				height,
+				overflow: "hidden",
+				position: "relative",
+				width: 368 * scale,
+			}}
+		>
+			{/** biome-ignore lint/performance/noImgElement: recorte con offsets arbitrarios que next/image no puede expresar. */}
+			<img
+				alt="HM Constructora"
+				src="/brand/logo.png"
+				style={{
+					height: 479 * scale,
+					left: -78 * scale,
+					maxWidth: "none",
+					position: "absolute",
+					top: -100 * scale,
+					width: 521 * scale,
+				}}
+			/>
+		</span>
+	);
+}
+
+const FEATURES = [
+	{
+		description: "Seguimiento en tiempo real",
+		icon: BarChart3,
+		title: "Proyectos",
+	},
+	{
+		description: "Todo en un solo lugar",
+		icon: FileText,
+		title: "Documentación",
+	},
+	{
+		description: "Construyendo juntos",
+		icon: Users,
+		title: "Trabajo en equipo",
+	},
+];
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
 	const params = await searchParams;
 	const message = errorMessage(params.error);
 
 	return (
-		<main className="login-stage relative min-h-screen overflow-hidden bg-[#f5f6f2] text-[#14191b]">
-			<div className="login-beam" aria-hidden="true" />
-			<div className="login-bottom-band" aria-hidden="true" />
-			<div className="login-red-wash" aria-hidden="true" />
+		<main className="login-page relative min-h-screen text-[var(--foreground)]">
+			<div className="login-visual__photo" aria-hidden="true" />
+			<div className="login-visual__scrim" aria-hidden="true" />
 
-			<section className="relative grid min-h-screen px-6 py-8 sm:px-10 lg:grid-cols-[1.02fr_0.98fr] lg:grid-rows-[auto_1fr_auto] lg:px-16">
-				<header className="login-brand-mark order-1 flex items-center gap-4 lg:order-none lg:col-span-2">
-					<div className="relative grid size-[74px] shrink-0 place-items-center rounded-lg border border-[#cfd3cf] bg-white shadow-[0_12px_32px_rgba(20,25,27,0.14)] sm:size-[86px]">
-						<Image
-							alt="Logo del sistema"
-							className="object-contain p-2.5"
-							fill
-							priority
-							sizes="86px"
-							src="/brand/logo.png"
+			<div className="absolute right-4 top-3 z-20 sm:right-6 sm:top-5 lg:right-8 lg:top-6">
+				<ThemeToggle />
+			</div>
+
+			<div className="relative z-[2] grid min-h-screen lg:grid-cols-[1.12fr_1fr]">
+				<section className="relative hidden flex-col justify-between px-12 py-9 text-white lg:flex xl:px-16 xl:py-11">
+					<div className="relative z-[2] flex flex-col items-start gap-2">
+						<HmMark height={30} />
+						<span className="text-[13px] font-extrabold tracking-[0.2em]">
+							CONSTRUCTORA
+						</span>
+					</div>
+
+					<div className="relative z-[2] max-w-md">
+						<span
+							aria-hidden="true"
+							className="mb-4 block h-[3px] w-12 rounded-full bg-[var(--brand-red)]"
 						/>
-					</div>
-					<div>
-						<h1 className="text-2xl font-semibold tracking-tight">
-							Control de obra
-						</h1>
-					</div>
-				</header>
+						<p className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/70">
+							Construimos ideas en realidad
+						</p>
+						<h2 className="mt-4 text-[32px] font-extrabold leading-[1.1] tracking-tight xl:text-[36px]">
+							<span className="block">Gestión interna</span>
+							<span className="block text-[var(--brand-red)]">
+								de proyectos
+							</span>
+						</h2>
 
-				<section className="order-3 flex max-w-2xl flex-col justify-center py-8 lg:order-none lg:py-0">
-					<p className="login-kicker text-sm font-bold uppercase tracking-[0.34em] text-[var(--brand-red)]">
-						Control de obra
-					</p>
-					<h2 className="mt-6 max-w-[580px] text-balance text-4xl font-semibold leading-[1.08] tracking-[-0.03em] sm:text-5xl lg:text-[58px]">
-						Gestión interna de proyectos.
-					</h2>
+						<div className="mt-5 flex flex-wrap items-center gap-2.5 text-[13px] font-bold uppercase tracking-[0.16em] text-white/70">
+							<span>Planificación</span>
+							<span aria-hidden="true" className="h-3 w-px bg-white/25" />
+							<span>Control</span>
+							<span aria-hidden="true" className="h-3 w-px bg-white/25" />
+							<span>Resultados</span>
+						</div>
 
-					<div className="login-scope-line mt-10 flex max-w-[520px] flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-[0.2em] text-[#52605b]">
-						<span>Proyectos</span>
-						<span aria-hidden="true" />
-						<span>Avances</span>
-						<span aria-hidden="true" />
-						<span>Documentos</span>
+						<ul className="mt-7 space-y-4">
+							{FEATURES.map(({ icon: Icon, title, description }) => (
+								<li className="flex items-center gap-3" key={title}>
+									<span className="login-feature-icon">
+										<Icon aria-hidden="true" size={17} />
+									</span>
+									<div>
+										<strong className="block text-sm font-bold text-white">
+											{title}
+										</strong>
+										<span className="block text-xs text-white/60">
+											{description}
+										</span>
+									</div>
+								</li>
+							))}
+						</ul>
+					</div>
+
+					<div className="relative z-[2] flex items-center gap-2.5 text-[10px] font-bold uppercase tracking-[0.28em] text-white/55">
+						<span
+							aria-hidden="true"
+							className="h-px w-8 bg-[var(--brand-red)]"
+						/>
+						Obras que generan confianza
 					</div>
 				</section>
 
-				<section className="order-2 flex items-center justify-center py-6 lg:order-none lg:py-0">
-					<div className="login-card w-full max-w-[500px] rounded-xl p-6 sm:p-8 lg:p-10">
-						<div className="mb-6 flex items-center gap-4 sm:mb-8 sm:gap-5">
-							<div className="relative grid size-[64px] shrink-0 place-items-center rounded-xl border border-[#d7d9d6] bg-white shadow-[0_14px_34px_rgba(20,25,27,0.15)] sm:size-[82px]">
-								<Image
-									alt="Logo del sistema"
-									className="object-contain p-2"
-									fill
-									priority
-									sizes="(min-width: 640px) 82px, 64px"
-									src="/brand/logo.png"
-								/>
-							</div>
+				<section className="relative flex items-center justify-center px-5 py-16 sm:px-8 sm:py-20 lg:px-10 lg:py-6 xl:px-14">
+					<div className="login-form-card w-full max-w-[430px] rounded-[22px] p-6 sm:p-7">
+						<div className="flex items-center gap-3">
+							<HmMark height={28} />
+							<span
+								aria-hidden="true"
+								className="h-9 w-px bg-[var(--border)]"
+							/>
 							<div className="min-w-0">
-								<p className="text-xs font-bold uppercase tracking-[0.32em] text-[var(--brand-red)]">
+								<p className="text-[10px] font-bold uppercase tracking-[0.26em] text-[var(--foreground)]">
 									Acceso autorizado
 								</p>
-								<h3 className="mt-2 text-2xl font-semibold tracking-[-0.02em] sm:mt-3 sm:text-3xl">
-									Iniciar sesion
-								</h3>
+								<h1 className="text-[21px] font-extrabold tracking-tight text-[var(--foreground)] sm:text-[22px]">
+									Iniciar sesión
+								</h1>
 							</div>
 						</div>
+						<p className="mt-1.5 text-[13px] text-[var(--muted)]">
+							Ingresa tus credenciales para continuar
+						</p>
 
 						{message ? (
-							<p className="mb-5 rounded-md border border-[#efb5b9] bg-[#fff2f3] px-3 py-2 text-sm text-[var(--danger)]">
+							<p className="mt-4 rounded-lg border border-[color-mix(in_srgb,var(--danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--danger)_10%,var(--surface))] px-3 py-2 text-[13px] text-[var(--danger)]">
 								{message}
 							</p>
 						) : null}
 
-						<form action={loginAction} className="space-y-5">
+						<form action={loginAction} className="mt-5 space-y-3.5">
 							<label className="block">
-								<span className="mb-2 block text-sm font-medium">
+								<span className="mb-1.5 block text-[13px] font-semibold">
 									Usuario corporativo
 								</span>
-								<div className="login-input-row flex h-12 overflow-hidden rounded-md border border-[#cfd3cf] bg-white">
-									<span className="grid w-12 place-items-center border-r border-[#dfe2df] bg-[#f7f6f1] text-[#68716d]">
-										<Mail aria-hidden="true" size={18} />
-									</span>
+								<div className="login-field flex h-11 items-center rounded-lg pl-3.5 pr-1.5">
+									<Mail
+										aria-hidden="true"
+										className="shrink-0 text-[var(--muted)]"
+										size={16}
+									/>
 									<input
-										className="min-w-0 flex-1 px-3 text-base outline-none placeholder:text-[#87918d]"
-										name="email"
 										autoComplete="username"
-										placeholder="admin"
+										className="min-w-0 flex-1 bg-transparent px-2.5 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+										name="email"
+										placeholder="usuario"
 										required
 									/>
-									<span className="hidden border-l border-[#dfe2df] bg-[#f7f6f1] px-3 py-3 text-sm text-[#54605c] sm:block">
+									<span className="hidden shrink-0 whitespace-nowrap pr-2.5 text-xs font-medium text-[var(--muted)] sm:block">
 										@{COMPANY_EMAIL_DOMAIN}
 									</span>
 								</div>
+								<p className="mt-1 text-[11px] text-[var(--muted)]">
+									Solo escribe tu usuario, el dominio ya está incluido.
+								</p>
 							</label>
 
 							<div className="block">
 								<label
-									className="mb-2 block text-sm font-medium"
+									className="mb-1.5 block text-[13px] font-semibold"
 									htmlFor="login-password"
 								>
 									Contraseña
@@ -128,20 +216,40 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 							</div>
 
 							<button
-								className="login-submit focus-ring h-14 w-full rounded-md bg-[var(--brand-red)] px-4 text-lg font-semibold text-white shadow-[0_18px_36px_rgba(200,32,47,0.24)]"
+								className="login-submit focus-ring flex h-11 w-full items-center justify-center gap-2.5 rounded-lg bg-[var(--brand-red)] text-sm font-bold text-white"
 								type="submit"
 							>
+								<span className="grid size-6 place-items-center rounded-md bg-white/15">
+									<ArrowRight aria-hidden="true" size={14} />
+								</span>
 								Entrar al sistema
 							</button>
 						</form>
+
+						<div className="login-divider my-4">
+							<span aria-hidden="true" />
+							<span>o</span>
+							<span aria-hidden="true" />
+						</div>
+
 						<PasskeyLogin />
+
+						<div className="mt-4 flex items-start gap-2 border-t border-[var(--border)] pt-4 text-[var(--muted)]">
+							<ShieldCheck
+								aria-hidden="true"
+								className="mt-0.5 shrink-0 text-[var(--brand-red)]"
+								size={14}
+							/>
+							<p className="text-[11px] leading-relaxed">
+								<span className="block font-bold text-[var(--foreground)]">
+									Sistema seguro | HM Constructora
+								</span>
+								Uso exclusivo para personal autorizado.
+							</p>
+						</div>
 					</div>
 				</section>
-
-				<footer className="order-4 pb-4 text-xs uppercase tracking-[0.34em] text-[#5e6865] lg:order-none lg:col-span-2">
-					Sistema interno
-				</footer>
-			</section>
+			</div>
 		</main>
 	);
 }
