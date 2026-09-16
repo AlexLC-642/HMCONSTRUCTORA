@@ -13320,10 +13320,15 @@ input[id^="tab-seguridad-"]:checked
 
 @media (max-width: 720px) {
 	.public-gallery {
-		grid-template-columns: 1fr;
+		gap: 1rem 0.75rem;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 	.public-gallery__item {
 		border-radius: 14px;
+	}
+	.public-gallery__caption {
+		min-height: 3.6rem;
+		padding: 0.65rem 0.7rem 0.75rem;
 	}
 	.public-lightbox__stage {
 		min-height: 60vh;
@@ -13337,6 +13342,49 @@ input[id^="tab-seguridad-"]:checked
 	}
 	.public-lightbox__arrow--next {
 		right: 0.65rem;
+	}
+
+	/* Tarjetas de servicios/"nosotros": el auto-fit con un mínimo de
+	   14-17rem no deja espacio para una segunda columna en un teléfono
+	   angosto y cae a 1 columna. Se fuerzan 2 columnas explícitas con
+	   tarjetas más compactas en vez de depender del mínimo del auto-fit. */
+	.public-service-grid,
+	.public-service-grid--full,
+	.public-about__cards {
+		gap: 0.85rem;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.public-service-card,
+	.public-about__card {
+		padding: 1.1rem 1rem;
+		border-radius: 14px;
+	}
+
+	.public-service-card__icon,
+	.public-about__badge {
+		width: 2.5rem;
+		height: 2.5rem;
+	}
+
+	.public-service-card h3,
+	.public-about__card h3 {
+		margin-top: 0.75rem;
+		font-size: 0.95rem;
+	}
+
+	.public-service-card p {
+		font-size: 0.84rem;
+		line-height: 1.45;
+	}
+}
+
+@media (max-width: 400px) {
+	.public-service-grid,
+	.public-service-grid--full,
+	.public-about__cards,
+	.public-gallery {
+		grid-template-columns: minmax(0, 1fr);
 	}
 }
 
