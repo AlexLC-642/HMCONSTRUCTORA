@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Download, Share, X } from "lucide-react";
+import { Download, Share, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type BeforeInstallPromptEvent = Event & {
@@ -14,6 +14,29 @@ type InstallState =
 	| "installable"
 	| "ios-manual"
 	| "unsupported";
+
+const INSTALLED_MARKER_KEY = "hm-pwa-installed";
+
+function readInstalledMarker() {
+	try {
+		return window.localStorage.getItem(INSTALLED_MARKER_KEY) === "true";
+	} catch {
+		return false;
+	}
+}
+
+function writeInstalledMarker(installed: boolean) {
+	try {
+		if (installed) {
+			window.localStorage.setItem(INSTALLED_MARKER_KEY, "true");
+		} else {
+			window.localStorage.removeItem(INSTALLED_MARKER_KEY);
+		}
+	} catch {
+		// El modo standalone sigue siendo la fuente principal cuando el
+		// navegador bloquea el almacenamiento local.
+	}
+}
 
 function isStandaloneDisplay() {
 	if (typeof window === "undefined") return false;
@@ -40,9 +63,10 @@ function isIosDevice() {
  * only a manual path exists, and nothing where installing genuinely isn't
  * possible - never a button that silently does nothing.
  *
- * "Already installed" is read live from display-mode/navigator.standalone
- * and the appinstalled event, never a localStorage flag - so uninstalling
- * and reinstalling later just works instead of getting stuck on stale state.
+ * Browsers do not expose a cross-platform API that lets a normal tab query
+ * whether the same PWA is already installed. Keep a local marker only after
+ * the browser confirms acceptance/appinstalled, then clear it whenever a new
+ * beforeinstallprompt proves that this origin is installable again.
  */
 export function PwaInstallButton() {
 	const [state, setState] = useState<InstallState>("checking");
@@ -52,16 +76,23 @@ export function PwaInstallButton() {
 
 	useEffect(() => {
 		if (isStandaloneDisplay()) {
+			writeInstalledMarker(true);
 			setState("installed");
 			return;
 		}
 
+		if (readInstalledMarker()) setState("installed");
+
 		const onBeforeInstallPrompt = (event: Event) => {
 			event.preventDefault();
+			// Receiving this event is stronger evidence than our saved marker:
+			// the browser currently considers the app eligible for installation.
+			writeInstalledMarker(false);
 			deferredPromptRef.current = event as BeforeInstallPromptEvent;
 			setState("installable");
 		};
 		const onAppInstalled = () => {
+			writeInstalledMarker(true);
 			deferredPromptRef.current = null;
 			setShowIosHelp(false);
 			setState("installed");
@@ -72,7 +103,10 @@ export function PwaInstallButton() {
 
 		const displayModeQuery = window.matchMedia("(display-mode: standalone)");
 		const onDisplayModeChange = (event: MediaQueryListEvent) => {
-			if (event.matches) setState("installed");
+			if (event.matches) {
+				writeInstalledMarker(true);
+				setState("installed");
+			}
 		};
 		displayModeQuery.addEventListener("change", onDisplayModeChange);
 
@@ -124,22 +158,17 @@ export function PwaInstallButton() {
 		// A "dismissed" choice doesn't mean unsupported - the browser may offer
 		// the prompt again later - so fall back to hiding the button rather
 		// than claiming a state we can't actually confirm.
-		setState(choice.outcome === "accepted" ? "installed" : "unsupported");
+		if (choice.outcome === "accepted") {
+			writeInstalledMarker(true);
+			setState("installed");
+		} else {
+			setState("unsupported");
+		}
 	}
 
 	if (state === "checking" || state === "unsupported") return null;
 
-	if (state === "installed") {
-		return (
-			<span
-				className="pwa-install-badge inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--success)_35%,var(--border))] bg-[color-mix(in_srgb,var(--success)_12%,var(--surface))] px-3 text-xs font-semibold text-[var(--success)]"
-				title="Esta aplicación ya está instalada en este dispositivo"
-			>
-				<Check aria-hidden="true" size={14} />
-				<span className="hidden sm:inline">Ya instalada</span>
-			</span>
-		);
-	}
+	if (state === "installed") return null;
 
 	if (state === "ios-manual") {
 		return (
