@@ -509,14 +509,15 @@ function ReportStat({
 	tone: "red" | "green" | "blue";
 }) {
 	const toneClass = {
-		red: "from-[#fff6f6] to-white before:bg-[var(--brand-red)]",
-		green: "from-[#f1fbf6] to-white before:bg-[var(--success)]",
-		blue: "from-[#f2f7ff] to-white before:bg-[#2563eb]",
+		red: "from-[#fff6f6] to-white before:bg-[var(--brand-red)] hover:border-[color-mix(in_srgb,var(--brand-red)_28%,var(--border))]",
+		green:
+			"from-[#f1fbf6] to-white before:bg-[var(--success)] hover:border-[color-mix(in_srgb,var(--success)_28%,var(--border))]",
+		blue: "from-[#f2f7ff] to-white before:bg-[#2563eb] hover:border-[color-mix(in_srgb,#2563eb_28%,var(--border))]",
 	}[tone];
 
 	return (
 		<div
-			className={`relative overflow-hidden rounded-2xl border border-[var(--border)] bg-gradient-to-br p-4 shadow-[0_12px_28px_rgba(31,42,45,0.07)] before:absolute before:inset-x-0 before:top-0 before:h-1 ${toneClass}`}
+			className={`group relative overflow-hidden rounded-2xl border border-[var(--border)] bg-gradient-to-br p-4 shadow-[0_12px_28px_rgba(31,42,45,0.07)] transition duration-200 ease-out before:absolute before:inset-x-0 before:top-0 before:h-1 before:transition-[height] before:duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_44px_rgba(31,42,45,0.13)] hover:before:h-1.5 motion-reduce:transform-none motion-reduce:transition-none ${toneClass}`}
 		>
 			<p className="text-xs font-semibold uppercase text-[var(--muted)]">
 				{label}
@@ -579,7 +580,7 @@ function StatusPill({
 }) {
 	const share = total > 0 ? (count / total) * 100 : 0;
 	return (
-		<div className="rounded-2xl border border-[var(--border)] bg-[#fbfaf6] p-4">
+		<div className="rounded-2xl border border-[var(--border)] bg-[#fbfaf6] p-4 transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_16px_36px_rgba(37,48,51,0.11)] motion-reduce:transform-none motion-reduce:transition-none">
 			<div className="flex items-center justify-between gap-3">
 				<span className="text-sm font-medium text-[var(--muted)]">{label}</span>
 				<strong>{count}</strong>

@@ -5602,6 +5602,13 @@ textarea.focus-ring:focus-visible {
 	color: var(--metric-color, #293634);
 	box-shadow: inset 0 0 0 1px
 		color-mix(in srgb, var(--metric-color, #293634) 12%, transparent);
+	transition:
+		transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 220ms ease;
+}
+
+.inventory-metric:hover .inventory-metric-icon {
+	transform: translateY(-2px) rotate(-3deg) scale(1.06);
 }
 
 .inventory-status {
@@ -5891,6 +5898,17 @@ textarea.focus-ring:focus-visible {
 	box-shadow:
 		0 13px 30px rgba(28, 38, 36, 0.08),
 		inset 0 1px #fff;
+	transition:
+		transform 170ms ease,
+		box-shadow 170ms ease,
+		border-color 170ms ease;
+}
+.reports-metric::before {
+	position: absolute;
+	inset: 0 0 auto;
+	height: 3px;
+	background: var(--metric-color, #4c5b54);
+	content: "";
 }
 .reports-metric::after {
 	position: absolute;
@@ -5901,6 +5919,21 @@ textarea.focus-ring:focus-visible {
 	border: 1px solid rgba(76, 91, 84, 0.09);
 	border-radius: 50%;
 	content: "";
+}
+.reports-metric:hover {
+	transform: translateY(-2px);
+}
+.reports-metric:hover .reports-metric__icon {
+	transform: translateY(-2px) rotate(-3deg) scale(1.06);
+}
+.reports-metric--red {
+	--metric-color: #c31d2e;
+}
+.reports-metric--amber {
+	--metric-color: #a5660b;
+}
+.reports-metric--green {
+	--metric-color: #147356;
 }
 .reports-eyebrow {
 	color: #53615c;
@@ -5919,6 +5952,9 @@ textarea.focus-ring:focus-visible {
 	background: #e9eeea;
 	color: #3f4d48;
 	box-shadow: inset 0 1px #fff;
+	transition:
+		transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 220ms ease;
 }
 .reports-metric--red .reports-metric__icon {
 	background: #fde9eb;
@@ -6413,6 +6449,17 @@ textarea.focus-ring:focus-visible {
 	border-radius: 14px;
 	background: linear-gradient(145deg, #fff, #f5f7f4);
 	box-shadow: 0 12px 28px rgba(26, 38, 34, 0.075);
+	transition:
+		transform 170ms ease,
+		box-shadow 170ms ease,
+		border-color 170ms ease;
+}
+.documents-metric::before {
+	position: absolute;
+	inset: 0 0 auto;
+	height: 3px;
+	background: var(--metric-color, #46564e);
+	content: "";
 }
 .documents-metric::after {
 	position: absolute;
@@ -6423,6 +6470,21 @@ textarea.focus-ring:focus-visible {
 	border: 1px solid rgba(54, 70, 63, 0.08);
 	border-radius: 50%;
 	content: "";
+}
+.documents-metric:hover {
+	transform: translateY(-2px);
+}
+.documents-metric:hover .documents-metric__icon {
+	transform: translateY(-2px) rotate(-3deg) scale(1.06);
+}
+.documents-metric--red {
+	--metric-color: #c31d2e;
+}
+.documents-metric--green {
+	--metric-color: #187357;
+}
+.documents-metric--amber {
+	--metric-color: #9d620e;
 }
 .documents-label {
 	color: #53615c;
@@ -6440,6 +6502,9 @@ textarea.focus-ring:focus-visible {
 	border-radius: 11px;
 	background: #e7ece8;
 	color: #42514b;
+	transition:
+		transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 220ms ease;
 }
 .documents-metric--red .documents-metric__icon {
 	background: #fde8eb;
@@ -9448,6 +9513,13 @@ input[id^="tab-seguridad-"]:checked
 	color: var(--metric-color, #293634);
 	box-shadow: inset 0 0 0 1px
 		color-mix(in srgb, var(--metric-color, #293634) 12%, transparent);
+	transition:
+		transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+		box-shadow 220ms ease;
+}
+
+.requisitions-metric:hover .requisitions-metric__icon {
+	transform: translateY(-2px) rotate(-3deg) scale(1.06);
 }
 
 .requisitions-panel {
@@ -18697,6 +18769,64 @@ input[id^="tab-seguridad-"]:checked
 		box-shadow: var(--panel-shadow-hover);
 	}
 
+	/* Same problem as above, for the rest of the KPI/metric family: each
+	   already has its own tuned :hover border-color/box-shadow, but the
+	   generic [class*="-kpi"/"-metric"] shadow above (same specificity,
+	   declared later) wins, so hovering visibly did nothing outside the
+	   dashboard. Reassert each one's own values here so the interaction
+	   actually shows. */
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.project-kpi:hover {
+		border-color: rgba(255, 90, 99, 0.5);
+		box-shadow:
+			0 26px 58px rgba(0, 0, 0, 0.34),
+			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	}
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.access-kpi:hover {
+		border-color: var(--kpi-accent, rgba(255, 90, 99, 0.5));
+		box-shadow:
+			0 26px 58px rgba(0, 0, 0, 0.34),
+			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	}
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.purchases-kpi:hover {
+		box-shadow:
+			0 26px 58px rgba(0, 0, 0, 0.34),
+			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	}
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.finances-metric:hover {
+		box-shadow:
+			0 26px 58px rgba(0, 0, 0, 0.34),
+			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	}
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.inventory-metric,
+			.requisitions-metric,
+			.reports-metric,
+			.documents-metric
+		):hover {
+		border-color: var(--metric-color, rgba(255, 90, 99, 0.5));
+		box-shadow:
+			0 26px 58px rgba(0, 0, 0, 0.34),
+			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	}
+	:root[data-theme="dark"]
+		.app-shell:not(:has(.print-surface))
+		.projects-kpis
+		> *:hover {
+		box-shadow:
+			0 26px 58px rgba(0, 0, 0, 0.34),
+			inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	}
+
 	/* Los iconos/insignias pequeños dentro de una tarjeta -metric/-kpi (p.ej.
 	   ".reports-metric__icon") heredan el selector de arriba por el sufijo
 	   compartido; se les quita el aro para que no parezcan mini-tarjetas. */
@@ -18812,6 +18942,61 @@ input[id^="tab-seguridad-"]:checked
 		.executive-kpi:hover {
 		border-color: var(--kpi-accent, var(--brand-red));
 		box-shadow: var(--panel-shadow-hover);
+	}
+
+	/* Same problem as above, for the rest of the KPI/metric family: each
+	   already has its own tuned :hover border-color/box-shadow, but the
+	   named catch-all above (same specificity, declared later) wins, so
+	   hovering visibly did nothing outside the dashboard. Reassert each
+	   one's own values here so the interaction actually shows. */
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.project-kpi:hover {
+		border-color: rgba(200, 32, 47, 0.24);
+		box-shadow: var(--project-shadow-hover);
+	}
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.access-kpi:hover {
+		border-color: var(--kpi-accent, var(--brand-red));
+		box-shadow:
+			var(--glass-highlight),
+			0 28px 68px rgba(37, 48, 51, 0.17),
+			0 5px 16px rgba(37, 48, 51, 0.08);
+	}
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.purchases-kpi:hover {
+		box-shadow:
+			0 24px 52px rgba(22, 27, 29, 0.16),
+			inset 0 1px 0 rgba(255, 255, 255, 0.9);
+	}
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.finances-metric:hover {
+		box-shadow: 0 22px 44px rgba(22, 27, 29, 0.15);
+	}
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		:is(
+			.inventory-metric,
+			.requisitions-metric,
+			.reports-metric,
+			.documents-metric
+		):hover {
+		border-color: var(--metric-color, var(--brand-red));
+		box-shadow:
+			0 20px 44px rgba(27, 38, 35, 0.135),
+			inset 0 1px 0 rgba(255, 255, 255, 0.95);
+	}
+	:root:not([data-theme="dark"])
+		.app-shell:not(:has(.print-surface))
+		.projects-kpis
+		> *:hover {
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.7),
+			0 3px 8px rgba(22, 27, 29, 0.08),
+			0 22px 44px rgba(22, 27, 29, 0.13);
 	}
 
 	:root:not([data-theme="dark"])

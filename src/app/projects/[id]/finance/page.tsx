@@ -29,13 +29,25 @@ export default async function ProjectFinancePage({
 			label: "Presupuesto",
 			value: moneyCompact(budgetTotal),
 			icon: WalletCards,
+			tone: "var(--steel)",
 		},
-		{ label: "Ejecutado", value: moneyCompact(spent), icon: Banknote },
-		{ label: "Abonado", value: moneyCompact(paid), icon: ReceiptText },
+		{
+			label: "Ejecutado",
+			value: moneyCompact(spent),
+			icon: Banknote,
+			tone: "var(--brand-red)",
+		},
+		{
+			label: "Abonado",
+			value: moneyCompact(paid),
+			icon: ReceiptText,
+			tone: "var(--success)",
+		},
 		{
 			label: "Saldo",
 			value: moneyFull(dashboard.budget.balance),
 			icon: WalletCards,
+			tone: "var(--info)",
 		},
 	];
 
@@ -60,12 +72,19 @@ export default async function ProjectFinancePage({
 				{metricCards.map((card) => {
 					const ItemIcon = card.icon;
 					return (
-						<div className="project-panel" key={card.label}>
-							<ItemIcon className="mb-3 text-[var(--brand-red)]" size={20} />
-							<p className="text-xs font-bold uppercase text-[var(--muted)]">
+						<div className="project-kpi" key={card.label}>
+							<span
+								className="project-kpi-icon"
+								style={{ backgroundColor: card.tone }}
+							>
+								<ItemIcon aria-hidden="true" size={18} />
+							</span>
+							<span className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted)]">
 								{card.label}
-							</p>
-							<p className="mt-1 text-2xl font-semibold">{card.value}</p>
+							</span>
+							<strong className="mt-3 block text-2xl tabular-nums">
+								{card.value}
+							</strong>
 						</div>
 					);
 				})}

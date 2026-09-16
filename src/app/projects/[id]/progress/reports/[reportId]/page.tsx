@@ -289,7 +289,7 @@ function ReportHeader({
 
 function Metric({ label, value }: { label: string; value: string }) {
 	return (
-		<div className="rounded-2xl border border-[var(--border)] bg-white/80 p-4 shadow-[0_14px_30px_rgba(31,42,45,0.08)] backdrop-blur-xl backdrop-saturate-150">
+		<div className="rounded-2xl border border-[var(--border)] bg-white/80 p-4 shadow-[0_14px_30px_rgba(31,42,45,0.08)] backdrop-blur-xl backdrop-saturate-150 transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--brand-red)_28%,var(--border))] hover:shadow-[0_20px_44px_rgba(31,42,45,0.13)] motion-reduce:transform-none motion-reduce:transition-none">
 			<p className="text-xs font-semibold uppercase text-[var(--muted)]">
 				{label}
 			</p>

@@ -2,6 +2,7 @@ import {
 	ArrowLeft,
 	Building2,
 	CalendarDays,
+	type LucideIcon,
 	MapPin,
 	Users,
 } from "lucide-react";
@@ -18,6 +19,35 @@ const dateFormatter = new Intl.DateTimeFormat("es-GT", { dateStyle: "medium" });
 
 function formatDate(value?: Date | null) {
 	return value ? dateFormatter.format(value) : "Sin fecha";
+}
+
+function InfoTile({
+	icon: Icon,
+	label,
+	value,
+	tone,
+}: {
+	icon: LucideIcon;
+	label: string;
+	value: string;
+	tone: string;
+}) {
+	return (
+		<div className="group relative overflow-hidden rounded-xl bg-[#fbfaf6] p-4 transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_16px_36px_rgba(37,48,51,0.12)] motion-reduce:transform-none motion-reduce:transition-none">
+			<span
+				className="mb-3 grid size-9 place-items-center rounded-lg text-white shadow-[0_8px_18px_rgba(37,48,51,0.12)] transition duration-200 group-hover:-rotate-3 group-hover:scale-105"
+				style={{ backgroundColor: tone }}
+			>
+				<Icon aria-hidden="true" size={17} />
+			</span>
+			<p className="text-xs font-bold uppercase text-[var(--muted)]">{label}</p>
+			<p className="mt-1 font-semibold">{value}</p>
+			<span
+				className="pointer-events-none absolute inset-x-0 top-0 h-[3px] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+				style={{ backgroundColor: tone }}
+			/>
+		</div>
+	);
 }
 
 export default async function ProjectInformationPage({
@@ -57,43 +87,30 @@ export default async function ProjectInformationPage({
 
 			<section className="project-panel">
 				<div className="kpi-grid grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-					<div className="rounded-xl bg-[#fbfaf6] p-4">
-						<Building2 className="mb-3 text-[var(--brand-red)]" size={20} />
-						<p className="text-xs font-bold uppercase text-[var(--muted)]">
-							Cliente
-						</p>
-						<p className="mt-1 font-semibold">
-							{project.client?.name ?? "Sin cliente"}
-						</p>
-					</div>
-					<div className="rounded-xl bg-[#fbfaf6] p-4">
-						<MapPin className="mb-3 text-[var(--success)]" size={20} />
-						<p className="text-xs font-bold uppercase text-[var(--muted)]">
-							Ubicación
-						</p>
-						<p className="mt-1 font-semibold">
-							{project.location ?? "Sin ubicación"}
-						</p>
-					</div>
-					<div className="rounded-xl bg-[#fbfaf6] p-4">
-						<Users className="mb-3 text-[var(--steel)]" size={20} />
-						<p className="text-xs font-bold uppercase text-[var(--muted)]">
-							Responsable
-						</p>
-						<p className="mt-1 font-semibold">
-							{project.responsible?.name ?? "Sin responsable"}
-						</p>
-					</div>
-					<div className="rounded-xl bg-[#fbfaf6] p-4">
-						<CalendarDays className="mb-3 text-[var(--safety)]" size={20} />
-						<p className="text-xs font-bold uppercase text-[var(--muted)]">
-							Planificación
-						</p>
-						<p className="mt-1 font-semibold">
-							{formatDate(project.startDate)} -{" "}
-							{formatDate(project.expectedEndDate)}
-						</p>
-					</div>
+					<InfoTile
+						icon={Building2}
+						label="Cliente"
+						tone="var(--brand-red)"
+						value={project.client?.name ?? "Sin cliente"}
+					/>
+					<InfoTile
+						icon={MapPin}
+						label="Ubicación"
+						tone="var(--success)"
+						value={project.location ?? "Sin ubicación"}
+					/>
+					<InfoTile
+						icon={Users}
+						label="Responsable"
+						tone="var(--steel)"
+						value={project.responsible?.name ?? "Sin responsable"}
+					/>
+					<InfoTile
+						icon={CalendarDays}
+						label="Planificación"
+						tone="var(--safety)"
+						value={`${formatDate(project.startDate)} - ${formatDate(project.expectedEndDate)}`}
+					/>
 				</div>
 				{project.observations ? (
 					<p className="mt-4 rounded-xl border border-[var(--border)] bg-white p-4 text-sm text-[var(--muted)]">

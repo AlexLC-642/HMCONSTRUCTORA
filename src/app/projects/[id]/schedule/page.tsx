@@ -181,11 +181,14 @@ export default async function ProjectSchedulePage({
 							const Icon = metric.icon;
 							return (
 								<article
-									className="relative overflow-hidden rounded-2xl border border-[#cfd5ce] bg-white p-4 shadow-[0_16px_38px_rgba(37,48,51,0.09)]"
+									className="group relative overflow-hidden rounded-2xl border border-[#cfd5ce] bg-white p-4 shadow-[0_16px_38px_rgba(37,48,51,0.09)] transition duration-200 ease-out hover:-translate-y-1 hover:shadow-[0_24px_54px_rgba(37,48,51,0.15)] motion-reduce:transform-none motion-reduce:transition-none"
 									key={metric.label}
 								>
 									<span
-										className={`absolute right-4 top-4 grid size-11 place-items-center rounded-xl text-white shadow-[0_12px_24px_rgba(37,48,51,0.18)] ${metric.tone}`}
+										className={`pointer-events-none absolute inset-x-0 top-0 h-[3px] ${metric.tone}`}
+									/>
+									<span
+										className={`absolute right-4 top-4 grid size-11 place-items-center rounded-xl text-white shadow-[0_12px_24px_rgba(37,48,51,0.18)] transition duration-200 group-hover:-rotate-3 group-hover:scale-105 ${metric.tone}`}
 									>
 										<Icon aria-hidden="true" size={18} />
 									</span>
