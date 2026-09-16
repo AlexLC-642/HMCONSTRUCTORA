@@ -41,15 +41,17 @@ export function SidebarNav({
 
 	return (
 		<nav aria-label="Principal" className="app-shell-nav">
-			<a
-				aria-label="Dashboard"
-				className={className(pathname === "/dashboard")}
-				href="/dashboard"
-				title={collapsed ? "Dashboard" : undefined}
-			>
-				<LayoutDashboard aria-hidden="true" size={18} />
-				<span className="app-shell-nav-label">Dashboard</span>
-			</a>
+			{canViewProjects ? (
+				<a
+					aria-label="Dashboard"
+					className={className(pathname === "/dashboard")}
+					href="/dashboard"
+					title={collapsed ? "Dashboard" : undefined}
+				>
+					<LayoutDashboard aria-hidden="true" size={18} />
+					<span className="app-shell-nav-label">Dashboard</span>
+				</a>
+			) : null}
 			{canViewProjects ? (
 				<a
 					aria-label="Proyectos"

@@ -88,18 +88,25 @@ function Metric({
 	}[tone];
 
 	return (
-		<div className="website-metric" data-tone={tone}>
+		<div
+			className="website-metric !min-h-[7.5rem] !p-3 sm:!min-h-[8.35rem] sm:!p-[1.15rem]"
+			data-tone={tone}
+		>
 			<div className="flex items-start justify-between gap-3">
 				<div>
-					<p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#58635f]">
+					<p className="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-[#58635f] sm:text-xs">
 						{label}
 					</p>
-					<p className="mt-2 text-3xl font-semibold leading-none tabular-nums text-[#101416]">
+					<p className="mt-2 text-2xl font-semibold leading-none tabular-nums text-[#101416] sm:text-3xl">
 						{value}
 					</p>
-					<p className="mt-2 text-sm text-[var(--muted)]">{detail}</p>
+					<p className="mt-2 text-xs text-[var(--muted)] sm:text-sm">
+						{detail}
+					</p>
 				</div>
-				<span className={`website-metric__icon ${toneClass}`}>
+				<span
+					className={`website-metric__icon !size-9 sm:!size-[2.8rem] ${toneClass}`}
+				>
 					<Icon aria-hidden="true" size={18} />
 				</span>
 			</div>
@@ -155,7 +162,10 @@ export default async function WebsitePage({
 				</div>
 			</section>
 
-			<section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+			<section
+				aria-label="Resumen del sitio web"
+				className="grid grid-cols-2 gap-3 xl:grid-cols-4"
+			>
 				<Metric
 					detail="Visibles en /servicios"
 					icon={Layers}

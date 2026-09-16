@@ -6,6 +6,7 @@ import { verifyAuthenticationResponse } from "@simplewebauthn/server";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { recordAuditLog } from "@/modules/audit/application/audit";
+import { defaultAuthenticatedRouteForUser } from "@/modules/auth/application/authenticated-route";
 import {
 	clearPasskeyAuthAttempts,
 	isPasskeyAuthRateLimited,
@@ -127,7 +128,8 @@ export async function POST(request: Request) {
 			metadata: { method: "passkey" },
 		});
 
-		return NextResponse.json({ verified: true, redirectTo: "/dashboard" });
+		const redirectTo = await defaultAuthenticatedRouteForUser(passkey.user.id);
+		return NextResponse.json({ verified: true, redirectTo });
 	} catch (error) {
 		recordPasskeyAuthAttempt(ipAddress);
 		console.error("Passkey authentication failed", error);

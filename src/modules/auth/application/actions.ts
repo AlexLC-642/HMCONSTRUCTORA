@@ -8,6 +8,7 @@ import { COMPANY_EMAIL_DOMAIN } from "@/modules/auth/domain/email-domain";
 import { prisma } from "@/shared/lib/prisma";
 import { requestIp } from "@/shared/lib/request-ip";
 import { loginSchema } from "../domain/validation";
+import { defaultAuthenticatedRouteForUser } from "./authenticated-route";
 import {
 	clearLoginAttempts,
 	isLoginRateLimited,
@@ -106,6 +107,7 @@ export async function loginAction(formData: FormData) {
 	}
 
 	clearLoginAttempts(email, ipAddress);
+	const destination = await defaultAuthenticatedRouteForUser(activeUser.id);
 
 	const token = await createSessionToken({
 		sub: activeUser.id,
@@ -124,7 +126,7 @@ export async function loginAction(formData: FormData) {
 		metadata: { email: activeUser.email },
 	});
 
-	redirect("/dashboard");
+	redirect(destination);
 }
 
 export async function logoutAction() {

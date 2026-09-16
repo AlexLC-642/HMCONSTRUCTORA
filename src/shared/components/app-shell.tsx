@@ -97,6 +97,15 @@ export function AppShell({
 		};
 	}, [isMobileNavigationOpen]);
 
+	useEffect(() => {
+		if (!isNotificationsOpen) return;
+		const closeOnEscape = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setIsNotificationsOpen(false);
+		};
+		window.addEventListener("keydown", closeOnEscape);
+		return () => window.removeEventListener("keydown", closeOnEscape);
+	}, [isNotificationsOpen]);
+
 	function toggleDesktopSidebar() {
 		setIsSidebarCollapsed((current) => {
 			const next = !current;
@@ -278,8 +287,10 @@ export function AppShell({
 
 								<div className="relative">
 									<button
+										aria-controls="app-shell-notifications"
 										aria-label="Notificaciones"
 										aria-expanded={isNotificationsOpen}
+										aria-haspopup="dialog"
 										className="app-shell-bell focus-ring relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] transition hover:bg-[color-mix(in_srgb,var(--foreground)_6%,var(--surface))]"
 										onClick={() => {
 											setIsNotificationsOpen((current) => !current);
@@ -296,7 +307,12 @@ export function AppShell({
 									</button>
 
 									{isNotificationsOpen ? (
-										<div className="app-shell-notifications absolute right-0 top-full z-50 mt-3 overflow-hidden rounded-xl border border-[var(--border)] shadow-[0_18px_48px_rgba(37,48,51,0.14)]">
+										<div
+											aria-label="Panel de notificaciones"
+											className="app-shell-notifications fixed inset-x-3 top-[calc(var(--app-shell-header-height)_+_0.5rem)] z-50 flex max-h-[calc(100dvh_-_var(--app-shell-header-height)_-_1rem)] !w-auto flex-col overflow-hidden rounded-xl border border-[var(--border)] shadow-[0_18px_48px_rgba(37,48,51,0.14)] sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-3 sm:max-h-none sm:!w-[27rem] sm:max-w-[calc(100vw_-_1.5rem)]"
+											id="app-shell-notifications"
+											role="dialog"
+										>
 											<div className="app-shell-notifications__header flex items-center justify-between border-b border-[var(--border)] bg-[#f7f9f7] px-4 py-3">
 												<div>
 													<p className="text-sm font-semibold">
@@ -311,18 +327,28 @@ export function AppShell({
 															: `${unreadCount} pendientes`}
 													</p>
 												</div>
-												{unreadCount > 0 ? (
+												<div className="flex shrink-0 items-center gap-2">
+													{unreadCount > 0 ? (
+														<button
+															className="focus-ring min-h-11 rounded-lg px-2 text-xs font-semibold text-[var(--primary)]"
+															onClick={resolveAllNotifications}
+															type="button"
+														>
+															Descartar todo
+														</button>
+													) : null}
 													<button
-														className="text-xs font-semibold text-[var(--primary)]"
-														onClick={resolveAllNotifications}
+														aria-label="Cerrar notificaciones"
+														className="focus-ring grid size-11 place-items-center rounded-lg text-[var(--foreground)] transition hover:bg-black/5"
+														onClick={() => setIsNotificationsOpen(false)}
 														type="button"
 													>
-														Descartar todo
+														<X aria-hidden="true" size={18} />
 													</button>
-												) : null}
+												</div>
 											</div>
 
-											<div className="max-h-[32rem] overflow-y-auto">
+											<div className="min-h-0 flex-1 overscroll-contain overflow-y-auto sm:max-h-[32rem]">
 												{notifications.length > 0 ? (
 													notifications.map((notification) => (
 														<div
@@ -338,7 +364,7 @@ export function AppShell({
 																	)}
 																</div>
 																<div className="min-w-0 flex-1">
-																	<div className="flex items-center justify-between gap-3">
+																	<div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
 																		<p className="app-shell-notification__title text-sm font-semibold text-[#1b2325]">
 																			{notification.title}
 																		</p>
@@ -351,7 +377,7 @@ export function AppShell({
 																	</p>
 																	<div className="mt-2 flex items-center justify-between gap-2">
 																		<button
-																			className="text-xs font-semibold text-[var(--primary)]"
+																			className="focus-ring min-h-11 rounded-lg pr-2 text-xs font-semibold text-[var(--primary)]"
 																			onClick={() =>
 																				handleNotificationClick(
 																					notification.href as Route,
@@ -362,7 +388,7 @@ export function AppShell({
 																			{notification.actionLabel}
 																		</button>
 																		<button
-																			className="app-shell-notification__resolve text-xs font-semibold text-[#2f8d5a]"
+																			className="app-shell-notification__resolve focus-ring min-h-11 rounded-lg pl-2 text-xs font-semibold text-[#2f8d5a]"
 																			onClick={() =>
 																				resolveNotification(notification.id)
 																			}
