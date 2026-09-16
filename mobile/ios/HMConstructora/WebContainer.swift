@@ -2,12 +2,24 @@ import SwiftUI
 import UIKit
 import WebKit
 
+enum WebNavigationCommand {
+    case back
+    case forward
+}
+
 struct WebContainer: UIViewRepresentable {
     let session: MobileSession
     let onNeedsAuthentication: () -> Void
+    @Binding var canGoBack: Bool
+    @Binding var canGoForward: Bool
+    @Binding var navigationCommand: WebNavigationCommand?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onNeedsAuthentication: onNeedsAuthentication)
+        Coordinator(
+            onNeedsAuthentication: onNeedsAuthentication,
+            canGoBack: $canGoBack,
+            canGoForward: $canGoForward
+        )
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -25,6 +37,21 @@ struct WebContainer: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.onNeedsAuthentication = onNeedsAuthentication
+
+        // A command is a one-shot instruction from the on-screen pill, not
+        // durable view state - clear it right after acting so re-rendering
+        // this view (e.g. from an unrelated @State change) never replays it.
+        switch navigationCommand {
+        case .back where webView.canGoBack:
+            webView.goBack()
+        case .forward where webView.canGoForward:
+            webView.goForward()
+        default:
+            break
+        }
+        if navigationCommand != nil {
+            DispatchQueue.main.async { navigationCommand = nil }
+        }
     }
 
     private func installCookiesAndLoad(_ webView: WKWebView, coordinator: Coordinator) {
@@ -46,9 +73,22 @@ struct WebContainer: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate {
         var onNeedsAuthentication: () -> Void
         var hasLoaded = false
+        @Binding var canGoBack: Bool
+        @Binding var canGoForward: Bool
 
-        init(onNeedsAuthentication: @escaping () -> Void) {
+        init(
+            onNeedsAuthentication: @escaping () -> Void,
+            canGoBack: Binding<Bool>,
+            canGoForward: Binding<Bool>
+        ) {
             self.onNeedsAuthentication = onNeedsAuthentication
+            self._canGoBack = canGoBack
+            self._canGoForward = canGoForward
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            canGoBack = webView.canGoBack
+            canGoForward = webView.canGoForward
         }
 
         func webView(
@@ -70,7 +110,11 @@ struct WebContainer: UIViewRepresentable {
             if url.path.hasPrefix("/login") {
                 decisionHandler(.cancel)
                 webView.stopLoading()
-                DispatchQueue.main.async { self.onNeedsAuthentication() }
+                DispatchQueue.main.async {
+                    self.canGoBack = false
+                    self.canGoForward = false
+                    self.onNeedsAuthentication()
+                }
                 return
             }
             decisionHandler(.allow)

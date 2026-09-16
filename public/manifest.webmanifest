@@ -1,10 +1,13 @@
 {
+	"id": "/dashboard",
 	"name": "Control de obra HM",
 	"short_name": "Control HM",
 	"description": "Control de obra: proyectos, presupuestos, inventario, avances y documentos de HM Constructora, con acceso sin conexión en el sitio.",
 	"start_url": "/dashboard",
 	"scope": "/",
 	"display": "standalone",
+	"display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+	"orientation": "any",
 	"background_color": "#f7f8f5",
 	"theme_color": "#c8202f",
 	"icons": [

@@ -6,6 +6,14 @@ export const metadata: Metadata = {
 	title: "Control de obra",
 	description: "Sistema interno de gestión de proyectos",
 	manifest: "/manifest.webmanifest",
+	appleWebApp: {
+		capable: true,
+		statusBarStyle: "black-translucent",
+		title: "Control HM",
+	},
+	icons: {
+		apple: "/icon-192",
+	},
 };
 
 export const viewport: Viewport = {

@@ -27,4 +27,6 @@
     <string name="biometric_changed">Las huellas del teléfono cambiaron. Por seguridad, vincula nuevamente este dispositivo.</string>
     <string name="network_error">No se pudo conectar. Verifica tu internet e inténtalo de nuevo.</string>
     <string name="retry">Reintentar</string>
+    <string name="nav_back">Ir atrás</string>
+    <string name="nav_forward">Ir adelante</string>
 </resources>

@@ -2,6 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var viewModel: AppViewModel
+    @State private var canGoBack = false
+    @State private var canGoForward = false
+    @State private var navigationCommand: WebNavigationCommand?
 
     var body: some View {
         Group {
@@ -15,13 +18,68 @@ struct ContentView: View {
                     BiometricLoginView(viewModel: viewModel)
                 }
             case let .web(session):
-                WebContainer(session: session) {
-                    viewModel.handleWebLoginRedirect()
+                ZStack(alignment: .topLeading) {
+                    WebContainer(
+                        session: session,
+                        onNeedsAuthentication: { viewModel.handleWebLoginRedirect() },
+                        canGoBack: $canGoBack,
+                        canGoForward: $canGoForward,
+                        navigationCommand: $navigationCommand
+                    )
+                    .ignoresSafeArea(edges: .bottom)
+
+                    WebNavigationPill(canGoBack: canGoBack, canGoForward: canGoForward) { command in
+                        navigationCommand = command
+                    }
+                    .padding(.leading, 12)
+                    .padding(.top, 8)
                 }
-                .ignoresSafeArea(edges: .bottom)
             }
         }
         .tint(.hmRed)
+    }
+}
+
+private struct WebNavigationPill: View {
+    let canGoBack: Bool
+    let canGoForward: Bool
+    let onCommand: (WebNavigationCommand) -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            PillButton(symbol: "chevron.left", isEnabled: canGoBack) {
+                onCommand(.back)
+            }
+            Divider()
+                .frame(width: 1, height: 22)
+                .overlay(Color.white.opacity(0.22))
+            PillButton(symbol: "chevron.right", isEnabled: canGoForward) {
+                onCommand(.forward)
+            }
+        }
+        .background(Color.black.opacity(0.8), in: Capsule())
+        .overlay {
+            Capsule().stroke(Color.white.opacity(0.14), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
+    }
+}
+
+private struct PillButton: View {
+    let symbol: String
+    let isEnabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.35)
     }
 }
 

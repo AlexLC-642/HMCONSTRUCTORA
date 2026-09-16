@@ -22,6 +22,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -40,6 +41,9 @@ public final class MainActivity extends Activity {
     private BiometricVault vault;
     private ScrollView authScreen;
     private WebView webView;
+    private LinearLayout webNavPill;
+    private ImageButton webNavBack;
+    private ImageButton webNavForward;
     private LinearLayout enrollContent;
     private LinearLayout loginContent;
     private EditText username;
@@ -84,6 +88,15 @@ public final class MainActivity extends Activity {
     private void bindViews() {
         authScreen = findViewById(R.id.auth_screen);
         webView = findViewById(R.id.web_view);
+        webNavPill = findViewById(R.id.web_nav_pill);
+        webNavBack = findViewById(R.id.web_nav_back);
+        webNavForward = findViewById(R.id.web_nav_forward);
+        webNavBack.setOnClickListener(view -> {
+            if (webView.canGoBack()) webView.goBack();
+        });
+        webNavForward.setOnClickListener(view -> {
+            if (webView.canGoForward()) webView.goForward();
+        });
         enrollContent = findViewById(R.id.enroll_content);
         loginContent = findViewById(R.id.login_content);
         username = findViewById(R.id.username);
@@ -280,7 +293,18 @@ public final class MainActivity extends Activity {
         cookieManager.flush();
         authScreen.setVisibility(View.GONE);
         webView.setVisibility(View.VISIBLE);
+        webNavPill.setVisibility(View.VISIBLE);
         webView.loadUrl(AppConfig.BASE_URL + result.redirectTo);
+    }
+
+    // Reflects webView.canGoBack()/canGoForward() onto the pill so a user
+    // never taps an arrow that has nothing to do - called after every
+    // navigation instead of once, since both flags change on each page.
+    private void updateNavPillState() {
+        webNavBack.setEnabled(webView.canGoBack());
+        webNavBack.setAlpha(webView.canGoBack() ? 1f : 0.35f);
+        webNavForward.setEnabled(webView.canGoForward());
+        webNavForward.setAlpha(webView.canGoForward() ? 1f : 0.35f);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -299,9 +323,15 @@ public final class MainActivity extends Activity {
                 if (sameHost(uri) && uri.getPath() != null && uri.getPath().startsWith("/login")) {
                     view.stopLoading();
                     view.setVisibility(View.GONE);
+                    webNavPill.setVisibility(View.GONE);
                     authScreen.setVisibility(View.VISIBLE);
                     showBiometricLogin();
                 }
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                updateNavPillState();
             }
 
             @Override
