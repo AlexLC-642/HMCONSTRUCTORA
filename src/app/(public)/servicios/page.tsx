@@ -7,6 +7,7 @@ import {
 	withDefault,
 } from "@/modules/website/domain/defaults";
 import { resolveWebsiteServiceIcon } from "@/modules/website/domain/icon-registry";
+import { serviceCardPhoto } from "@/modules/website/domain/service-card-photos";
 
 export const metadata: Metadata = {
 	title: "Servicios",
@@ -54,10 +55,20 @@ export default async function ServiciosPage() {
 							key={service.id}
 							style={{ "--i": index } as React.CSSProperties}
 						>
-							<span className="public-service-card__icon">
-								<service.icon aria-hidden="true" size={22} />
-							</span>
-							<h3>{service.title}</h3>
+							<div className="public-service-card__head">
+								<span className="public-service-card__icon">
+									<service.icon aria-hidden="true" size={20} />
+								</span>
+								<h3>{service.title}</h3>
+							</div>
+							<div className="public-service-card__media">
+								<Image
+									alt=""
+									fill
+									sizes="(min-width: 960px) 25vw, 90vw"
+									src={serviceCardPhoto(index)}
+								/>
+							</div>
 							<p>{service.description}</p>
 							<Link
 								className="public-service-card__cta"

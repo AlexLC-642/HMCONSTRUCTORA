@@ -101,5 +101,10 @@ self.addEventListener("fetch", (event) => {
 	}
 
 	// Next.js, los estilos y los datos siempre deben venir de la versión activa.
-	event.respondWith(fetch(request));
+	// Sin capturar el error aquí, cualquier fetch que el propio navegador
+	// cancele o rechace (una petición cortada por una navegación rápida, una
+	// extensión bloqueadora, un parpadeo de red) queda como una promesa sin
+	// atender - el navegador ya maneja ese fallo por su cuenta, pero aparece
+	// como "Uncaught (in promise)" en la consola si no se captura aquí.
+	event.respondWith(fetch(request).catch(() => Response.error()));
 });

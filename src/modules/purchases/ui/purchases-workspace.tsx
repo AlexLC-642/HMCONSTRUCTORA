@@ -952,16 +952,73 @@ function DirectPurchaseForm({
 		setLines((current) =>
 			current.map((line) => (line.key === key ? { ...line, ...change } : line)),
 		);
-	const canAddLine = data.materials.length > lines.length;
-	const addLine = () => {
-		if (!canAddLine) return;
-		const key = nextKey.current;
-		nextKey.current += 1;
-		pendingLineFocusKey.current = key;
-		setLines((current) => [
-			...current,
-			{ key, materialId: "", quantity: 1, unitCost: 0 },
-		]);
+	// Selector masivo: marcar varios artículos a la vez en vez de agregarlos
+	// uno por uno con "+ Agregar artículo" y elegirlos fila por fila.
+	const [pickerOpen, setPickerOpen] = useState(false);
+	const [pickerQuery, setPickerQuery] = useState("");
+	const [pickerSelected, setPickerSelected] = useState<Set<string>>(new Set());
+	const pickerRef = useRef<HTMLDivElement>(null);
+	const selectedMaterialIds = useMemo(
+		() => new Set(lines.map((line) => line.materialId).filter(Boolean)),
+		[lines],
+	);
+	const materialsForPicker = useMemo(() => {
+		const query = pickerQuery.trim().toLowerCase();
+		return data.materials.filter((material) => {
+			if (selectedMaterialIds.has(material.id)) return false;
+			if (!query) return true;
+			return `${material.code} ${material.name}`.toLowerCase().includes(query);
+		});
+	}, [data.materials, selectedMaterialIds, pickerQuery]);
+
+	useEffect(() => {
+		if (!pickerOpen) return;
+		function onPointerDown(event: MouseEvent) {
+			if (!pickerRef.current?.contains(event.target as Node)) {
+				setPickerOpen(false);
+			}
+		}
+		function onKeyDown(event: KeyboardEvent) {
+			if (event.key === "Escape") setPickerOpen(false);
+		}
+		document.addEventListener("mousedown", onPointerDown);
+		document.addEventListener("keydown", onKeyDown);
+		return () => {
+			document.removeEventListener("mousedown", onPointerDown);
+			document.removeEventListener("keydown", onKeyDown);
+		};
+	}, [pickerOpen]);
+
+	const togglePicked = (materialId: string) => {
+		setPickerSelected((current) => {
+			const next = new Set(current);
+			if (next.has(materialId)) next.delete(materialId);
+			else next.add(materialId);
+			return next;
+		});
+	};
+
+	const confirmPicker = () => {
+		if (pickerSelected.size > 0) {
+			setLines((current) => {
+				const kept = current.filter((line) => line.materialId !== "");
+				const added = Array.from(pickerSelected).map((materialId) => {
+					const key = nextKey.current;
+					nextKey.current += 1;
+					return {
+						key,
+						materialId,
+						quantity: 1,
+						unitCost: materialById.get(materialId)?.unitCost ?? 0,
+					};
+				});
+				pendingLineFocusKey.current = added[0]?.key ?? null;
+				return [...kept, ...added];
+			});
+		}
+		setPickerSelected(new Set());
+		setPickerQuery("");
+		setPickerOpen(false);
 	};
 
 	const serializedItems = JSON.stringify(
@@ -1194,20 +1251,89 @@ function DirectPurchaseForm({
 							<span aria-live="polite" className="purchases-order-lines__count">
 								{lines.length} {lines.length === 1 ? "artículo" : "artículos"}
 							</span>
-							<button
-								aria-label="Agregar otro artículo a la compra"
-								className="purchases-order-lines__add focus-ring"
-								disabled={!canAddLine}
-								onClick={addLine}
-								title={
-									canAddLine
-										? "Agregar otro artículo"
-										: "Todos los artículos disponibles ya fueron agregados"
-								}
-								type="button"
-							>
-								<Plus aria-hidden="true" size={17} /> Agregar artículo
-							</button>
+							<div className="purchases-material-picker" ref={pickerRef}>
+								<button
+									aria-expanded={pickerOpen}
+									aria-label="Agregar varios artículos a la compra"
+									className="purchases-order-lines__add focus-ring"
+									disabled={materialsForPicker.length === 0 && !pickerOpen}
+									onClick={() => setPickerOpen((current) => !current)}
+									type="button"
+								>
+									<Plus aria-hidden="true" size={17} /> Agregar artículos
+								</button>
+								{pickerOpen ? (
+									<div
+										className="purchases-material-picker__panel"
+										role="dialog"
+									>
+										<div className="purchases-material-picker__search">
+											<Search aria-hidden="true" size={15} />
+											<input
+												aria-label="Buscar artículo"
+												onChange={(event) => setPickerQuery(event.target.value)}
+												placeholder="Buscar por código o nombre"
+												type="text"
+												value={pickerQuery}
+											/>
+										</div>
+										<div className="purchases-material-picker__list">
+											{materialsForPicker.length === 0 ? (
+												<p className="purchases-material-picker__empty">
+													{data.materials.length === selectedMaterialIds.size
+														? "Todos los artículos disponibles ya fueron agregados."
+														: "Sin resultados para esa búsqueda."}
+												</p>
+											) : (
+												materialsForPicker.map((material) => {
+													const checked = pickerSelected.has(material.id);
+													return (
+														<label
+															className="purchases-material-picker__item"
+															key={material.id}
+														>
+															<input
+																checked={checked}
+																onChange={() => togglePicked(material.id)}
+																type="checkbox"
+															/>
+															<span>
+																<strong>{material.code}</strong>
+																<small>{material.name}</small>
+															</span>
+															{checked ? (
+																<Check aria-hidden="true" size={15} />
+															) : null}
+														</label>
+													);
+												})
+											)}
+										</div>
+										<div className="purchases-material-picker__footer">
+											<span>
+												{pickerSelected.size === 0
+													? "Ninguno seleccionado"
+													: `${pickerSelected.size} seleccionado${pickerSelected.size === 1 ? "" : "s"}`}
+											</span>
+											<button
+												className="purchases-button purchases-button--ghost focus-ring"
+												onClick={() => setPickerOpen(false)}
+												type="button"
+											>
+												Cancelar
+											</button>
+											<button
+												className="purchases-order-lines__add focus-ring"
+												disabled={pickerSelected.size === 0}
+												onClick={confirmPicker}
+												type="button"
+											>
+												Agregar
+											</button>
+										</div>
+									</div>
+								) : null}
+							</div>
 						</div>
 					</div>
 					{errorFor("items") ? (
@@ -1242,16 +1368,6 @@ function DirectPurchaseForm({
 												});
 											}}
 											required
-											ref={(node) => {
-												if (!node || pendingLineFocusKey.current !== line.key)
-													return;
-												pendingLineFocusKey.current = null;
-												node.focus({ preventScroll: true });
-												node.scrollIntoView({
-													behavior: "smooth",
-													block: "nearest",
-												});
-											}}
 											value={line.materialId}
 										>
 											<option value="">Seleccionar artículo</option>
@@ -1288,6 +1404,16 @@ function DirectPurchaseForm({
 												quantity: Number(event.target.value) || 0,
 											})
 										}
+										ref={(node) => {
+											if (!node || pendingLineFocusKey.current !== line.key)
+												return;
+											pendingLineFocusKey.current = null;
+											node.focus({ preventScroll: true });
+											node.scrollIntoView({
+												behavior: "smooth",
+												block: "nearest",
+											});
+										}}
 										required
 										step="0.01"
 										type="number"

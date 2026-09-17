@@ -410,6 +410,11 @@ export async function createClientPayment(
 
 	return prisma.$transaction(async (tx) => {
 		if (parsed.budgetSectionId) {
+			// Mismo motivo que el lock en recordSupplierPayment: sin esto, dos
+			// abonos casi simultáneos al mismo renglón pueden leer el mismo
+			// saldo pendiente y ambos pasar la validación de abajo.
+			await tx.$executeRaw`SELECT id FROM BudgetSection WHERE id = ${parsed.budgetSectionId} FOR UPDATE`;
+
 			const section = await tx.budgetSection.findFirst({
 				where: {
 					id: parsed.budgetSectionId,
@@ -504,6 +509,13 @@ export async function recordSupplierPayment(
 	) as SupplierPaymentInput;
 
 	return prisma.$transaction(async (tx) => {
+		// Bloquea la fila del gasto antes de sumar sus pagos: sin esto, dos
+		// pagos enviados casi a la vez (doble clic, o dos personas pagando la
+		// misma factura) pueden leer el mismo saldo pendiente y ambos pasar la
+		// validación de abajo, sumando más de lo que en realidad se debía
+		// (pago duplicado / de más) - ver CLAUDE.md seccion 11.
+		await tx.$executeRaw`SELECT id FROM FinancialExpense WHERE id = ${parsed.financialExpenseId} FOR UPDATE`;
+
 		const expense = await tx.financialExpense.findUniqueOrThrow({
 			where: { id: parsed.financialExpenseId },
 			include: { supplierPayments: { where: { status: "REGISTERED" } } },

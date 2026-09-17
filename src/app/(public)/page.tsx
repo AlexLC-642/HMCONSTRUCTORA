@@ -7,64 +7,72 @@ import {
 	withDefault,
 } from "@/modules/website/domain/defaults";
 import { resolveWebsiteServiceIcon } from "@/modules/website/domain/icon-registry";
+import { serviceCardPhoto } from "@/modules/website/domain/service-card-photos";
 
 export default async function PublicHomePage() {
-	const { settings, services } = await getPublicWebsiteContent();
+	const { settings, services, photos } = await getPublicWebsiteContent();
 	const homeServices = services.slice(0, 3).map((service) => ({
 		id: service.id,
 		icon: resolveWebsiteServiceIcon(service.icon),
 		title: service.title,
 		description: service.description,
 	}));
+	const featuredProject = photos[0] ?? null;
 
 	return (
 		<>
 			<section className="public-hero">
-				<div className="public-hero__background">
-					<Image
-						alt="Obra en ejecución HM Constructora"
-						fill
-						priority
-						sizes="100vw"
-						src={settings?.heroImageUrl || "/site/images/blog1.jpg"}
-					/>
-				</div>
-				<div className="public-hero__overlay" />
 				<div className="public-hero__inner">
-					<p className="public-eyebrow">
-						{withDefault(settings?.heroEyebrow, websiteDefaults.heroEyebrow)}
-					</p>
-					<h1>
-						{settings?.heroHeading ? (
-							settings.heroHeading
-						) : (
-							<>
-								Constructora <em>H&amp;M</em>
-							</>
-						)}
-					</h1>
-					<p className="public-hero__lede">
-						{withDefault(
-							settings?.heroSubheading,
-							websiteDefaults.heroSubheading,
-						)}
-					</p>
-					<div className="public-hero__actions">
-						<Link
-							className="public-button public-button--primary"
-							href="/proyectos"
-						>
-							Conoce nuestros proyectos
-						</Link>
-						<Link
-							className="public-button public-button--ghost"
-							href="/contacto"
-						>
-							Solicitar cotización
-						</Link>
+					<div className="public-hero__copy">
+						<p className="public-eyebrow">
+							{withDefault(settings?.heroEyebrow, websiteDefaults.heroEyebrow)}
+						</p>
+						<h1>
+							{settings?.heroHeading ? (
+								settings.heroHeading
+							) : (
+								<>
+									Constructora <em>H&amp;M</em>
+								</>
+							)}
+						</h1>
+						<p className="public-hero__lede">
+							{withDefault(
+								settings?.heroSubheading,
+								websiteDefaults.heroSubheading,
+							)}
+						</p>
+						<div className="public-hero__actions">
+							<Link
+								className="public-button public-button--primary"
+								href="/contacto"
+							>
+								Solicitar cotización
+							</Link>
+							<Link
+								className="public-button public-button--ghost"
+								href="/proyectos"
+							>
+								Conoce nuestros proyectos
+							</Link>
+						</div>
+					</div>
+					<div className="public-hero__media">
+						<div className="public-hero__media-frame">
+							<Image
+								alt="Obra de HM Constructora"
+								fill
+								priority
+								sizes="(min-width: 960px) 46vw, 92vw"
+								src={settings?.heroImageUrl || "/site/images/blog1.jpg"}
+							/>
+						</div>
+						<div className="public-hero__media-badge">
+							<Image alt="" height={26} src="/brand/logo.png" width={28} />
+							HM Constructora
+						</div>
 					</div>
 				</div>
-				<span className="public-hero__scroll">Descubre más</span>
 			</section>
 
 			<section className="public-section" id="servicios">
@@ -89,10 +97,20 @@ export default async function PublicHomePage() {
 							key={service.id}
 							style={{ "--i": index } as React.CSSProperties}
 						>
-							<span className="public-service-card__icon">
-								<service.icon aria-hidden="true" size={22} />
-							</span>
-							<h3>{service.title}</h3>
+							<div className="public-service-card__head">
+								<span className="public-service-card__icon">
+									<service.icon aria-hidden="true" size={20} />
+								</span>
+								<h3>{service.title}</h3>
+							</div>
+							<div className="public-service-card__media">
+								<Image
+									alt=""
+									fill
+									sizes="(min-width: 960px) 25vw, 90vw"
+									src={serviceCardPhoto(index)}
+								/>
+							</div>
 							<p>{service.description}</p>
 						</div>
 					))}
@@ -109,41 +127,91 @@ export default async function PublicHomePage() {
 
 			<section className="public-section public-section--muted" id="nosotros">
 				<div className="public-about">
-					<div>
-						<p className="public-eyebrow">Nosotros</p>
-						<h2>
-							{withDefault(
-								settings?.aboutHeading,
-								websiteDefaults.aboutHeading,
-							)}
-						</h2>
-						<p>{withDefault(settings?.aboutText, websiteDefaults.aboutText)}</p>
+					<div className="public-about__media">
+						<Image
+							alt="Obra de HM Constructora en ejecución"
+							fill
+							sizes="(min-width: 960px) 38vw, 92vw"
+							src="/site/images/Rd.png"
+						/>
 					</div>
-					<div className="public-about__cards">
-						<div className="public-about__card">
-							<span className="public-about__badge">
-								<ClipboardCheck aria-hidden="true" size={20} />
-							</span>
-							<h3>Misión</h3>
-							<p>
+					<div className="public-about__content">
+						<div>
+							<p className="public-eyebrow">Nosotros</p>
+							<h2>
 								{withDefault(
-									settings?.missionText,
-									websiteDefaults.missionText,
+									settings?.aboutHeading,
+									websiteDefaults.aboutHeading,
 								)}
+							</h2>
+							<p>
+								{withDefault(settings?.aboutText, websiteDefaults.aboutText)}
 							</p>
 						</div>
-						<div className="public-about__card">
-							<span className="public-about__badge">
-								<ClipboardCheck aria-hidden="true" size={20} />
-							</span>
-							<h3>Visión</h3>
-							<p>
-								{withDefault(settings?.visionText, websiteDefaults.visionText)}
-							</p>
+						<div className="public-about__cards">
+							<div className="public-about__card">
+								<span className="public-about__badge">
+									<ClipboardCheck aria-hidden="true" size={20} />
+								</span>
+								<h3>Misión</h3>
+								<p>
+									{withDefault(
+										settings?.missionText,
+										websiteDefaults.missionText,
+									)}
+								</p>
+							</div>
+							<div className="public-about__card">
+								<span className="public-about__badge">
+									<ClipboardCheck aria-hidden="true" size={20} />
+								</span>
+								<h3>Visión</h3>
+								<p>
+									{withDefault(
+										settings?.visionText,
+										websiteDefaults.visionText,
+									)}
+								</p>
+							</div>
 						</div>
 					</div>
 				</div>
 			</section>
+
+			{featuredProject ? (
+				<section className="public-section" id="proyectos-destacados">
+					<div className="public-projects-teaser">
+						<div className="public-projects-teaser__content">
+							<p className="public-eyebrow">Proyectos destacados</p>
+							<h2>Obras que dejan huella</h2>
+							<p>
+								Cada proyecto refleja nuestro compromiso con la calidad, la
+								funcionalidad y la confianza de nuestros clientes.
+							</p>
+							<div className="public-projects-teaser__actions">
+								<Link
+									className="public-button public-button--ghost"
+									href="/proyectos"
+								>
+									Ver todos los proyectos
+								</Link>
+							</div>
+						</div>
+						<div className="public-projects-teaser__media">
+							<Image
+								alt={featuredProject.altText ?? featuredProject.title}
+								fill
+								sizes="(min-width: 960px) 50vw, 92vw"
+								src={featuredProject.imageUrl}
+							/>
+							<div className="public-projects-teaser__caption">
+								<strong>{featuredProject.title}</strong>
+								<Link href="/proyectos">Ver proyecto →</Link>
+							</div>
+						</div>
+					</div>
+				</section>
+			) : null}
 
 			<section className="public-cta">
 				<div>

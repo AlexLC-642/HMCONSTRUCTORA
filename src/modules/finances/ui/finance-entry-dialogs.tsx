@@ -150,15 +150,28 @@ export function FinanceEntryDialogs({
 						presupuesto.
 					</p>
 				</div>
-				<div className="grid grid-cols-1 gap-2 sm:flex">
-					<button
-						className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[var(--brand-red)] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(200,32,47,0.22)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45"
-						disabled={!invoiceOrders.some((order) => order.available > 0)}
-						onClick={() => setDialog("invoice")}
-						type="button"
-					>
-						<FileCheck2 size={17} /> Registrar factura
-					</button>
+				<div className="grid grid-cols-1 gap-2 sm:flex sm:items-start">
+					<div>
+						<button
+							className="focus-ring inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--brand-red)] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(200,32,47,0.22)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
+							disabled={!invoiceOrders.some((order) => order.available > 0)}
+							onClick={() => setDialog("invoice")}
+							title={
+								invoiceOrders.some((order) => order.available > 0)
+									? undefined
+									: "Necesitas una orden de compra emitida con saldo pendiente por facturar. Emítela desde Compras primero."
+							}
+							type="button"
+						>
+							<FileCheck2 size={17} /> Registrar factura
+						</button>
+						{!invoiceOrders.some((order) => order.available > 0) ? (
+							<p className="mt-1.5 max-w-56 text-xs text-[var(--muted)]">
+								Emite una orden de compra en Compras con saldo pendiente para
+								poder facturarla aquí.
+							</p>
+						) : null}
+					</div>
 					<button
 						className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd3cc] bg-white px-4 text-sm font-semibold shadow-[0_8px_20px_rgba(22,27,29,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(22,27,29,0.12)]"
 						onClick={() => setDialog("expense")}

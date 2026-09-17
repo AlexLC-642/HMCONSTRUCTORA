@@ -75,18 +75,14 @@ export function RequisitionItemsBuilder({
 	const [items, setItems] = useState<DraftItem[]>([emptyItem(1)]);
 
 	function update(id: number, values: Partial<DraftItem>) {
-		if (values.resourceType) {
-			setItems((current) =>
-				current.map((item) => ({
-					...item,
-					resourceType: values.resourceType as ResourceType,
-					materialId: "",
-				})),
-			);
-			return;
-		}
 		setItems((current) =>
-			current.map((item) => (item.id === id ? { ...item, ...values } : item)),
+			current.map((item) => {
+				if (item.id !== id) return item;
+				// Cambiar el tipo de recurso de ESTE renglón invalida el material
+				// que tenía elegido (el catálogo disponible cambia con el tipo).
+				if (values.resourceType) return { ...item, ...values, materialId: "" };
+				return { ...item, ...values };
+			}),
 		);
 	}
 
