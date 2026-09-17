@@ -55,6 +55,7 @@ export default async function InventoryPage({
 				type: first(params.type),
 				warehouseId: first(params.warehouseId),
 				projectId: first(params.projectId),
+				review: first(params.review),
 				page: Number(first(params.page) ?? "1"),
 				pageSize: Number(first(params.pageSize) ?? "25"),
 			},
@@ -63,7 +64,13 @@ export default async function InventoryPage({
 		return (
 			<main className="mx-auto max-w-[1520px] space-y-5 px-3 pb-10 md:px-6">
 				<InventoryWorkspaceHeader view="movement" />
-				<InventoryMovements data={data} params={params} />
+				<InventoryMovements
+					canReviewWaste={user.permissions.includes(
+						"inventario.desperdicio.revisar",
+					)}
+					data={data}
+					params={params}
+				/>
 			</main>
 		);
 	}

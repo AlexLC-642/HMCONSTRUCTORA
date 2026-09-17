@@ -3,6 +3,7 @@ import {
 	projectScopeWhere,
 } from "@/modules/auth/application/authorization";
 import type { AuthenticatedUser } from "@/modules/auth/domain/types";
+import { env } from "@/shared/lib/env";
 import { prisma } from "@/shared/lib/prisma";
 import {
 	serializeMaterial,
@@ -26,6 +27,7 @@ export type InventoryListFilters = {
 	projectId?: string;
 	status?: string;
 	type?: string;
+	review?: string;
 	page?: number;
 	pageSize?: number;
 };
@@ -330,8 +332,17 @@ export async function getMovementHistory(
 	const query = clean(filters.query);
 	const canSeePortfolio = hasProjectScopePortfolioAccess(user, "inventory");
 	const allowedProjectWhere = projectScopeWhere(user, "inventory");
+	const reviewStatus =
+		filters.review === "pending"
+			? (["PENDING", "NEEDS_ACTION"] as const)
+			: filters.review === "reviewed"
+				? (["REVIEWED"] as const)
+				: filters.review === "normal"
+					? (["NOT_REQUIRED"] as const)
+					: undefined;
+	const accessWhere = !canSeePortfolio ? { project: allowedProjectWhere } : {};
 	const where = {
-		...(!canSeePortfolio ? { project: allowedProjectWhere } : {}),
+		...accessWhere,
 		...(filters.materialId ? { materialId: filters.materialId } : {}),
 		...(filters.warehouseId ? { warehouseId: filters.warehouseId } : {}),
 		...(filters.projectId ? { projectId: filters.projectId } : {}),
@@ -346,6 +357,9 @@ export async function getMovementHistory(
 						| "TRANSFER",
 				}
 			: {}),
+		...(reviewStatus
+			? { type: "WASTE" as const, wasteReviewStatus: { in: [...reviewStatus] } }
+			: {}),
 		...(query
 			? {
 					OR: [
@@ -359,42 +373,57 @@ export async function getMovementHistory(
 				}
 			: {}),
 	};
-	const [items, total, movementGroups, materials, warehouses, projects] =
-		await Promise.all([
-			prisma.stockMovement.findMany({
-				where,
-				include: {
-					material: true,
-					warehouse: true,
-					project: { select: { id: true, code: true, name: true } },
-					createdBy: { select: { name: true } },
-				},
-				orderBy: { createdAt: "desc" },
-				skip: (page - 1) * pageSize,
-				take: pageSize,
-			}),
-			prisma.stockMovement.count({ where }),
-			prisma.stockMovement.groupBy({
-				by: ["type"],
-				where,
-				_count: { _all: true },
-				_sum: { totalCost: true },
-			}),
-			prisma.inventoryMaterial.findMany({
-				where: { active: true },
-				orderBy: { name: "asc" },
-			}),
-			prisma.warehouse.findMany({
-				where: { active: true },
-				orderBy: { name: "asc" },
-			}),
-			prisma.project.findMany({
-				where: allowedProjectWhere,
-				select: { id: true, code: true, name: true },
-				orderBy: { updatedAt: "desc" },
-				take: 50,
-			}),
-		]);
+	const [
+		items,
+		total,
+		movementGroups,
+		materials,
+		warehouses,
+		projects,
+		pendingWasteReviews,
+	] = await Promise.all([
+		prisma.stockMovement.findMany({
+			where,
+			include: {
+				material: true,
+				warehouse: true,
+				project: { select: { id: true, code: true, name: true } },
+				createdBy: { select: { name: true } },
+				wasteReviewedBy: { select: { name: true } },
+			},
+			orderBy: { createdAt: "desc" },
+			skip: (page - 1) * pageSize,
+			take: pageSize,
+		}),
+		prisma.stockMovement.count({ where }),
+		prisma.stockMovement.groupBy({
+			by: ["type"],
+			where,
+			_count: { _all: true },
+			_sum: { totalCost: true },
+		}),
+		prisma.inventoryMaterial.findMany({
+			where: { active: true },
+			orderBy: { name: "asc" },
+		}),
+		prisma.warehouse.findMany({
+			where: { active: true },
+			orderBy: { name: "asc" },
+		}),
+		prisma.project.findMany({
+			where: allowedProjectWhere,
+			select: { id: true, code: true, name: true },
+			orderBy: { updatedAt: "desc" },
+			take: 50,
+		}),
+		prisma.stockMovement.count({
+			where: {
+				...accessWhere,
+				type: "WASTE",
+				wasteReviewStatus: { in: ["PENDING", "NEEDS_ACTION"] },
+			},
+		}),
+	]);
 	const movementCounts = Object.fromEntries(
 		movementGroups.map((item) => [item.type, item._count._all]),
 	);
@@ -413,5 +442,7 @@ export async function getMovementHistory(
 		materials: materials.map(serializeMaterial),
 		warehouses: warehouses.map(serializeWarehouse),
 		projects,
+		pendingWasteReviews,
+		wasteReviewAmountThreshold: env.WASTE_REVIEW_AMOUNT_GTQ,
 	};
 }

@@ -12,6 +12,7 @@ export const permissionKeys = [
 	"avance.aprobar",
 	"avance.publicar",
 	"inventario.mover",
+	"inventario.desperdicio.revisar",
 	"requerimiento.aprobar",
 	"compras.ver",
 	"compras.gestionar",
@@ -105,6 +106,7 @@ export const rolePermissionPresets: Record<
 		"avance.aprobar",
 		"avance.publicar",
 		"inventario.mover",
+		"inventario.desperdicio.revisar",
 		"requerimiento.aprobar",
 		"compras.ver",
 		"finanzas.ver",
@@ -118,6 +120,7 @@ export const rolePermissionPresets: Record<
 		"avance.crear",
 		"avance.revisar",
 		"inventario.mover",
+		"inventario.desperdicio.revisar",
 	],
 	contabilidad: [
 		"proyectos.ver",

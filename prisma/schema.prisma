@@ -89,6 +89,23 @@ enum StockMovementType {
   TRANSFER
 }
 
+enum WasteReason {
+  CUTTING_SURPLUS
+  BREAKAGE
+  DAMAGE
+  EXPIRATION
+  LOSS
+  THEFT
+  OTHER
+}
+
+enum WasteReviewStatus {
+  NOT_REQUIRED
+  PENDING
+  REVIEWED
+  NEEDS_ACTION
+}
+
 enum InventoryResourceType {
   MATERIAL
   TOOL
@@ -195,6 +212,7 @@ model User {
   syncOperations           SyncOperation[]
   dailyReportMedias        DailyReportMedia[]   @relation("DailyReportMediaUploadedBy")
   stockMovements           StockMovement[]      @relation("StockMovementCreatedBy")
+  reviewedWasteMovements   StockMovement[]      @relation("StockMovementWasteReviewedBy")
   createdRequisitions      Requisition[]        @relation("RequisitionCreatedBy")
   approvedRequisitions     Requisition[]        @relation("RequisitionApprovedBy")
   financialExpenses        FinancialExpense[]   @relation("FinancialExpenseCreatedBy")
@@ -782,6 +800,12 @@ model StockMovement {
   notes                 String?              @db.Text
   responsibleName       String?
   expectedReturnDate    DateTime?
+  wasteReason           WasteReason?
+  wasteReviewStatus     WasteReviewStatus?
+  wasteReviewTriggers   Json?
+  wasteReviewNotes      String?              @db.Text
+  wasteReviewedById     String?
+  wasteReviewedAt       DateTime?
   createdById           String?
   createdAt             DateTime             @default(now())
   material              InventoryMaterial    @relation(fields: [materialId], references: [id], onDelete: Restrict)
@@ -789,6 +813,7 @@ model StockMovement {
   project               Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
   dailyReportMaterial   DailyReportMaterial? @relation(fields: [dailyReportMaterialId], references: [id], onDelete: SetNull)
   createdBy             User?                @relation("StockMovementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  wasteReviewedBy       User?                @relation("StockMovementWasteReviewedBy", fields: [wasteReviewedById], references: [id], onDelete: SetNull)
 
   @@index([transferGroupId])
   @@index([materialId])
@@ -796,6 +821,8 @@ model StockMovement {
   @@index([projectId])
   @@index([dailyReportMaterialId])
   @@index([type])
+  @@index([wasteReviewStatus])
+  @@index([wasteReviewedById])
   @@index([createdAt])
 }
 

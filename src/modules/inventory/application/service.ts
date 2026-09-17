@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type StockMovementType } from "@prisma/client";
+import { env } from "@/shared/lib/env";
 import { prisma } from "@/shared/lib/prisma";
 import {
 	type InventoryMaterialInput,
@@ -9,14 +10,23 @@ import {
 	type StockMovementInput,
 	stockMovementInputSchema,
 	type WarehouseInput,
+	type WasteReviewInput,
 	warehouseInputSchema,
+	wasteReviewInputSchema,
 } from "../domain/validation";
+import { evaluateWasteReview } from "../domain/waste-review";
 
 type InventoryContext = {
 	userId: string;
 };
 
 type InventoryTx = Prisma.TransactionClient;
+type StockMovementMutationInput = Omit<
+	StockMovementInput,
+	"requestWasteReview"
+> & {
+	requestWasteReview?: boolean;
+};
 
 function nullable(value?: string | null) {
 	const clean = value?.trim();
@@ -122,7 +132,7 @@ function nextWarehouseCode(existingCodes: string[]) {
 
 export async function recordStockMovementInTransaction(
 	tx: InventoryTx,
-	input: StockMovementInput & {
+	input: StockMovementMutationInput & {
 		dailyReportMaterialId?: string;
 		idempotencyKey?: string;
 	},
@@ -139,7 +149,7 @@ export async function recordStockMovementInTransaction(
 	const inputUnitCost = decimal(input.unitCost);
 	const material = await tx.inventoryMaterial.findUniqueOrThrow({
 		where: { id: input.materialId },
-		select: { unitCost: true },
+		select: { unitCost: true, resourceType: true },
 	});
 	const unitCost = inputUnitCost.gt(0)
 		? inputUnitCost
@@ -187,21 +197,67 @@ export async function recordStockMovementInTransaction(
 	if (input.type === "TRANSFER" && !destination)
 		throw new Error("La bodega destino no existe o está inactiva.");
 	const transferGroupId = input.type === "TRANSFER" ? randomUUID() : undefined;
+	const totalCost = quantity.mul(unitCost).toDecimalPlaces(2);
+	const wasteReviewTriggers =
+		input.type === "WASTE" && input.wasteReason
+			? evaluateWasteReview({
+					reason: input.wasteReason,
+					resourceType: material.resourceType,
+					totalCost: totalCost.toNumber(),
+					reviewAmountThreshold: env.WASTE_REVIEW_AMOUNT_GTQ,
+					requestedByUser: input.requestWasteReview ?? false,
+				})
+			: [];
 
-	await tx.stock.upsert({
-		where: {
-			materialId_warehouseId: {
+	if (
+		input.type === "OUT" ||
+		input.type === "WASTE" ||
+		input.type === "TRANSFER"
+	) {
+		const stockUpdate = await tx.stock.updateMany({
+			where: {
 				materialId: input.materialId,
 				warehouseId: input.warehouseId,
+				quantity: { gte: quantity },
 			},
-		},
-		create: {
-			materialId: input.materialId,
-			warehouseId: input.warehouseId,
-			quantity: nextQuantity,
-		},
-		update: { quantity: nextQuantity },
-	});
+			data: { quantity: { decrement: quantity } },
+		});
+		if (stockUpdate.count !== 1) {
+			throw new Error(
+				"La existencia cambió mientras se registraba. Actualice e intente nuevamente.",
+			);
+		}
+	} else if (input.type === "IN" || input.type === "RETURN") {
+		await tx.stock.upsert({
+			where: {
+				materialId_warehouseId: {
+					materialId: input.materialId,
+					warehouseId: input.warehouseId,
+				},
+			},
+			create: {
+				materialId: input.materialId,
+				warehouseId: input.warehouseId,
+				quantity,
+			},
+			update: { quantity: { increment: quantity } },
+		});
+	} else {
+		await tx.stock.upsert({
+			where: {
+				materialId_warehouseId: {
+					materialId: input.materialId,
+					warehouseId: input.warehouseId,
+				},
+			},
+			create: {
+				materialId: input.materialId,
+				warehouseId: input.warehouseId,
+				quantity: nextQuantity,
+			},
+			update: { quantity: nextQuantity },
+		});
+	}
 
 	const movement = await tx.stockMovement.create({
 		data: {
@@ -214,13 +270,22 @@ export async function recordStockMovementInTransaction(
 			type: input.type,
 			quantity: input.type === "ADJUSTMENT" ? delta.abs() : quantity,
 			unitCost,
-			totalCost: quantity.mul(unitCost).toDecimalPlaces(2),
+			totalCost,
 			reference: nullable(input.reference),
 			notes: nullable(input.notes),
 			responsibleName: nullable(input.responsibleName),
 			expectedReturnDate: input.expectedReturnDate
 				? new Date(`${input.expectedReturnDate}T00:00:00.000Z`)
 				: null,
+			wasteReason: input.type === "WASTE" ? input.wasteReason : null,
+			wasteReviewStatus:
+				input.type === "WASTE"
+					? wasteReviewTriggers.length > 0
+						? "PENDING"
+						: "NOT_REQUIRED"
+					: null,
+			wasteReviewTriggers:
+				input.type === "WASTE" ? wasteReviewTriggers : Prisma.JsonNull,
 			createdById: context.userId,
 		},
 	});
@@ -483,6 +548,72 @@ export async function recordStockMovement(
 			},
 		});
 		return movement;
+	});
+}
+
+export async function reviewWasteMovement(
+	rawInput: unknown,
+	context: InventoryContext,
+) {
+	const parsed = wasteReviewInputSchema.parse(rawInput) as WasteReviewInput;
+
+	return prisma.$transaction(async (tx) => {
+		const existing = await tx.stockMovement.findUniqueOrThrow({
+			where: { id: parsed.movementId },
+			select: {
+				id: true,
+				type: true,
+				wasteReviewStatus: true,
+				wasteReviewNotes: true,
+			},
+		});
+		if (existing.type !== "WASTE" || !existing.wasteReviewStatus) {
+			throw new Error(
+				"El movimiento no corresponde a un desperdicio revisable.",
+			);
+		}
+		if (
+			existing.wasteReviewStatus !== "PENDING" &&
+			existing.wasteReviewStatus !== "NEEDS_ACTION"
+		) {
+			throw new Error(
+				"Este desperdicio ya fue cerrado o no requiere revisión.",
+			);
+		}
+
+		const updated = await tx.stockMovement.updateMany({
+			where: {
+				id: parsed.movementId,
+				type: "WASTE",
+				wasteReviewStatus: { in: ["PENDING", "NEEDS_ACTION"] },
+			},
+			data: {
+				wasteReviewStatus: parsed.status,
+				wasteReviewNotes: nullable(parsed.notes),
+				wasteReviewedById: context.userId,
+				wasteReviewedAt: new Date(),
+			},
+		});
+		if (updated.count !== 1) {
+			throw new Error(
+				"El desperdicio cambió mientras se revisaba. Actualice la página.",
+			);
+		}
+
+		await tx.auditLog.create({
+			data: {
+				userId: context.userId,
+				action: "UPDATE",
+				entityType: "StockMovementWasteReview",
+				entityId: parsed.movementId,
+				metadata: {
+					previousStatus: existing.wasteReviewStatus,
+					previousNotes: existing.wasteReviewNotes,
+					status: parsed.status,
+					notes: nullable(parsed.notes),
+				},
+			},
+		});
 	});
 }
 

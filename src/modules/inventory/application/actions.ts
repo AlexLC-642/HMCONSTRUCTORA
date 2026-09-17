@@ -7,10 +7,12 @@ import {
 	requireProjectScopePortfolioPermission,
 	requireScopedProjectPermission,
 } from "@/modules/auth/application/authorization";
+import { prisma } from "@/shared/lib/prisma";
 import {
 	createInventoryMaterial,
 	createWarehouse,
 	recordStockMovement,
+	reviewWasteMovement,
 	updateInventoryMaterial,
 } from "./service";
 
@@ -112,9 +114,45 @@ export async function recordStockMovementAction(formData: FormData) {
 			unitCost: value(formData, "unitCost"),
 			reference: value(formData, "reference"),
 			notes: value(formData, "notes"),
+			responsibleName: value(formData, "responsibleName"),
+			expectedReturnDate: value(formData, "expectedReturnDate"),
+			wasteReason: value(formData, "wasteReason") || undefined,
+			requestWasteReview: formData.get("requestWasteReview") === "on",
 		},
 		{ userId: user.id },
 	);
 	revalidatePath("/inventory");
 	redirect("/inventory?view=stock" as Route);
+}
+
+export async function reviewWasteMovementAction(formData: FormData) {
+	const movementId = value(formData, "movementId");
+	const movement = await prisma.stockMovement.findUnique({
+		where: { id: movementId },
+		select: { projectId: true },
+	});
+	if (!movement) throw new Error("El movimiento ya no existe.");
+
+	const user = movement.projectId
+		? await requireScopedProjectPermission(
+				movement.projectId,
+				"inventario.desperdicio.revisar",
+				"inventory",
+			)
+		: await requireProjectScopePortfolioPermission(
+				"inventario.desperdicio.revisar",
+				"inventory",
+			);
+
+	await reviewWasteMovement(
+		{
+			movementId,
+			status: value(formData, "status"),
+			notes: value(formData, "notes"),
+		},
+		{ userId: user.id },
+	);
+	revalidatePath("/inventory");
+	revalidatePath("/api/notifications");
+	redirect("/inventory?view=movement&review=pending" as Route);
 }

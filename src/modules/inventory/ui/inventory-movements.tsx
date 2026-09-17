@@ -1,22 +1,36 @@
 "use client";
 
 import {
+	AlertTriangle,
 	ArrowDownToLine,
 	ArrowLeftRight,
 	ArrowUpFromLine,
+	CheckCircle2,
 	CircleDollarSign,
 	ClipboardList,
 	History,
 	PackageOpen,
 	Plus,
 	Search,
+	ShieldCheck,
 	SlidersHorizontal,
 	X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { AutoFilterForm } from "@/shared/ui/auto-filter-form";
-import { recordStockMovementAction } from "../application/actions";
+import {
+	recordStockMovementAction,
+	reviewWasteMovementAction,
+} from "../application/actions";
 import type { getMovementHistory } from "../application/queries";
+import {
+	evaluateWasteReview,
+	type WasteReasonValue,
+	type WasteReviewTrigger,
+	wasteReasonLabels,
+	wasteReasonValues,
+	wasteReviewTriggerLabels,
+} from "../domain/waste-review";
 import {
 	InventoryEmpty,
 	InventoryMetric,
@@ -63,6 +77,21 @@ function typeTone(
 	if (type === "TRANSFER") return "info";
 	return "neutral";
 }
+function wasteReviewLabel(status: Movement["wasteReviewStatus"]) {
+	if (status === "PENDING") return "Por revisar";
+	if (status === "NEEDS_ACTION") return "Con observación";
+	if (status === "REVIEWED") return "Revisado";
+	if (status === "NOT_REQUIRED") return "Registrado";
+	return null;
+}
+function wasteReviewTone(
+	status: Movement["wasteReviewStatus"],
+): "success" | "warning" | "danger" | "neutral" {
+	if (status === "REVIEWED") return "success";
+	if (status === "NEEDS_ACTION") return "danger";
+	if (status === "PENDING") return "warning";
+	return "neutral";
+}
 function signedQuantity(item: Movement) {
 	const sign =
 		item.type === "IN" || item.type === "RETURN"
@@ -88,9 +117,11 @@ function href(params: Params, changes: Record<string, string>) {
 export function InventoryMovements({
 	data,
 	params,
+	canReviewWaste,
 }: {
 	data: HistoryData;
 	params: Params;
+	canReviewWaste: boolean;
 }) {
 	const [open, setOpen] = useState(false);
 	const [selected, setSelected] = useState<Movement | null>(null);
@@ -164,9 +195,41 @@ export function InventoryMovements({
 				/>
 			</section>
 
+			{canReviewWaste && data.pendingWasteReviews > 0 ? (
+				<a
+					className="inventory-panel flex min-h-16 items-center justify-between gap-4 px-4 py-3 transition hover:bg-[#fff8e8]"
+					href={href(params, {
+						view: "movement",
+						review: "pending",
+						page: "1",
+					})}
+				>
+					<span className="flex min-w-0 items-center gap-3">
+						<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#fff1c7] text-[#9a6200]">
+							<AlertTriangle aria-hidden="true" size={19} />
+						</span>
+						<span className="min-w-0">
+							<strong className="block text-sm text-[#182224]">
+								{data.pendingWasteReviews}{" "}
+								{data.pendingWasteReviews === 1
+									? "desperdicio requiere"
+									: "desperdicios requieren"}{" "}
+								revisión
+							</strong>
+							<span className="block text-xs leading-5 text-[#68746f]">
+								El stock ya fue actualizado; falta confirmar el seguimiento.
+							</span>
+						</span>
+					</span>
+					<span className="shrink-0 text-xs font-bold text-[#8a5700]">
+						Revisar
+					</span>
+				</a>
+			) : null}
+
 			<AutoFilterForm
 				action="/inventory"
-				className="inventory-panel grid gap-2 p-3 sm:p-4 md:grid-cols-[minmax(220px,1fr)_175px_195px]"
+				className="inventory-panel grid gap-2 p-3 sm:p-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_175px_195px_190px]"
 			>
 				<input name="view" type="hidden" value="movement" />
 				<label className="relative">
@@ -197,6 +260,19 @@ export function InventoryMovements({
 								{label}
 							</option>
 						))}
+					</select>
+				</label>
+				<label>
+					<span className="sr-only">Filtrar revisión de desperdicio</span>
+					<select
+						className={inventoryInputClass}
+						defaultValue={first(params.review) ?? ""}
+						name="review"
+					>
+						<option value="">Todo seguimiento</option>
+						<option value="pending">Por revisar</option>
+						<option value="reviewed">Revisados</option>
+						<option value="normal">Sin revisión requerida</option>
 					</select>
 				</label>
 				<label>
@@ -255,9 +331,18 @@ export function InventoryMovements({
 												{item.createdAtLabel}
 											</td>
 											<td>
-												<InventoryStatus tone={typeTone(item.type)}>
-													{typeLabel(item.type)}
-												</InventoryStatus>
+												<div className="flex flex-col items-start gap-1.5">
+													<InventoryStatus tone={typeTone(item.type)}>
+														{typeLabel(item.type)}
+													</InventoryStatus>
+													{item.type === "WASTE" && item.wasteReviewStatus ? (
+														<InventoryStatus
+															tone={wasteReviewTone(item.wasteReviewStatus)}
+														>
+															{wasteReviewLabel(item.wasteReviewStatus)}
+														</InventoryStatus>
+													) : null}
+												</div>
 											</td>
 											<td className="font-bold">
 												{item.material.name}
@@ -307,9 +392,18 @@ export function InventoryMovements({
 									key={item.id}
 								>
 									<div className="flex items-center justify-between gap-3">
-										<InventoryStatus tone={typeTone(item.type)}>
-											{typeLabel(item.type)}
-										</InventoryStatus>
+										<div className="flex flex-wrap gap-1.5">
+											<InventoryStatus tone={typeTone(item.type)}>
+												{typeLabel(item.type)}
+											</InventoryStatus>
+											{item.type === "WASTE" && item.wasteReviewStatus ? (
+												<InventoryStatus
+													tone={wasteReviewTone(item.wasteReviewStatus)}
+												>
+													{wasteReviewLabel(item.wasteReviewStatus)}
+												</InventoryStatus>
+											) : null}
+										</div>
 										<time className="text-xs text-[#68746f]">
 											{item.createdAtLabel}
 										</time>
@@ -359,7 +453,11 @@ export function InventoryMovements({
 				<MovementDialog data={data} onClose={() => setOpen(false)} />
 			) : null}
 			{selected ? (
-				<MovementDetail movement={selected} onClose={() => setSelected(null)} />
+				<MovementDetail
+					canReviewWaste={canReviewWaste}
+					movement={selected}
+					onClose={() => setSelected(null)}
+				/>
 			) : null}
 		</div>
 	);
@@ -396,10 +494,30 @@ function Pagination({ data, params }: { data: HistoryData; params: Params }) {
 function MovementDetail({
 	movement,
 	onClose,
+	canReviewWaste,
 }: {
 	movement: Movement;
 	onClose: () => void;
+	canReviewWaste: boolean;
 }) {
+	const reviewLabel = wasteReviewLabel(movement.wasteReviewStatus);
+	const validateReviewDecision = (event: FormEvent<HTMLFormElement>) => {
+		const submitter = (event.nativeEvent as SubmitEvent)
+			.submitter as HTMLButtonElement | null;
+		const notes = event.currentTarget.elements.namedItem(
+			"notes",
+		) as HTMLTextAreaElement | null;
+		if (!notes) return;
+
+		notes.setCustomValidity("");
+		if (submitter?.value === "NEEDS_ACTION" && notes.value.trim().length < 8) {
+			event.preventDefault();
+			notes.setCustomValidity(
+				"Explique la acción requerida con al menos 8 caracteres.",
+			);
+			notes.reportValidity();
+		}
+	};
 	return (
 		<div className="inventory-drawer-backdrop">
 			<button
@@ -420,9 +538,18 @@ function MovementDetail({
 					title={typeLabel(movement.type)}
 				/>
 				<div className="p-5">
-					<InventoryStatus tone={typeTone(movement.type)}>
-						{typeLabel(movement.type)}
-					</InventoryStatus>
+					<div className="flex flex-wrap gap-2">
+						<InventoryStatus tone={typeTone(movement.type)}>
+							{typeLabel(movement.type)}
+						</InventoryStatus>
+						{reviewLabel ? (
+							<InventoryStatus
+								tone={wasteReviewTone(movement.wasteReviewStatus)}
+							>
+								{reviewLabel}
+							</InventoryStatus>
+						) : null}
+					</div>
 					<dl className="mt-5 grid grid-cols-[7rem_1fr] gap-x-3 gap-y-4 text-sm">
 						<dt className="text-[#68746f]">Fecha</dt>
 						<dd>{movement.createdAtLabel}</dd>
@@ -474,7 +601,109 @@ function MovementDetail({
 						<dd>{movement.createdBy?.name ?? "Sin usuario"}</dd>
 						<dt className="text-[#68746f]">Notas</dt>
 						<dd>{movement.notes ?? "Sin notas"}</dd>
+						{movement.type === "WASTE" ? (
+							<>
+								<dt className="text-[#68746f]">Causa</dt>
+								<dd>
+									{movement.wasteReason
+										? wasteReasonLabels[movement.wasteReason]
+										: "Sin clasificar"}
+								</dd>
+								{movement.wasteReviewTriggers.length > 0 ? (
+									<>
+										<dt className="text-[#68746f]">Control</dt>
+										<dd className="space-y-1">
+											{movement.wasteReviewTriggers.map((trigger) => (
+												<span className="block" key={trigger}>
+													{wasteReviewTriggerLabels[
+														trigger as WasteReviewTrigger
+													] ?? trigger}
+												</span>
+											))}
+										</dd>
+									</>
+								) : null}
+								{movement.wasteReviewedBy ? (
+									<>
+										<dt className="text-[#68746f]">Revisó</dt>
+										<dd>
+											{movement.wasteReviewedBy.name}
+											{movement.wasteReviewedAt ? (
+												<small className="block text-[#68746f]">
+													{new Intl.DateTimeFormat("es-GT", {
+														dateStyle: "short",
+														timeStyle: "short",
+													}).format(new Date(movement.wasteReviewedAt))}
+												</small>
+											) : null}
+										</dd>
+									</>
+								) : null}
+								{movement.wasteReviewNotes ? (
+									<>
+										<dt className="text-[#68746f]">Seguimiento</dt>
+										<dd>{movement.wasteReviewNotes}</dd>
+									</>
+								) : null}
+							</>
+						) : null}
 					</dl>
+
+					{canReviewWaste &&
+					movement.type === "WASTE" &&
+					(movement.wasteReviewStatus === "PENDING" ||
+						movement.wasteReviewStatus === "NEEDS_ACTION") ? (
+						<form
+							action={reviewWasteMovementAction}
+							className="mt-6 grid gap-3 rounded-xl bg-[#f2f4f0] p-4"
+							onSubmit={validateReviewDecision}
+						>
+							<input name="movementId" type="hidden" value={movement.id} />
+							<div className="flex items-start gap-3">
+								<ShieldCheck
+									aria-hidden="true"
+									className="mt-0.5 shrink-0 text-[#1f7a57]"
+									size={19}
+								/>
+								<div>
+									<strong className="block text-sm">
+										Registrar seguimiento
+									</strong>
+									<p className="mt-1 text-xs leading-5 text-[#64706b]">
+										El inventario ya fue descontado. Esta decisión solo
+										documenta la revisión.
+									</p>
+								</div>
+							</div>
+							<textarea
+								className={inventoryTextareaClass}
+								maxLength={1000}
+								name="notes"
+								onInput={(event) => event.currentTarget.setCustomValidity("")}
+								placeholder="Observación o acción solicitada"
+							/>
+							<div className="grid gap-2 sm:grid-cols-2">
+								<button
+									className={inventorySecondaryButtonClass}
+									name="status"
+									type="submit"
+									value="NEEDS_ACTION"
+								>
+									<AlertTriangle aria-hidden="true" size={16} />
+									Solicitar acción
+								</button>
+								<button
+									className={inventoryPrimaryButtonClass}
+									name="status"
+									type="submit"
+									value="REVIEWED"
+								>
+									<CheckCircle2 aria-hidden="true" size={16} />
+									Marcar revisado
+								</button>
+							</div>
+						</form>
+					) : null}
 				</div>
 			</section>
 		</div>
@@ -526,9 +755,27 @@ function MovementDialog({
 }) {
 	const [type, setType] = useState("IN");
 	const [materialId, setMaterialId] = useState("");
+	const [quantity, setQuantity] = useState(0);
+	const [unitCost, setUnitCost] = useState(0);
+	const [wasteReason, setWasteReason] =
+		useState<WasteReasonValue>("CUTTING_SURPLUS");
+	const [requestWasteReview, setRequestWasteReview] = useState(false);
 	const selectedResource = data.materials.find(
 		(item) => item.id === materialId,
 	);
+	const effectiveUnitCost =
+		unitCost > 0 ? unitCost : (selectedResource?.unitCost ?? 0);
+	const hasWasteReviewPreview = Boolean(selectedResource && quantity > 0);
+	const wasteReviewTriggers =
+		type === "WASTE" && selectedResource && hasWasteReviewPreview
+			? evaluateWasteReview({
+					reason: wasteReason,
+					resourceType: selectedResource.resourceType,
+					totalCost: quantity * effectiveUnitCost,
+					reviewAmountThreshold: data.wasteReviewAmountThreshold,
+					requestedByUser: requestWasteReview,
+				})
+			: [];
 	const isAssignable =
 		type === "OUT" &&
 		selectedResource &&
@@ -675,6 +922,9 @@ function MovementDialog({
 									className={inventoryInputClass}
 									min="0.01"
 									name="quantity"
+									onChange={(event) =>
+										setQuantity(Number(event.target.value) || 0)
+									}
 									required
 									step="0.01"
 									type="number"
@@ -687,12 +937,101 @@ function MovementDialog({
 								className={inventoryInputClass}
 								min="0"
 								name="unitCost"
+								onChange={(event) =>
+									setUnitCost(Number(event.target.value) || 0)
+								}
 								step="0.01"
 								type="number"
 								defaultValue="0"
 							/>
 						</label>
 					</div>
+					{type === "WASTE" ? (
+						<div className="grid gap-4 rounded-xl bg-[#f5f1ed] p-4">
+							<label className="grid gap-1.5">
+								<span className={inventoryLabelClass}>
+									Causa del desperdicio
+								</span>
+								<select
+									className={inventoryInputClass}
+									name="wasteReason"
+									onChange={(event) =>
+										setWasteReason(event.target.value as WasteReasonValue)
+									}
+									required
+									value={wasteReason}
+								>
+									{wasteReasonValues.map((reason) => (
+										<option key={reason} value={reason}>
+											{wasteReasonLabels[reason]}
+										</option>
+									))}
+								</select>
+							</label>
+							<label className="flex min-h-11 items-start gap-3 rounded-xl bg-white px-3 py-2.5 text-sm text-[#263130]">
+								<input
+									checked={requestWasteReview}
+									className="mt-0.5 size-4 accent-[#c8202f]"
+									name="requestWasteReview"
+									onChange={(event) =>
+										setRequestWasteReview(event.target.checked)
+									}
+									type="checkbox"
+								/>
+								<span>
+									<strong className="block text-sm">Solicitar revisión</strong>
+									<span className="mt-0.5 block text-xs leading-5 text-[#65716c]">
+										Úsalo si el caso necesita seguimiento aunque no active una
+										regla automática.
+									</span>
+								</span>
+							</label>
+							<div
+								aria-live="polite"
+								className={`flex items-start gap-3 rounded-xl px-3 py-3 text-sm ${
+									!hasWasteReviewPreview
+										? "bg-[#eef1ef] text-[#52605b]"
+										: wasteReviewTriggers.length > 0
+											? "bg-[#fff1c7] text-[#704800]"
+											: "bg-[#eaf5ee] text-[#245d43]"
+								}`}
+							>
+								{!hasWasteReviewPreview ? (
+									<ShieldCheck
+										aria-hidden="true"
+										className="mt-0.5 shrink-0"
+										size={18}
+									/>
+								) : wasteReviewTriggers.length > 0 ? (
+									<AlertTriangle
+										aria-hidden="true"
+										className="mt-0.5 shrink-0"
+										size={18}
+									/>
+								) : (
+									<CheckCircle2
+										aria-hidden="true"
+										className="mt-0.5 shrink-0"
+										size={18}
+									/>
+								)}
+								<span>
+									<strong className="block">
+										{!hasWasteReviewPreview
+											? "Completa recurso y cantidad"
+											: wasteReviewTriggers.length > 0
+												? "Se enviará a revisión"
+												: "No requiere revisión"}
+									</strong>
+									<span className="mt-0.5 block text-xs leading-5">
+										{hasWasteReviewPreview
+											? "El stock se descontará inmediatamente al registrar el movimiento."
+											: "Con esos datos te indicaremos si necesita seguimiento."}
+									</span>
+								</span>
+							</div>
+						</div>
+					) : null}
 					<label className="grid gap-1.5">
 						<span className={inventoryLabelClass}>
 							Proyecto{" "}
@@ -715,6 +1054,7 @@ function MovementDialog({
 								<span className={inventoryLabelClass}>Responsable</span>
 								<input
 									className={inventoryInputClass}
+									maxLength={120}
 									name="responsibleName"
 									placeholder="Persona que recibe"
 									required
@@ -729,7 +1069,8 @@ function MovementDialog({
 								/>
 							</label>
 							<p className="text-xs leading-5 text-[#52615b] sm:col-span-2">
-								Esta salida se registrará como asignación al proyecto. La devolución debe ingresarse como “Devolución”.
+								Esta salida se registrará como asignación al proyecto. La
+								devolución debe ingresarse como “Devolución”.
 							</p>
 						</div>
 					) : null}
@@ -742,6 +1083,7 @@ function MovementDialog({
 						</span>
 						<input
 							className={inventoryInputClass}
+							maxLength={120}
 							name="reference"
 							placeholder="Factura, vale o documento"
 						/>
@@ -752,11 +1094,15 @@ function MovementDialog({
 						</span>
 						<textarea
 							className={inventoryTextareaClass}
+							maxLength={1000}
+							minLength={type === "WASTE" ? 8 : undefined}
 							name="notes"
 							required={destructive}
 							placeholder={
 								destructive
-									? "Explica el motivo del ajuste"
+									? type === "WASTE"
+										? "Describe brevemente qué ocurrió"
+										: "Explica el motivo del ajuste"
 									: "Información adicional"
 							}
 						/>

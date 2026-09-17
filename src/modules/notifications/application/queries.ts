@@ -22,6 +22,11 @@ export async function getSystemNotifications(
 	);
 	const purchaseProjectWhere = projectScopeWhere(user, "purchases");
 	const financeProjectWhere = projectScopeWhere(user, "finances");
+	const canSeeInventoryPortfolio = hasProjectScopePortfolioAccess(
+		user,
+		"inventory",
+	);
+	const inventoryProjectWhere = projectScopeWhere(user, "inventory");
 	const canSeeFinancePortfolio = hasProjectScopePortfolioAccess(
 		user,
 		"finances",
@@ -47,6 +52,7 @@ export async function getSystemNotifications(
 		overdueOrders,
 		receivedWithoutInvoice,
 		creditOrders,
+		pendingWasteReviews,
 	] = await Promise.all([
 		permissions.has("sitio.editar")
 			? prisma.websiteInquiry.count({ where: { status: "NEW" } })
@@ -177,6 +183,17 @@ export async function getSystemNotifications(
 					},
 				})
 			: Promise.resolve([]),
+		permissions.has("inventario.desperdicio.revisar")
+			? prisma.stockMovement.count({
+					where: {
+						type: "WASTE",
+						wasteReviewStatus: { in: ["PENDING", "NEEDS_ACTION"] },
+						...(!canSeeInventoryPortfolio
+							? { project: inventoryProjectWhere }
+							: {}),
+					},
+				})
+			: Promise.resolve(0),
 	]);
 	const lowStock = stockLevels.filter(
 		(stock) =>
@@ -297,6 +314,17 @@ export async function getSystemNotifications(
 		"/projects",
 		"Cronograma",
 		"Revisar cronogramas",
+	);
+	addAlert(
+		"waste-reviews",
+		pendingWasteReviews,
+		"Desperdicios por revisar",
+		pendingWasteReviews === 1
+			? "movimiento necesita seguimiento."
+			: "movimientos necesitan seguimiento.",
+		"/inventory?view=movement&review=pending" as Route,
+		"Inventario",
+		"Revisar desperdicios",
 	);
 	addAlert(
 		"low-stock",

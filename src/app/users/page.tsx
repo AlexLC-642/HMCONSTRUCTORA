@@ -55,6 +55,7 @@ const permissionLabels: Record<string, string> = {
 	"finanzas.registrar": "Registrar finanzas",
 	"finanzas.ver": "Ver finanzas",
 	"inventario.mover": "Mover inventario",
+	"inventario.desperdicio.revisar": "Revisar desperdicios",
 	"portal.gestionar": "Gestionar portal cliente",
 	"presupuesto.aprobar": "Aprobar presupuesto",
 	"presupuesto.editar": "Editar presupuesto",

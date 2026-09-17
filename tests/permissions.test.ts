@@ -11,6 +11,7 @@ describe("permissions", () => {
 		expect(permissionKeys).toContain("presupuesto.aprobar");
 		expect(permissionKeys).toContain("avance.publicar");
 		expect(permissionKeys).toContain("inventario.mover");
+		expect(permissionKeys).toContain("inventario.desperdicio.revisar");
 		expect(permissionKeys).toContain("finanzas.registrar");
 		expect(permissionKeys).toContain("compras.ver");
 		expect(permissionKeys).toContain("compras.gestionar");
@@ -30,6 +31,12 @@ describe("permissions", () => {
 		expect(rolePermissionPresets.contabilidad).toContain("finanzas.ver");
 		expect(rolePermissionPresets.contabilidad).toContain("finanzas.registrar");
 		expect(rolePermissionPresets.bodega).not.toContain("usuarios.gestionar");
+		expect(rolePermissionPresets.bodega).not.toContain(
+			"inventario.desperdicio.revisar",
+		);
+		expect(rolePermissionPresets.gerente_proyecto).toContain(
+			"inventario.desperdicio.revisar",
+		);
 		expect(rolePermissionPresets.compras).toContain("compras.gestionar");
 	});
 
