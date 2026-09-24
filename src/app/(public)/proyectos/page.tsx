@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { getPublicWebsiteContent } from "@/modules/website/application/queries";
 import {
 	websiteDefaults,
 	withDefault,
 } from "@/modules/website/domain/defaults";
+import { PublicArchitecturalBackdrop } from "@/modules/website/ui/public-architectural-backdrop";
+import { PublicHeroRail } from "@/modules/website/ui/public-hero-rail";
 import { PublicProjectGallery } from "@/modules/website/ui/public-project-gallery";
 
 export const metadata: Metadata = {
@@ -56,10 +57,10 @@ export default async function ProyectosPage() {
 	return (
 		<>
 			<section className="public-page-hero">
-				<div className="public-page-hero__background">
-					<Image alt="" fill sizes="100vw" src="/site/images/proyecto3.jpg" />
-				</div>
-				<div className="public-page-hero__overlay" />
+				<PublicArchitecturalBackdrop
+					position="center 58%"
+					src="/site/images/proyecto3.jpg"
+				/>
 				<div className="public-page-hero__inner">
 					<p className="public-eyebrow">
 						{withDefault(
@@ -80,6 +81,7 @@ export default async function ProyectosPage() {
 						)}
 					</p>
 				</div>
+				<PublicHeroRail />
 			</section>
 
 			<section className="public-projects-showcase">

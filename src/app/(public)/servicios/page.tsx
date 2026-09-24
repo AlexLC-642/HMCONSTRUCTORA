@@ -8,6 +8,8 @@ import {
 } from "@/modules/website/domain/defaults";
 import { resolveWebsiteServiceIcon } from "@/modules/website/domain/icon-registry";
 import { serviceCardPhoto } from "@/modules/website/domain/service-card-photos";
+import { PublicArchitecturalBackdrop } from "@/modules/website/ui/public-architectural-backdrop";
+import { PublicHeroRail } from "@/modules/website/ui/public-hero-rail";
 
 export const metadata: Metadata = {
 	title: "Servicios",
@@ -27,10 +29,10 @@ export default async function ServiciosPage() {
 	return (
 		<>
 			<section className="public-page-hero">
-				<div className="public-page-hero__background">
-					<Image alt="" fill sizes="100vw" src="/site/images/Rd1.png" />
-				</div>
-				<div className="public-page-hero__overlay" />
+				<PublicArchitecturalBackdrop
+					position="center 44%"
+					src="/site/images/Rd1.png"
+				/>
 				<div className="public-page-hero__inner">
 					<p className="public-eyebrow">
 						{withDefault(
@@ -45,6 +47,7 @@ export default async function ServiciosPage() {
 						)}
 					</h1>
 				</div>
+				<PublicHeroRail />
 			</section>
 
 			<section className="public-section">

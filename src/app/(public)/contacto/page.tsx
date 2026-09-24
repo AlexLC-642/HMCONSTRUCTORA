@@ -1,6 +1,5 @@
 import { Clock, Mail, MapPin, Phone } from "lucide-react";
 import type { Metadata } from "next";
-import Image from "next/image";
 import { submitWebsiteInquiryAction } from "@/modules/website/application/actions";
 import { getPublicWebsiteContent } from "@/modules/website/application/queries";
 import {
@@ -12,6 +11,8 @@ import {
 	websiteDefaults,
 	withDefault,
 } from "@/modules/website/domain/defaults";
+import { PublicArchitecturalBackdrop } from "@/modules/website/ui/public-architectural-backdrop";
+import { PublicHeroRail } from "@/modules/website/ui/public-hero-rail";
 import { FacebookIcon, InstagramIcon } from "@/modules/website/ui/social-icons";
 
 export const metadata: Metadata = {
@@ -85,10 +86,10 @@ export default async function ContactoPage({
 	return (
 		<>
 			<section className="public-page-hero">
-				<div className="public-page-hero__background">
-					<Image alt="" fill sizes="100vw" src="/site/images/Rd4.jpg" />
-				</div>
-				<div className="public-page-hero__overlay" />
+				<PublicArchitecturalBackdrop
+					position="center 60%"
+					src="/site/images/Rd4.jpg"
+				/>
 				<div className="public-page-hero__inner">
 					<p className="public-eyebrow">
 						{withDefault(
@@ -109,6 +110,7 @@ export default async function ContactoPage({
 						)}
 					</p>
 				</div>
+				<PublicHeroRail />
 			</section>
 
 			<section className="public-section public-contact" id="formulario">

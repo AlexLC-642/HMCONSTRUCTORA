@@ -8,6 +8,8 @@ import {
 } from "@/modules/website/domain/defaults";
 import { resolveWebsiteServiceIcon } from "@/modules/website/domain/icon-registry";
 import { serviceCardPhoto } from "@/modules/website/domain/service-card-photos";
+import { PublicArchitecturalBackdrop } from "@/modules/website/ui/public-architectural-backdrop";
+import { PublicHeroRail } from "@/modules/website/ui/public-hero-rail";
 
 export default async function PublicHomePage() {
 	const { settings, services, photos } = await getPublicWebsiteContent();
@@ -22,6 +24,10 @@ export default async function PublicHomePage() {
 	return (
 		<>
 			<section className="public-hero">
+				<PublicArchitecturalBackdrop
+					priority
+					src={settings?.heroImageUrl || "/assets/plates/hero-photo.png"}
+				/>
 				<div className="public-hero__inner">
 					<div className="public-hero__copy">
 						<p className="public-eyebrow">
@@ -57,22 +63,8 @@ export default async function PublicHomePage() {
 							</Link>
 						</div>
 					</div>
-					<div className="public-hero__media">
-						<div className="public-hero__media-frame">
-							<Image
-								alt="Obra de HM Constructora"
-								fill
-								priority
-								sizes="(min-width: 960px) 46vw, 92vw"
-								src={settings?.heroImageUrl || "/site/images/blog1.jpg"}
-							/>
-						</div>
-						<div className="public-hero__media-badge">
-							<Image alt="" height={26} src="/brand/logo.png" width={28} />
-							HM Constructora
-						</div>
-					</div>
 				</div>
+				<PublicHeroRail />
 			</section>
 
 			<section className="public-section" id="servicios">

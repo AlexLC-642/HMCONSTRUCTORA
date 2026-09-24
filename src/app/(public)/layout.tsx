@@ -11,6 +11,7 @@ import {
 	websiteDefaults,
 	withDefault,
 } from "@/modules/website/domain/defaults";
+import { PublicDesktopNav } from "@/modules/website/ui/public-desktop-nav";
 import { PublicMobileNav } from "@/modules/website/ui/public-mobile-nav";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -81,17 +82,11 @@ export default async function PublicLayout({
 							alt="HM Constructora"
 							height={80}
 							priority
-							src="/brand/logo.png"
+							src="/assets/plates/brand-logo.png"
 							width={87}
 						/>
 					</Link>
-					<nav aria-label="Navegación principal" className="public-nav__links">
-						{navLinks.map((link) => (
-							<Link href={link.href} key={link.href}>
-								{link.label}
-							</Link>
-						))}
-					</nav>
+					<PublicDesktopNav links={navLinks} />
 					<Link className="public-nav__cta" href="/contacto">
 						Solicitar cotización
 					</Link>
@@ -107,7 +102,7 @@ export default async function PublicLayout({
 						<Image
 							alt="HM Constructora"
 							height={44}
-							src="/brand/logo.png"
+							src="/assets/plates/brand-logo.png"
 							width={44}
 						/>
 						<p>
