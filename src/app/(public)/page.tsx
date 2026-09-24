@@ -67,7 +67,7 @@ export default async function PublicHomePage() {
 				<PublicHeroRail />
 			</section>
 
-			<section className="public-section" id="servicios">
+			<section className="public-section public-home-services" id="servicios">
 				<div className="public-section__heading">
 					<p className="public-eyebrow">
 						{withDefault(
@@ -117,7 +117,10 @@ export default async function PublicHomePage() {
 				</div>
 			</section>
 
-			<section className="public-section public-section--muted" id="nosotros">
+			<section
+				className="public-section public-section--muted public-about-section"
+				id="nosotros"
+			>
 				<div className="public-about">
 					<div className="public-about__media">
 						<Image
@@ -171,7 +174,10 @@ export default async function PublicHomePage() {
 			</section>
 
 			{featuredProject ? (
-				<section className="public-section" id="proyectos-destacados">
+				<section
+					className="public-section public-projects-featured"
+					id="proyectos-destacados"
+				>
 					<div className="public-projects-teaser">
 						<div className="public-projects-teaser__content">
 							<p className="public-eyebrow">Proyectos destacados</p>

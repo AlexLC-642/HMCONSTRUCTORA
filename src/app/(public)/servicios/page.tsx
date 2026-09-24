@@ -50,7 +50,7 @@ export default async function ServiciosPage() {
 				<PublicHeroRail />
 			</section>
 
-			<section className="public-section">
+			<section className="public-section public-services-catalog">
 				<div className="public-service-grid public-service-grid--full">
 					{services.map((service, index) => (
 						<div
