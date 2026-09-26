@@ -10,6 +10,7 @@ import {
 	Plus,
 	Trash2,
 } from "lucide-react";
+import Image from "next/image";
 import type { ReactNode } from "react";
 import { requirePermission } from "@/modules/auth/application/authorization";
 import {
@@ -24,6 +25,7 @@ import {
 } from "@/modules/website/application/actions";
 import { getWebsiteAdminWorkspace } from "@/modules/website/application/queries";
 import { resolveWebsiteCopy } from "@/modules/website/domain/defaults";
+import { serviceCardPhoto } from "@/modules/website/domain/service-card-photos";
 import {
 	websiteInquiryStatusLabels,
 	websiteInquiryStatusValues,
@@ -152,7 +154,13 @@ export default async function WebsitePage({
 						</span>
 						<a
 							className="website-public-link focus-ring inline-flex min-h-10 items-center gap-2 rounded-xl bg-white px-4 text-xs font-semibold text-[#172123] shadow-[0_10px_26px_rgba(0,0,0,0.18)] transition hover:bg-[#edf2ee]"
-							href="/"
+							href={
+								activeTab === "servicios"
+									? "/servicios"
+									: activeTab === "galeria"
+										? "/proyectos"
+										: "/"
+							}
 							target="_blank"
 							rel="noreferrer"
 						>
@@ -213,6 +221,11 @@ export default async function WebsitePage({
 
 			{activeTab === "inicio" ? (
 				<WebsiteSettingsEditor
+					content={{
+						settings,
+						services: services.filter((item) => item.active),
+						photos: photos.filter((item) => item.active),
+					}}
 					copy={publishedCopy}
 					heroImageUrl={settings.heroImageUrl ?? "/site/images/blog1.jpg"}
 					published={settings.published}
@@ -287,6 +300,16 @@ export default async function WebsitePage({
 									className="grid gap-2"
 								>
 									<input name="id" type="hidden" value={service.id} />
+									<Image
+										alt={`Foto del servicio ${service.title}`}
+										src={serviceCardPhoto(service.position)}
+										width={240}
+										height={135}
+										className="rounded-lg object-cover"
+									/>
+									<p className="text-xs text-[var(--muted)]">
+										Foto usada en Inicio y Servicios.
+									</p>
 									<div className="grid gap-2">
 										<input
 											className={inputClass}

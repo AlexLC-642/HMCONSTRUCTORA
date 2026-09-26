@@ -56,6 +56,7 @@ export function PublicProjectGallery({ albums }: { albums: ProjectAlbum[] }) {
 					>
 						<span className="public-gallery__media">
 							<Image
+								unoptimized
 								alt={item.photos[0]?.alt ?? item.title}
 								className="public-gallery__image"
 								fill
@@ -103,6 +104,7 @@ export function PublicProjectGallery({ albums }: { albums: ProjectAlbum[] }) {
 
 						<div className="public-lightbox__stage">
 							<Image
+								unoptimized
 								alt={album.photos[selectedPhoto]?.alt ?? album.title}
 								className="public-lightbox__image"
 								fill
@@ -158,7 +160,13 @@ export function PublicProjectGallery({ albums }: { albums: ProjectAlbum[] }) {
 										onClick={() => setSelectedPhoto(index)}
 										type="button"
 									>
-										<Image alt="" fill sizes="88px" src={photo.image} />
+										<Image
+											unoptimized
+											alt=""
+											fill
+											sizes="88px"
+											src={photo.image}
+										/>
 									</button>
 								))}
 							</nav>

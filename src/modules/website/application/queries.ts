@@ -1,21 +1,23 @@
+import { connection } from "next/server";
 import {
-  getWebsiteSettings,
-  listReusableProjectEvidence,
-  listWebsiteInquiries,
-  listWebsitePhotos,
-  listWebsiteServices
+	getWebsiteSettings,
+	listReusableProjectEvidence,
+	listWebsiteInquiries,
+	listWebsitePhotos,
+	listWebsiteServices,
 } from "./service";
 
 export async function getWebsiteAdminWorkspace() {
-  const [settings, services, photos, inquiries, reusableEvidence] = await Promise.all([
-    getWebsiteSettings(),
-    listWebsiteServices(),
-    listWebsitePhotos(),
-    listWebsiteInquiries(),
-    listReusableProjectEvidence()
-  ]);
+	const [settings, services, photos, inquiries, reusableEvidence] =
+		await Promise.all([
+			getWebsiteSettings(),
+			listWebsiteServices(),
+			listWebsitePhotos(),
+			listWebsiteInquiries(),
+			listReusableProjectEvidence(),
+		]);
 
-  return { settings, services, photos, inquiries, reusableEvidence };
+	return { settings, services, photos, inquiries, reusableEvidence };
 }
 
 // Read-only projection for the public site: only published settings and only
@@ -23,15 +25,19 @@ export async function getWebsiteAdminWorkspace() {
 // everything, including inactive/unpublished, so staff can review before
 // flipping the switch.
 export async function getPublicWebsiteContent() {
-  const [settings, services, photos] = await Promise.all([
-    getWebsiteSettings(),
-    listWebsiteServices(),
-    listWebsitePhotos()
-  ]);
+	// CMS content must come from the running environment, never from build time.
+	await connection();
+	const [settings, services, photos] = await Promise.all([
+		getWebsiteSettings(),
+		listWebsiteServices(),
+		listWebsitePhotos(),
+	]);
 
-  return {
-    settings: settings.published ? settings : null,
-    services: services.filter((service) => service.active),
-    photos: photos.filter((photo) => photo.active)
-  };
+	return {
+		settings: settings.published ? settings : null,
+		services: services.filter(
+			(service) => settings.published && service.active,
+		),
+		photos: photos.filter((photo) => settings.published && photo.active),
+	};
 }

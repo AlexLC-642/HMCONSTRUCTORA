@@ -137,7 +137,9 @@ export async function updateWebsiteSettings(
 
 	const updated = await prisma.websiteSettings.upsert({
 		where: { id: SETTINGS_ID },
-		update: { ...parsed },
+		update: Object.fromEntries(
+			Object.entries(parsed).map(([key, value]) => [key, value ?? null]),
+		),
 		create: { id: SETTINGS_ID, ...parsed },
 	});
 
@@ -261,7 +263,10 @@ export async function moveWebsiteService(id: string, direction: "up" | "down") {
 // ---------------------------------------------------------------------------
 
 export async function listWebsitePhotos() {
-	return prisma.websiteProjectPhoto.findMany({ orderBy: { position: "asc" } });
+	return prisma.websiteProjectPhoto.findMany({
+		omit: { imageData: true, imageMimeType: true },
+		orderBy: [{ position: "asc" }, { id: "asc" }],
+	});
 }
 
 // Only images (not videos/other) from daily-report evidence make sense as
@@ -304,7 +309,8 @@ export async function addWebsitePhotoFromUpload(
 			id: mediaId,
 			title: parsed.title,
 			imageUrl: stored.publicUrl,
-			storageKey: stored.storageKey,
+			imageData: stored.buffer,
+			imageMimeType: stored.mimeType,
 			altText: nullable(parsed.altText) ?? parsed.title,
 			position: (maxPosition._max.position ?? -1) + 1,
 		},

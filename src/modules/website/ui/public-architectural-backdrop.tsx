@@ -14,6 +14,7 @@ export function PublicArchitecturalBackdrop({
 	return (
 		<div aria-hidden="true" className="public-architecture">
 			<Image
+				unoptimized={src.startsWith("/api/website/photos/")}
 				alt=""
 				className="public-architecture__image"
 				fill

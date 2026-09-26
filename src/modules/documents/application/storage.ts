@@ -203,24 +203,18 @@ export async function storeWebsiteImageFile(
 ) {
 	assertUploadNotRateLimited(userId);
 
-	const { buffer, extension, mimeType, checksum } = await validateAndReadFile(
+	const { buffer, mimeType, checksum } = await validateAndReadFile(
 		file,
 		imageExtensionMime,
 		MAX_WEBSITE_IMAGE_SIZE,
 	);
-	const { fileName, storageKey, publicUrl } = await writeStoredFile(
-		`uploads/website/${mediaId}`,
-		buffer,
-		extension,
-	);
 
 	return {
 		checksum,
-		fileName,
+		buffer,
 		fileSize: file.size,
 		mimeType,
 		originalName: file.name,
-		publicUrl,
-		storageKey,
+		publicUrl: `/api/website/photos/${mediaId}`,
 	};
 }

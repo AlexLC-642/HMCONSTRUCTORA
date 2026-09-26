@@ -55,7 +55,14 @@ export const websiteSettingsInputSchema = z.object({
 	heroEyebrow: optionalText(120),
 	heroHeading: optionalText(200),
 	heroSubheading: optionalText(600),
-	heroImageUrl: optionalText(500),
+	heroImageUrl: optionalText(500).refine(
+		(value) =>
+			!value ||
+			(value.startsWith("/") &&
+				!value.startsWith("//") &&
+				!value.includes("\\")),
+		"Usa una ruta de imagen de este sitio que empiece con /.",
+	),
 	homeServicesEyebrow: optionalText(120),
 	homeServicesHeading: optionalText(240),
 	ctaHeading: optionalText(240),

@@ -3,15 +3,15 @@
 import { Menu, X } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePublicPathname } from "./public-preview-path";
 
 type NavLink = { href: Route; label: string };
 
 export function PublicMobileNav({ links }: { links: NavLink[] }) {
 	const [isOpen, setIsOpen] = useState(false);
-	const pathname = usePathname();
+	const pathname = usePublicPathname();
 	const dialogRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement>(null);
 

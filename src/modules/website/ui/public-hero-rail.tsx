@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePublicPathname } from "./public-preview-path";
 
 const destinations: Array<{ href: Route; label: string }> = [
 	{ href: "/", label: "Inicio" },
@@ -12,7 +12,7 @@ const destinations: Array<{ href: Route; label: string }> = [
 ];
 
 export function PublicHeroRail() {
-	const pathname = usePathname();
+	const pathname = usePublicPathname();
 
 	return (
 		<div className="public-hero-rail">

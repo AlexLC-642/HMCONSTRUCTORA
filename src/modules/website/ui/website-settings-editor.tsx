@@ -4,7 +4,6 @@ import {
 	Building2,
 	Check,
 	Contact,
-	Eye,
 	ImageIcon,
 	PanelsTopLeft,
 	Save,
@@ -14,8 +13,9 @@ import {
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { updateWebsiteSettingsAction } from "../application/actions";
-import { getSocialContact } from "../domain/contact-links";
 import type { WebsiteCopy } from "../domain/defaults";
+import type { PublicWebsiteContent } from "../domain/public-content";
+import { WebsitePagePreview } from "./website-page-preview";
 
 type SectionKey = "portada" | "nosotros" | "paginas" | "contacto" | "seo";
 type EditableCopy = WebsiteCopy & { heroImageUrl: string };
@@ -99,7 +99,9 @@ export function WebsiteSettingsEditor({
 	copy,
 	heroImageUrl,
 	published,
+	content,
 }: {
+	content: PublicWebsiteContent;
 	copy: WebsiteCopy;
 	heroImageUrl: string;
 	published: boolean;
@@ -164,7 +166,10 @@ export function WebsiteSettingsEditor({
 						<h2>
 							{sections.find((section) => section.key === activeSection)?.label}
 						</h2>
-						<p>El panel derecho refleja tus cambios antes de guardarlos.</p>
+						<p>
+							La vista previa usa las mismas páginas del sitio público. Los
+							cambios se publican al guardar.
+						</p>
 					</div>
 					<span
 						className={
@@ -215,7 +220,7 @@ export function WebsiteSettingsEditor({
 							</Field>
 							<Field
 								label="Imagen de portada"
-								hint="Usa una ruta del sitio o una URL pública de imagen."
+								hint="Usa una ruta de imagen del sitio, por ejemplo /site/images/Rd1.png."
 							>
 								<div className="website-editor-image-input">
 									<ImageIcon aria-hidden="true" size={17} />
@@ -554,88 +559,15 @@ export function WebsiteSettingsEditor({
 						</section>
 					</div>
 
-					<aside className="website-live-preview">
-						<div className="website-live-preview__bar">
-							<span>
-								<Eye aria-hidden="true" size={15} /> Vista previa
-							</span>
-							<small>Inicio</small>
-						</div>
-						{activeSection === "portada" ? (
-							<div className="website-live-preview__hero">
-								{/* biome-ignore lint/performance/noImgElement: live preview supports arbitrary editor URLs */}
-								<img
-									alt=""
-									src={values.heroImageUrl || "/site/images/blog1.jpg"}
-								/>
-								<span />
-								<div>
-									<small>{values.heroEyebrow}</small>
-									<h3>{values.heroHeading}</h3>
-									<p>{values.heroSubheading}</p>
-									<button type="button">Conoce nuestros proyectos</button>
-								</div>
-							</div>
-						) : null}
-						{activeSection === "nosotros" ? (
-							<div className="website-live-preview__about">
-								<small>Nosotros</small>
-								<h3>{values.aboutHeading}</h3>
-								<p>{values.aboutText}</p>
-								<div>
-									<article>
-										<strong>Misión</strong>
-										<p>{values.missionText}</p>
-									</article>
-									<article>
-										<strong>Visión</strong>
-										<p>{values.visionText}</p>
-									</article>
-								</div>
-							</div>
-						) : null}
-						{activeSection === "contacto" ? (
-							<div className="website-live-preview__contact">
-								<small>{values.contactEyebrow}</small>
-								<h3>{values.contactHeading}</h3>
-								<p>{values.contactSubheading}</p>
-								<ul>
-									<li>{values.phonePrimary}</li>
-									<li>{values.email}</li>
-									<li>{values.address}</li>
-									<li>{values.hoursWeekdays}</li>
-									<li>
-										{getSocialContact("facebook", values.facebookUrl)?.label}
-									</li>
-									<li>
-										{getSocialContact("instagram", values.instagramUrl)?.label}
-									</li>
-								</ul>
-							</div>
-						) : null}
-						{activeSection === "paginas" ? (
-							<div className="website-live-preview__pages">
-								<small>{values.projectsEyebrow}</small>
-								<h3>{values.projectsHeading}</h3>
-								<p>{values.projectsSubheading}</p>
-								<div>
-									<span>{values.servicesEyebrow}</span>
-									<strong>{values.servicesHeading}</strong>
-								</div>
-								<footer>
-									<strong>{values.ctaHeading}</strong>
-									<p>{values.ctaText}</p>
-								</footer>
-							</div>
-						) : null}
-						{activeSection === "seo" ? (
-							<div className="website-live-preview__seo">
-								<Search aria-hidden="true" size={28} />
-								<strong>Así podrá encontrarte un cliente</strong>
-								<p>La vista de Google se actualiza mientras escribes.</p>
-							</div>
-						) : null}
-					</aside>
+					<WebsitePagePreview
+						content={{
+							...content,
+							settings: content.settings
+								? { ...content.settings, ...values }
+								: null,
+						}}
+						section={activeSection}
+					/>
 				</div>
 
 				<footer className="website-editor-footer">

@@ -1215,6 +1215,8 @@ model WebsiteProjectPhoto {
   title                    String
   imageUrl                 String
   storageKey               String?
+  imageData                Bytes?            @db.LongBlob
+  imageMimeType            String?
   altText                  String?
   position                 Int               @default(0)
   active                   Boolean           @default(true)

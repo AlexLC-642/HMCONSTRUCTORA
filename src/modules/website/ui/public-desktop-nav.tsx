@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePublicPathname } from "./public-preview-path";
 
 type NavLink = { href: Route; label: string };
 
@@ -11,7 +11,7 @@ function isCurrent(pathname: string, href: Route) {
 }
 
 export function PublicDesktopNav({ links }: { links: NavLink[] }) {
-	const pathname = usePathname();
+	const pathname = usePublicPathname();
 
 	return (
 		<nav aria-label="Navegación principal" className="public-nav__links">

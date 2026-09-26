@@ -1,0 +1,230 @@
+import { Clock, Mail, MapPin, Phone } from "lucide-react";
+import { submitWebsiteInquiryAction } from "@/modules/website/application/actions";
+import {
+	getGmailComposeLink,
+	getSocialContact,
+	getWhatsAppLink,
+} from "@/modules/website/domain/contact-links";
+import {
+	websiteDefaults,
+	withDefault,
+} from "@/modules/website/domain/defaults";
+import { PublicArchitecturalBackdrop } from "@/modules/website/ui/public-architectural-backdrop";
+import { PublicHeroRail } from "@/modules/website/ui/public-hero-rail";
+import { FacebookIcon, InstagramIcon } from "@/modules/website/ui/social-icons";
+import type { PublicWebsiteContent } from "../domain/public-content";
+
+const outcomeMessages: Record<
+	string,
+	{ tone: "success" | "error"; text: string }
+> = {
+	ok: {
+		tone: "success",
+		text: "¡Gracias! Recibimos tu solicitud y te contactaremos pronto.",
+	},
+	validation: {
+		tone: "error",
+		text: "Revisa los datos del formulario e intenta de nuevo.",
+	},
+	rate_limit: {
+		tone: "error",
+		text: "Has enviado demasiadas solicitudes. Intenta de nuevo más tarde.",
+	},
+	server: {
+		tone: "error",
+		text: "No pudimos enviar tu solicitud. Intenta de nuevo en unos minutos.",
+	},
+};
+
+export function PublicContactContent({
+	settings,
+	outcomeKey,
+}: PublicWebsiteContent & { outcomeKey?: string }) {
+	const outcome = outcomeKey ? outcomeMessages[outcomeKey] : undefined;
+	const phonePrimary = withDefault(
+		settings?.phonePrimary,
+		websiteDefaults.phonePrimary,
+	);
+	const phoneSecondary = withDefault(
+		settings?.phoneSecondary,
+		websiteDefaults.phoneSecondary,
+	);
+	const email = withDefault(settings?.email, websiteDefaults.email);
+	const address = withDefault(settings?.address, websiteDefaults.address);
+	const hoursWeekdays = withDefault(
+		settings?.hoursWeekdays,
+		websiteDefaults.hoursWeekdays,
+	);
+	const hoursSaturday = withDefault(
+		settings?.hoursSaturday,
+		websiteDefaults.hoursSaturday,
+	);
+	const facebookUrl = withDefault(
+		settings?.facebookUrl,
+		websiteDefaults.facebookUrl,
+	);
+	const instagramUrl = withDefault(
+		settings?.instagramUrl,
+		websiteDefaults.instagramUrl,
+	);
+	const primaryWhatsApp = getWhatsAppLink(phonePrimary);
+	const secondaryWhatsApp = getWhatsAppLink(phoneSecondary);
+	const gmailCompose = getGmailComposeLink(email);
+	const facebook = getSocialContact("facebook", facebookUrl);
+	const instagram = getSocialContact("instagram", instagramUrl);
+
+	return (
+		<>
+			<section className="public-page-hero">
+				<PublicArchitecturalBackdrop
+					position="center 60%"
+					src="/site/images/Rd4.jpg"
+				/>
+				<div className="public-page-hero__inner">
+					<p className="public-eyebrow">
+						{withDefault(
+							settings?.contactEyebrow,
+							websiteDefaults.contactEyebrow,
+						)}
+					</p>
+					<h1>
+						{withDefault(
+							settings?.contactHeading,
+							websiteDefaults.contactHeading,
+						)}
+					</h1>
+					<p className="public-page-hero__lede">
+						{withDefault(
+							settings?.contactSubheading,
+							websiteDefaults.contactSubheading,
+						)}
+					</p>
+				</div>
+				<PublicHeroRail />
+			</section>
+
+			<section className="public-section public-contact" id="formulario">
+				<div className="public-contact__info">
+					<div className="public-contact__item">
+						<Phone aria-hidden="true" size={18} />
+						<div>
+							{primaryWhatsApp ? (
+								<a
+									aria-label={`Escribir por WhatsApp al ${phonePrimary}`}
+									href={primaryWhatsApp}
+									rel="noreferrer"
+									target="_blank"
+								>
+									{phonePrimary}
+								</a>
+							) : null}
+							{secondaryWhatsApp ? (
+								<a
+									aria-label={`Escribir por WhatsApp al ${phoneSecondary}`}
+									href={secondaryWhatsApp}
+									rel="noreferrer"
+									target="_blank"
+								>
+									{phoneSecondary}
+								</a>
+							) : null}
+						</div>
+					</div>
+					<div className="public-contact__item">
+						<Mail aria-hidden="true" size={18} />
+						{gmailCompose ? (
+							<a
+								aria-label={`Redactar correo para ${email} en Gmail`}
+								href={gmailCompose}
+								rel="noreferrer"
+								target="_blank"
+							>
+								{email}
+							</a>
+						) : null}
+					</div>
+					<div className="public-contact__item">
+						<MapPin aria-hidden="true" size={18} />
+						<span>{address}</span>
+					</div>
+					<div className="public-contact__item">
+						<Clock aria-hidden="true" size={18} />
+						<div>
+							<span>{hoursWeekdays}</span>
+							<span>{hoursSaturday}</span>
+						</div>
+					</div>
+					<div className="public-contact__item">
+						<FacebookIcon size={18} />
+						{facebook?.href ? (
+							<a href={facebook.href} rel="noreferrer" target="_blank">
+								{facebook.label}
+							</a>
+						) : (
+							<span>{facebook?.label}</span>
+						)}
+					</div>
+					<div className="public-contact__item">
+						<InstagramIcon size={18} />
+						{instagram?.href ? (
+							<a href={instagram.href} rel="noreferrer" target="_blank">
+								{instagram.label}
+							</a>
+						) : (
+							<span>{instagram?.label}</span>
+						)}
+					</div>
+				</div>
+
+				<form
+					action={submitWebsiteInquiryAction}
+					className="public-contact__form"
+				>
+					<input name="startedAt" type="hidden" value={Date.now()} />
+					<div aria-hidden="true" className="public-honeypot">
+						<label htmlFor="website">No llenar este campo</label>
+						<input
+							autoComplete="off"
+							id="website"
+							name="website"
+							tabIndex={-1}
+							type="text"
+						/>
+					</div>
+
+					{outcome ? (
+						<p
+							className={`public-form-message public-form-message--${outcome.tone}`}
+							role="status"
+						>
+							{outcome.text}
+						</p>
+					) : null}
+
+					<label className="public-field">
+						<span>Nombre y apellido</span>
+						<input name="name" required type="text" />
+					</label>
+					<label className="public-field">
+						<span>Teléfono</span>
+						<input name="phone" required type="tel" />
+					</label>
+					<label className="public-field">
+						<span>Correo electrónico</span>
+						<input name="email" required type="email" />
+					</label>
+					<label className="public-field">
+						<span>Mensaje</span>
+						<textarea name="message" required rows={5} />
+					</label>
+					<button
+						className="public-button public-button--primary"
+						type="submit"
+					>
+						Enviar mensaje
+					</button>
+				</form>
+			</section>
+		</>
+	);
+}

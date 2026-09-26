@@ -1,0 +1,1 @@
+ALTER TABLE `WebsiteProjectPhoto` ADD COLUMN `imageData` LONGBLOB NULL, ADD COLUMN `imageMimeType` VARCHAR(191) NULL;
