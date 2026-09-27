@@ -25,7 +25,13 @@ import {
 	requireAuthenticatedUser,
 } from "@/modules/auth/application/authorization";
 import { COMPANY_EMAIL_DOMAIN } from "@/modules/auth/domain/email-domain";
+import {
+	PASSWORD_HTML_PATTERN,
+	PASSWORD_MIN_LENGTH,
+	PASSWORD_POLICY_HINT,
+} from "@/modules/auth/domain/password-policy";
 import { DevicePasskeyMark } from "@/modules/auth/ui/device-passkey-mark";
+import { PasswordRequirements } from "@/modules/auth/ui/password-requirements";
 import {
 	changeOwnPasswordAction,
 	createInternalUserAction,
@@ -327,13 +333,17 @@ export default async function UsersPage() {
 										<input
 											autoComplete="new-password"
 											className="min-w-0 flex-1 px-3 text-base outline-none placeholder:text-[#7c8681]"
+											id="new-user-password"
 											name="password"
 											required
-											minLength={10}
+											minLength={PASSWORD_MIN_LENGTH}
+											pattern={PASSWORD_HTML_PATTERN}
 											placeholder="Mínimo 10 caracteres"
+											title={PASSWORD_POLICY_HINT}
 											type="password"
 										/>
 									</div>
+									<PasswordRequirements inputId="new-user-password" />
 								</label>
 								<div className="flex items-center justify-between gap-4 border-t border-[#d9ddd7] pt-4">
 									<p className="max-w-56 text-xs leading-5 text-[#65706b]">
@@ -778,7 +788,7 @@ export default async function UsersPage() {
 																</div>
 																<form
 																	action={resetAction}
-																	className="grid gap-3 sm:grid-cols-[1fr_auto]"
+																	className="grid items-start gap-3 sm:grid-cols-[1fr_auto]"
 																>
 																	<label className="grid gap-1.5">
 																		<span className="sr-only">
@@ -787,11 +797,17 @@ export default async function UsersPage() {
 																		<input
 																			autoComplete="new-password"
 																			className={fieldClass}
+																			id={`reset-password-${internalUser.id}`}
 																			name="password"
-																			minLength={10}
+																			minLength={PASSWORD_MIN_LENGTH}
+																			pattern={PASSWORD_HTML_PATTERN}
 																			required
-																			placeholder="Nueva contraseña (mínimo 10 caracteres)"
+																			placeholder="Nueva contraseña segura"
+																			title={PASSWORD_POLICY_HINT}
 																			type="password"
+																		/>
+																		<PasswordRequirements
+																			inputId={`reset-password-${internalUser.id}`}
 																		/>
 																	</label>
 																	<button
