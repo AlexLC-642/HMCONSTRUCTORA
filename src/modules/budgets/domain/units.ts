@@ -9,12 +9,22 @@ export const laborUnitOptions = [
 
 export const generalUnitOptions = [
 	{ value: "unidad", label: "Unidad" },
+	{ value: "accesorio", label: "Accesorio" },
+	{ value: "docena", label: "Docena" },
 	{ value: "m", label: "Metro lineal (m)" },
+	{ value: "pie tablar", label: "Pie tablar" },
 	{ value: "m²", label: "Metro cuadrado (m²)" },
 	{ value: "m³", label: "Metro cúbico (m³)" },
+	{ value: "hoja", label: "Hoja" },
+	{ value: "plancha", label: "Plancha" },
+	{ value: "rollo", label: "Rollo" },
+	{ value: "lb", label: "Libra (lb)" },
 	{ value: "kg", label: "Kilogramo (kg)" },
+	{ value: "quintal", label: "Quintal" },
 	{ value: "saco", label: "Saco" },
+	{ value: "litro", label: "Litro" },
 	{ value: "galón", label: "Galón" },
+	{ value: "bote", label: "Bote" },
 	{ value: "lote", label: "Lote" },
 	{ value: "global", label: "Global" },
 ] as const;
