@@ -10,7 +10,8 @@
 
 /* ---------- Tokens ---------- */
 .hm-experience,
-.hm-mnav {
+.hm-mnav,
+.hm-lightbox {
 	--hm-ink: #0d0c0b;
 	--hm-ink-2: #141210;
 	--hm-panel: #1c1a17;
@@ -70,7 +71,8 @@
 	text-decoration: none;
 }
 .hm-experience :is(a, button, input, textarea, [tabindex]):focus-visible,
-.hm-mnav :is(a, button):focus-visible {
+.hm-mnav :is(a, button):focus-visible,
+.hm-lightbox button:focus-visible {
 	outline: 2px solid var(--hm-red-soft);
 	outline-offset: 4px;
 }
@@ -1386,6 +1388,29 @@ html:has(.hm-experience) {
 	backdrop-filter: blur(10px);
 	-webkit-backdrop-filter: blur(10px);
 	animation: hm-fade 280ms ease both;
+}
+.hm-lightbox {
+	font-family: var(--hm-body);
+}
+.hm-lightbox :is(h2, p) {
+	margin: 0;
+}
+.hm-lightbox h2 {
+	color: var(--hm-text);
+	font-family: var(--hm-display);
+	font-weight: 600;
+	letter-spacing: -0.012em;
+}
+/* The close control is the most important button here: larger, and it
+   turns HM red on hover so it is unmistakable. */
+.hm-lightbox__close {
+	width: 3.4rem;
+	height: 3.4rem;
+}
+.hm-lightbox__close:hover {
+	border-color: var(--hm-red);
+	background: var(--hm-red);
+	color: #fff;
 }
 .hm-lightbox__header {
 	display: flex;

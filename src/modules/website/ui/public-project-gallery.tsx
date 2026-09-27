@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { publicFontVariables } from "./public-fonts";
 
 type GalleryPhoto = { id: string; image: string; alt: string };
 type ProjectAlbum = { id: string; title: string; photos: GalleryPhoto[] };
@@ -24,6 +26,7 @@ export function PublicProjectGallery({ albums }: { albums: ProjectAlbum[] }) {
 	const dialogRef = useRef<HTMLDivElement>(null);
 	const triggerRef = useRef<HTMLButtonElement | null>(null);
 	const closeButtonRef = useRef<HTMLButtonElement>(null);
+	const mosaicRef = useRef<HTMLDivElement>(null);
 	const normalizedQuery = normalize(query);
 	const filteredAlbums = albums
 		.map((item, index) => ({ item, index }))
@@ -103,7 +106,7 @@ export function PublicProjectGallery({ albums }: { albums: ProjectAlbum[] }) {
 					No hay obras con ese nombre. Prueba otra búsqueda.
 				</p>
 			) : null}
-			<div className="hm-mosaic">
+			<div className="hm-mosaic" ref={mosaicRef}>
 				{filteredAlbums.map(({ item, index }, position) => (
 					<button
 						aria-label={`Abrir galería de ${item.title}, ${item.photos.length} ${item.photos.length === 1 ? "foto" : "fotos"}`}
@@ -146,103 +149,110 @@ export function PublicProjectGallery({ albums }: { albums: ProjectAlbum[] }) {
 				))}
 			</div>
 
-			{album && current ? (
-				<div
-					aria-label={`Galería de ${album.title}`}
-					aria-modal="true"
-					className="hm-lightbox"
-					onMouseDown={(event) => {
-						if (event.currentTarget === event.target) setSelectedAlbum(null);
-					}}
-					ref={dialogRef}
-					role="dialog"
-				>
-					<header className="hm-lightbox__header">
-						<div>
-							<h2>{album.title}</h2>
-							<p>
-								{selectedPhoto + 1} de {album.photos.length}
-							</p>
-						</div>
-						<button
-							aria-label="Cerrar galería"
-							className="hm-round-btn"
-							onClick={() => setSelectedAlbum(null)}
-							ref={closeButtonRef}
-							type="button"
+			{/* Portalled to <body>: inside the page the section's own stacking
+			    context kept the viewer under the fixed nav, hiding its close button. */}
+			{album && current
+				? createPortal(
+						<div
+							aria-label={`Galería de ${album.title}`}
+							aria-modal="true"
+							className={`hm-lightbox ${publicFontVariables}`}
+							onMouseDown={(event) => {
+								if (event.currentTarget === event.target)
+									setSelectedAlbum(null);
+							}}
+							ref={dialogRef}
+							role="dialog"
 						>
-							<X aria-hidden="true" size={20} />
-						</button>
-					</header>
+							<header className="hm-lightbox__header">
+								<div>
+									<h2>{album.title}</h2>
+									<p>
+										{selectedPhoto + 1} de {album.photos.length}
+									</p>
+								</div>
+								<button
+									aria-label="Cerrar galería"
+									className="hm-round-btn hm-lightbox__close"
+									onClick={() => setSelectedAlbum(null)}
+									ref={closeButtonRef}
+									type="button"
+								>
+									<X aria-hidden="true" size={24} />
+								</button>
+							</header>
 
-					<div className="hm-lightbox__stage">
-						<Image
-							alt={current.alt}
-							className="hm-lightbox__image"
-							fill
-							key={current.id}
-							priority
-							sizes="95vw"
-							src={current.image}
-							unoptimized
-						/>
-						{album.photos.length > 1 ? (
-							<>
-								<button
-									aria-label="Foto anterior"
-									className="hm-round-btn hm-lightbox__arrow hm-lightbox__arrow--prev"
-									onClick={() =>
-										setSelectedPhoto(
-											(value) =>
-												(value - 1 + album.photos.length) % album.photos.length,
-										)
-									}
-									type="button"
-								>
-									<ChevronLeft aria-hidden="true" size={24} />
-								</button>
-								<button
-									aria-label="Foto siguiente"
-									className="hm-round-btn hm-lightbox__arrow hm-lightbox__arrow--next"
-									onClick={() =>
-										setSelectedPhoto(
-											(value) => (value + 1) % album.photos.length,
-										)
-									}
-									type="button"
-								>
-									<ChevronRight aria-hidden="true" size={24} />
-								</button>
-							</>
-						) : null}
-					</div>
+							<div className="hm-lightbox__stage">
+								<Image
+									alt={current.alt}
+									className="hm-lightbox__image"
+									fill
+									key={current.id}
+									priority
+									sizes="95vw"
+									src={current.image}
+									unoptimized
+								/>
+								{album.photos.length > 1 ? (
+									<>
+										<button
+											aria-label="Foto anterior"
+											className="hm-round-btn hm-lightbox__arrow hm-lightbox__arrow--prev"
+											onClick={() =>
+												setSelectedPhoto(
+													(value) =>
+														(value - 1 + album.photos.length) %
+														album.photos.length,
+												)
+											}
+											type="button"
+										>
+											<ChevronLeft aria-hidden="true" size={24} />
+										</button>
+										<button
+											aria-label="Foto siguiente"
+											className="hm-round-btn hm-lightbox__arrow hm-lightbox__arrow--next"
+											onClick={() =>
+												setSelectedPhoto(
+													(value) => (value + 1) % album.photos.length,
+												)
+											}
+											type="button"
+										>
+											<ChevronRight aria-hidden="true" size={24} />
+										</button>
+									</>
+								) : null}
+							</div>
 
-					{album.photos.length > 1 ? (
-						<nav
-							aria-label="Fotos del proyecto"
-							className="hm-lightbox__thumbs"
-						>
-							{album.photos.map((photo, index) => (
-								<button
-									aria-label={`Ver foto ${index + 1}`}
-									aria-pressed={selectedPhoto === index}
-									key={photo.id}
-									onClick={() => setSelectedPhoto(index)}
-									type="button"
+							{album.photos.length > 1 ? (
+								<nav
+									aria-label="Fotos del proyecto"
+									className="hm-lightbox__thumbs"
 								>
-									<Image
-										alt=""
-										fill
-										sizes="96px"
-										src={photo.image}
-										unoptimized
-									/>
-								</button>
-							))}
-						</nav>
-					) : null}
-				</div>
-			) : null}
+									{album.photos.map((photo, index) => (
+										<button
+											aria-label={`Ver foto ${index + 1}`}
+											aria-pressed={selectedPhoto === index}
+											key={photo.id}
+											onClick={() => setSelectedPhoto(index)}
+											type="button"
+										>
+											<Image
+												alt=""
+												fill
+												sizes="96px"
+												src={photo.image}
+												unoptimized
+											/>
+										</button>
+									))}
+								</nav>
+							) : null}
+						</div>,
+						mosaicRef.current?.ownerDocument.body ?? document.body,
+					)
+				: null}
 		</>
 	);
 }
