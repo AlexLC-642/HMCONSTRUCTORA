@@ -1,4 +1,4 @@
-import { Clock, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowUpRight, Clock, Mail, MapPin, MessageCircle } from "lucide-react";
 import { submitWebsiteInquiryAction } from "@/modules/website/application/actions";
 import {
 	getGmailComposeLink,
@@ -9,10 +9,10 @@ import {
 	websiteDefaults,
 	withDefault,
 } from "@/modules/website/domain/defaults";
-import { PublicArchitecturalBackdrop } from "@/modules/website/ui/public-architectural-backdrop";
-import { PublicHeroRail } from "@/modules/website/ui/public-hero-rail";
 import { FacebookIcon, InstagramIcon } from "@/modules/website/ui/social-icons";
 import type { PublicWebsiteContent } from "../domain/public-content";
+import { PublicInquirySubmit } from "./public-inquiry-submit";
+import { PublicPageHero } from "./public-page-hero";
 
 const outcomeMessages: Record<
 	string,
@@ -35,6 +35,8 @@ const outcomeMessages: Record<
 		text: "No pudimos enviar tu solicitud. Intenta de nuevo en unos minutos.",
 	},
 };
+
+const delay = (d: number) => ({ "--d": d }) as React.CSSProperties;
 
 export function PublicContactContent({
 	settings,
@@ -59,171 +61,239 @@ export function PublicContactContent({
 		settings?.hoursSaturday,
 		websiteDefaults.hoursSaturday,
 	);
-	const facebookUrl = withDefault(
-		settings?.facebookUrl,
-		websiteDefaults.facebookUrl,
-	);
-	const instagramUrl = withDefault(
-		settings?.instagramUrl,
-		websiteDefaults.instagramUrl,
-	);
 	const primaryWhatsApp = getWhatsAppLink(phonePrimary);
 	const secondaryWhatsApp = getWhatsAppLink(phoneSecondary);
 	const gmailCompose = getGmailComposeLink(email);
-	const facebook = getSocialContact("facebook", facebookUrl);
-	const instagram = getSocialContact("instagram", instagramUrl);
+	const socials = [
+		{
+			Icon: FacebookIcon,
+			contact: getSocialContact(
+				"facebook",
+				withDefault(settings?.facebookUrl, websiteDefaults.facebookUrl),
+			),
+		},
+		{
+			Icon: InstagramIcon,
+			contact: getSocialContact(
+				"instagram",
+				withDefault(settings?.instagramUrl, websiteDefaults.instagramUrl),
+			),
+		},
+	];
+	const mapHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 
 	return (
 		<>
-			<section className="public-page-hero">
-				<PublicArchitecturalBackdrop
-					position="center 60%"
-					src="/site/images/Rd4.jpg"
-				/>
-				<div className="public-page-hero__inner">
-					<p className="public-eyebrow">
-						{withDefault(
-							settings?.contactEyebrow,
-							websiteDefaults.contactEyebrow,
-						)}
-					</p>
-					<h1>
-						{withDefault(
-							settings?.contactHeading,
-							websiteDefaults.contactHeading,
-						)}
-					</h1>
-					<p className="public-page-hero__lede">
-						{withDefault(
-							settings?.contactSubheading,
-							websiteDefaults.contactSubheading,
-						)}
-					</p>
-				</div>
-				<PublicHeroRail />
-			</section>
+			<PublicPageHero
+				eyebrow={withDefault(
+					settings?.contactEyebrow,
+					websiteDefaults.contactEyebrow,
+				)}
+				image="/site/images/Rd4.jpg"
+				imagePosition="center 60%"
+				lede={withDefault(
+					settings?.contactSubheading,
+					websiteDefaults.contactSubheading,
+				)}
+				next={{ href: "#formulario", label: "Escríbenos" }}
+				title={withDefault(
+					settings?.contactHeading,
+					websiteDefaults.contactHeading,
+				)}
+			/>
 
-			<section className="public-section public-contact" id="formulario">
-				<div className="public-contact__info">
-					<div className="public-contact__item">
-						<Phone aria-hidden="true" size={18} />
-						<div>
-							{primaryWhatsApp ? (
-								<a
-									aria-label={`Escribir por WhatsApp al ${phonePrimary}`}
-									href={primaryWhatsApp}
-									rel="noreferrer"
-									target="_blank"
-								>
-									{phonePrimary}
-								</a>
-							) : null}
-							{secondaryWhatsApp ? (
-								<a
-									aria-label={`Escribir por WhatsApp al ${phoneSecondary}`}
-									href={secondaryWhatsApp}
-									rel="noreferrer"
-									target="_blank"
-								>
-									{phoneSecondary}
-								</a>
-							) : null}
-						</div>
-					</div>
-					<div className="public-contact__item">
-						<Mail aria-hidden="true" size={18} />
-						{gmailCompose ? (
-							<a
-								aria-label={`Redactar correo para ${email} en Gmail`}
-								href={gmailCompose}
-								rel="noreferrer"
-								target="_blank"
-							>
-								{email}
-							</a>
-						) : null}
-					</div>
-					<div className="public-contact__item">
-						<MapPin aria-hidden="true" size={18} />
-						<span>{address}</span>
-					</div>
-					<div className="public-contact__item">
-						<Clock aria-hidden="true" size={18} />
-						<div>
-							<span>{hoursWeekdays}</span>
-							<span>{hoursSaturday}</span>
-						</div>
-					</div>
-					<div className="public-contact__item">
-						<FacebookIcon size={18} />
-						{facebook?.href ? (
-							<a href={facebook.href} rel="noreferrer" target="_blank">
-								{facebook.label}
-							</a>
-						) : (
-							<span>{facebook?.label}</span>
-						)}
-					</div>
-					<div className="public-contact__item">
-						<InstagramIcon size={18} />
-						{instagram?.href ? (
-							<a href={instagram.href} rel="noreferrer" target="_blank">
-								{instagram.label}
-							</a>
-						) : (
-							<span>{instagram?.label}</span>
-						)}
-					</div>
-				</div>
-
-				<form
-					action={submitWebsiteInquiryAction}
-					className="public-contact__form"
-				>
-					<input name="startedAt" type="hidden" value={Date.now()} />
-					<div aria-hidden="true" className="public-honeypot">
-						<label htmlFor="website">No llenar este campo</label>
-						<input
-							autoComplete="off"
-							id="website"
-							name="website"
-							tabIndex={-1}
-							type="text"
-						/>
-					</div>
-
-					{outcome ? (
-						<p
-							className={`public-form-message public-form-message--${outcome.tone}`}
-							role="status"
-						>
-							{outcome.text}
+			<section className="hm-section hm-section--lit" id="formulario">
+				<div className="hm-wrap hm-contact">
+					<div className="hm-contact__info">
+						<h2 data-reveal="up">Conversemos.</h2>
+						<p className="hm-contact__intro" data-reveal="up" style={delay(1)}>
+							El primer paso de tu proyecto empieza aquí.
 						</p>
-					) : null}
+						<div className="hm-channels">
+							<article
+								className="hm-channel"
+								data-glow
+								data-reveal="up"
+								style={delay(1)}
+							>
+								<MessageCircle aria-hidden="true" size={22} />
+								<h3>WhatsApp</h3>
+								{primaryWhatsApp ? (
+									<a
+										aria-label={`Escribir por WhatsApp al ${phonePrimary}`}
+										href={primaryWhatsApp}
+										rel="noreferrer"
+										target="_blank"
+									>
+										{phonePrimary}
+									</a>
+								) : null}
+								{secondaryWhatsApp ? (
+									<a
+										aria-label={`Escribir por WhatsApp al ${phoneSecondary}`}
+										href={secondaryWhatsApp}
+										rel="noreferrer"
+										target="_blank"
+									>
+										{phoneSecondary}
+									</a>
+								) : null}
+							</article>
+							<article
+								className="hm-channel"
+								data-glow
+								data-reveal="up"
+								style={delay(2)}
+							>
+								<Mail aria-hidden="true" size={22} />
+								<h3>Correo</h3>
+								{gmailCompose ? (
+									<a
+										aria-label={`Redactar correo para ${email} en Gmail`}
+										className="hm-channel__break"
+										href={gmailCompose}
+										rel="noreferrer"
+										target="_blank"
+									>
+										{email}
+									</a>
+								) : null}
+							</article>
+							<article
+								className="hm-channel"
+								data-glow
+								data-reveal="up"
+								style={delay(3)}
+							>
+								<MapPin aria-hidden="true" size={22} />
+								<h3>Visítanos</h3>
+								<p>{address}</p>
+								<a href={mapHref} rel="noreferrer" target="_blank">
+									Abrir en Google Maps
+									<ArrowUpRight aria-hidden="true" size={15} />
+								</a>
+							</article>
+							<article
+								className="hm-channel"
+								data-glow
+								data-reveal="up"
+								style={delay(4)}
+							>
+								<Clock aria-hidden="true" size={22} />
+								<h3>Horario</h3>
+								<p>{hoursWeekdays}</p>
+								<p>{hoursSaturday}</p>
+							</article>
+						</div>
+						<div
+							className="hm-contact__social"
+							data-reveal="up"
+							style={delay(2)}
+						>
+							{socials.map(({ Icon, contact }) =>
+								contact ? (
+									contact.href ? (
+										<a
+											href={contact.href}
+											key={contact.label}
+											rel="noreferrer"
+											target="_blank"
+										>
+											<Icon size={18} />
+											{contact.label}
+										</a>
+									) : (
+										<span key={contact.label}>
+											<Icon size={18} />
+											{contact.label}
+										</span>
+									)
+								) : null,
+							)}
+						</div>
+					</div>
 
-					<label className="public-field">
-						<span>Nombre y apellido</span>
-						<input name="name" required type="text" />
-					</label>
-					<label className="public-field">
-						<span>Teléfono</span>
-						<input name="phone" required type="tel" />
-					</label>
-					<label className="public-field">
-						<span>Correo electrónico</span>
-						<input name="email" required type="email" />
-					</label>
-					<label className="public-field">
-						<span>Mensaje</span>
-						<textarea name="message" required rows={5} />
-					</label>
-					<button
-						className="public-button public-button--primary"
-						type="submit"
+					<form
+						action={submitWebsiteInquiryAction}
+						className="hm-form"
+						data-glow
+						data-reveal="up"
+						style={delay(1)}
 					>
-						Enviar mensaje
-					</button>
-				</form>
+						<h2>Cuéntanos los detalles</h2>
+						<p className="hm-form__note">
+							Todos los campos son obligatorios. Te respondemos en horario
+							laboral.
+						</p>
+						<input name="startedAt" type="hidden" value={Date.now()} />
+						<div aria-hidden="true" className="public-honeypot">
+							<label htmlFor="website">No llenar este campo</label>
+							<input
+								autoComplete="off"
+								id="website"
+								name="website"
+								tabIndex={-1}
+								type="text"
+							/>
+						</div>
+
+						{outcome ? (
+							<p
+								className={`hm-form__message hm-form__message--${outcome.tone}`}
+								role="status"
+							>
+								{outcome.text}
+							</p>
+						) : null}
+
+						<div className="hm-form__row">
+							<label className="hm-field">
+								<span>Nombre y apellido</span>
+								<input
+									autoComplete="name"
+									maxLength={160}
+									minLength={2}
+									name="name"
+									required
+									type="text"
+								/>
+							</label>
+							<label className="hm-field">
+								<span>Teléfono</span>
+								<input
+									autoComplete="tel"
+									maxLength={30}
+									minLength={7}
+									name="phone"
+									required
+									type="tel"
+								/>
+							</label>
+						</div>
+						<label className="hm-field">
+							<span>Correo electrónico</span>
+							<input
+								autoComplete="email"
+								maxLength={200}
+								name="email"
+								required
+								type="email"
+							/>
+						</label>
+						<label className="hm-field">
+							<span>Mensaje</span>
+							<textarea
+								maxLength={4000}
+								minLength={10}
+								name="message"
+								placeholder="Tipo de obra, ubicación y lo que tienes en mente…"
+								required
+								rows={5}
+							/>
+						</label>
+						<PublicInquirySubmit />
+					</form>
+				</div>
 			</section>
 		</>
 	);

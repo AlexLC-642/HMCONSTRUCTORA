@@ -1,93 +1,83 @@
+import { getWhatsAppLink } from "@/modules/website/domain/contact-links";
 import {
 	websiteDefaults,
 	withDefault,
 } from "@/modules/website/domain/defaults";
-import { PublicArchitecturalBackdrop } from "@/modules/website/ui/public-architectural-backdrop";
-import { PublicHeroRail } from "@/modules/website/ui/public-hero-rail";
 import { PublicProjectGallery } from "@/modules/website/ui/public-project-gallery";
 import type { PublicWebsiteContent } from "../domain/public-content";
+import { PublicCtaBand } from "./public-cta-band";
+import { PublicPageHero } from "./public-page-hero";
+
+type Album = {
+	id: string;
+	title: string;
+	photos: Array<{ id: string; image: string; alt: string }>;
+};
 
 export function PublicProjectsContent(content: PublicWebsiteContent) {
 	const { photos, settings } = content;
-	const projects = photos.map((photo) => ({
-		id: photo.id,
-		image: photo.imageUrl,
-		title: photo.title,
-		alt: photo.altText ?? photo.title,
-	}));
 	const albums = Array.from(
-		projects
-			.reduce(
-				(grouped, project) => {
-					const key = project.title.trim().toLocaleLowerCase("es-GT");
-					const album = grouped.get(key);
-					const photo = {
-						id: project.id,
-						image: project.image,
-						alt: project.alt,
-					};
-					if (album) album.photos.push(photo);
-					else
-						grouped.set(key, {
-							id: project.id,
-							title: project.title,
-							photos: [photo],
-						});
-					return grouped;
-				},
-				new Map<
-					string,
-					{
-						id: string;
-						title: string;
-						photos: Array<{ id: string; image: string; alt: string }>;
-					}
-				>(),
-			)
+		photos
+			.reduce((grouped, photo) => {
+				const key = photo.title.trim().toLocaleLowerCase("es-GT");
+				const entry = {
+					id: photo.id,
+					image: photo.imageUrl,
+					alt: photo.altText ?? photo.title,
+				};
+				const album = grouped.get(key);
+				if (album) album.photos.push(entry);
+				else
+					grouped.set(key, {
+						id: photo.id,
+						title: photo.title,
+						photos: [entry],
+					});
+				return grouped;
+			}, new Map<string, Album>())
 			.values(),
 	);
 
 	return (
 		<>
-			<section className="public-page-hero">
-				<PublicArchitecturalBackdrop
-					position="center 58%"
-					src="/site/images/proyecto3.jpg"
-				/>
-				<div className="public-page-hero__inner">
-					<p className="public-eyebrow">
-						{withDefault(
-							settings?.projectsEyebrow,
-							websiteDefaults.projectsEyebrow,
-						)}
-					</p>
-					<h1>
-						{withDefault(
-							settings?.projectsHeading,
-							websiteDefaults.projectsHeading,
-						)}
-					</h1>
-					<p className="public-page-hero__lede">
-						{withDefault(
-							settings?.projectsSubheading,
-							websiteDefaults.projectsSubheading,
-						)}
-					</p>
-				</div>
-				<PublicHeroRail />
-			</section>
+			<PublicPageHero
+				eyebrow={withDefault(
+					settings?.projectsEyebrow,
+					websiteDefaults.projectsEyebrow,
+				)}
+				image="/site/images/Rd.png"
+				imagePosition="center 55%"
+				lede={withDefault(
+					settings?.projectsSubheading,
+					websiteDefaults.projectsSubheading,
+				)}
+				next={{ href: "#galeria", label: "Ver la galería" }}
+				title={withDefault(
+					settings?.projectsHeading,
+					websiteDefaults.projectsHeading,
+				)}
+			/>
 
-			<section className="public-projects-showcase">
-				<div className="public-section public-section--projects">
+			<section className="hm-section hm-section--lit" id="galeria">
+				<div className="hm-wrap hm-wrap--wide">
 					{albums.length ? (
 						<PublicProjectGallery albums={albums} />
 					) : (
-						<p className="public-empty-message">
+						<p className="hm-empty">
 							Estamos actualizando nuestra galería de construcciones.
 						</p>
 					)}
 				</div>
 			</section>
+
+			<PublicCtaBand
+				heading={withDefault(settings?.ctaHeading, websiteDefaults.ctaHeading)}
+				image="/site/images/hero-fachada.jpg"
+				text={withDefault(settings?.ctaText, websiteDefaults.ctaText)}
+				whatsAppHref={getWhatsAppLink(
+					withDefault(settings?.phonePrimary, websiteDefaults.phonePrimary),
+				)}
+			/>
 		</>
 	);
 }

@@ -41,18 +41,27 @@ export function WebsitePagePreview({
 		observer.observe(container.current);
 		return () => observer.disconnect();
 	}, []);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: initialize reads refs only; run once after mount.
+	useEffect(() => {
+		initialize();
+	}, []);
 	const viewport = mobile ? 390 : 1280;
 	const scale = Math.min(width / viewport, 1);
+	// The srcDoc frame can finish loading before React attaches onLoad (it is
+	// tiny and inline), so initialize is also tried right after mount. It only
+	// acts once per real srcdoc document, never on the transient about:blank.
 	function initialize() {
 		const doc = frame.current?.contentDocument;
-		if (!doc) return;
+		if (doc?.URL !== "about:srcdoc" || doc.readyState !== "complete") return;
+		if (doc.documentElement.dataset.hmPreview === "ready") return;
+		doc.documentElement.dataset.hmPreview = "ready";
 		for (const style of document.querySelectorAll(
 			'link[rel="stylesheet"], style',
 		))
 			doc.head.appendChild(style.cloneNode(true));
 		const reset = doc.createElement("style");
 		reset.textContent =
-			"html,body{margin:0;padding:0;background:#f5f5f5}body{min-width:0}.public-site{min-height:100vh}";
+			"html,body{margin:0;padding:0;background:#0d0c0b}body{min-width:0}.public-site{min-height:100vh}";
 		doc.head.appendChild(reset);
 		setMount(doc.body);
 	}
@@ -119,7 +128,9 @@ export function WebsitePagePreview({
 					<div
 						className="website-preview-interaction-guard"
 						onClickCapture={(event) => {
-							if ((event.target as Element).closest("a, button")) {
+							if (
+								(event.target as Element).closest('a, button[type="submit"]')
+							) {
 								event.preventDefault();
 								event.stopPropagation();
 							}

@@ -61,6 +61,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
 	typedRoutes: true,
+	// 90 is used for the full-bleed hero photos of the public site.
+	images: { qualities: [75, 90] },
 	experimental: {
 		authInterrupts: true,
 		useOffline: true,

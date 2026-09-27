@@ -1,154 +1,172 @@
-import { ClipboardCheck } from "lucide-react";
+import { ArrowDown, ArrowUpRight, Eye, Target } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { getWhatsAppLink } from "@/modules/website/domain/contact-links";
 import {
 	websiteDefaults,
 	withDefault,
 } from "@/modules/website/domain/defaults";
-import { resolveWebsiteServiceIcon } from "@/modules/website/domain/icon-registry";
-import { serviceCardPhoto } from "@/modules/website/domain/service-card-photos";
-import { PublicArchitecturalBackdrop } from "@/modules/website/ui/public-architectural-backdrop";
-import { PublicHeroRail } from "@/modules/website/ui/public-hero-rail";
+import { hdImage } from "@/modules/website/domain/hd-images";
 import type { PublicWebsiteContent } from "../domain/public-content";
+import { PublicCtaBand } from "./public-cta-band";
+import { PublicFeaturedProjects } from "./public-featured-projects";
+import { PublicMarquee } from "./public-marquee";
+import { PublicServiceExplorer } from "./public-service-explorer";
+
+const delay = (d: number) => ({ "--d": d }) as React.CSSProperties;
 
 export function PublicHomeContent(content: PublicWebsiteContent) {
 	const { settings, services, photos } = content;
-	const homeServices = services.slice(0, 3).map((service) => ({
-		id: service.id,
-		image: serviceCardPhoto(service.position),
-		icon: resolveWebsiteServiceIcon(service.icon),
-		title: service.title,
-		description: service.description,
-	}));
-	const featuredProject = photos[0] ?? null;
+	const homeServices = services.slice(0, 4);
+	const albums = Array.from(
+		photos
+			.reduce((grouped, photo) => {
+				const key = photo.title.trim().toLocaleLowerCase("es-GT");
+				const album = grouped.get(key);
+				if (album) album.count += 1;
+				else grouped.set(key, { ...photo, count: 1 });
+				return grouped;
+			}, new Map<string, (typeof photos)[number] & { count: number }>())
+			.values(),
+	).slice(0, 8);
+	const heroImage = settings?.heroImageUrl || "/assets/plates/hero-photo.png";
+	const whatsApp = getWhatsAppLink(
+		withDefault(settings?.phonePrimary, websiteDefaults.phonePrimary),
+	);
 
 	return (
 		<>
-			<section className="public-hero">
-				<PublicArchitecturalBackdrop
-					priority
-					src={settings?.heroImageUrl || "/assets/plates/hero-photo.png"}
-				/>
-				<div className="public-hero__inner">
-					<div className="public-hero__copy">
-						<p className="public-eyebrow">
-							{withDefault(settings?.heroEyebrow, websiteDefaults.heroEyebrow)}
-						</p>
-						<h1>
-							{settings?.heroHeading ? (
-								settings.heroHeading
-							) : (
-								<>
-									Constructora <em>H&amp;M</em>
-								</>
-							)}
-						</h1>
-						<p className="public-hero__lede">
-							{withDefault(
-								settings?.heroSubheading,
-								websiteDefaults.heroSubheading,
-							)}
-						</p>
-						<div className="public-hero__actions">
-							<Link
-								className="public-button public-button--primary"
-								href="/contacto"
-							>
-								Solicitar cotización
-							</Link>
-							<Link
-								className="public-button public-button--ghost"
-								href="/proyectos"
-							>
-								Conoce nuestros proyectos
-							</Link>
-						</div>
-					</div>
+			<section className="hm-hero">
+				<div aria-hidden="true" className="hm-hero__media" data-parallax="0.09">
+					<Image
+						alt=""
+						fill
+						priority
+						quality={90}
+						sizes="100vw"
+						src={hdImage(heroImage)}
+						unoptimized={heroImage.startsWith("/api/")}
+					/>
 				</div>
-				<PublicHeroRail />
-			</section>
-
-			<section className="public-section public-home-services" id="servicios">
-				<div className="public-section__heading">
-					<p className="public-eyebrow">
+				<div aria-hidden="true" className="hm-veil hm-veil--hero" />
+				<div aria-hidden="true" className="hm-worklight" />
+				<div className="hm-hero__inner">
+					<p className="hm-tag hm-rise" style={delay(0)}>
+						{withDefault(settings?.heroEyebrow, websiteDefaults.heroEyebrow)}
+					</p>
+					<h1 className="hm-hero__title hm-rise" style={delay(1)}>
+						{settings?.heroHeading ? (
+							settings.heroHeading
+						) : (
+							<>
+								Constructora <em>H&amp;M</em>
+							</>
+						)}
+					</h1>
+					<p className="hm-hero__lede hm-rise" style={delay(2)}>
 						{withDefault(
-							settings?.homeServicesEyebrow,
-							websiteDefaults.homeServicesEyebrow,
+							settings?.heroSubheading,
+							websiteDefaults.heroSubheading,
 						)}
 					</p>
-					<h2>
-						{withDefault(
-							settings?.homeServicesHeading,
-							websiteDefaults.homeServicesHeading,
-						)}
-					</h2>
-				</div>
-				<div className="public-service-grid">
-					{homeServices.map((service, index) => (
-						<div
-							className="public-service-card"
-							key={service.id}
-							style={{ "--i": index } as React.CSSProperties}
+					<div className="hm-hero__actions hm-rise" style={delay(3)}>
+						<Link
+							className="hm-btn hm-btn--primary hm-btn--lg"
+							href="/contacto"
 						>
-							<div className="public-service-card__head">
-								<span className="public-service-card__icon">
-									<service.icon aria-hidden="true" size={20} />
-								</span>
-								<h3>{service.title}</h3>
-							</div>
-							<div className="public-service-card__media">
-								<Image
-									alt=""
-									fill
-									sizes="(min-width: 960px) 25vw, 90vw"
-									src={service.image}
-								/>
-							</div>
-							<p>{service.description}</p>
-						</div>
-					))}
+							Solicitar cotización
+							<ArrowUpRight aria-hidden="true" size={20} />
+						</Link>
+						<Link className="hm-btn hm-btn--ghost hm-btn--lg" href="/proyectos">
+							Conoce nuestros proyectos
+							<ArrowUpRight aria-hidden="true" size={19} />
+						</Link>
+					</div>
 				</div>
-				<div className="public-section__footer">
-					<Link
-						className="public-button public-button--ghost"
-						href="/servicios"
-					>
-						Ver todos los servicios
-					</Link>
+				<a className="hm-scroll-cue" href="#servicios">
+					<span>Explora lo que construimos</span>
+					<ArrowDown aria-hidden="true" size={16} />
+				</a>
+				<PublicMarquee items={services.map((service) => service.title)} />
+			</section>
+
+			<section className="hm-section hm-section--lit" id="servicios">
+				<div className="hm-wrap">
+					<header className="hm-heading">
+						<div>
+							<p className="hm-tag" data-reveal="up">
+								{withDefault(
+									settings?.homeServicesEyebrow,
+									websiteDefaults.homeServicesEyebrow,
+								)}
+							</p>
+							<h2 data-reveal="up" style={delay(1)}>
+								{withDefault(
+									settings?.homeServicesHeading,
+									websiteDefaults.homeServicesHeading,
+								)}
+							</h2>
+						</div>
+						<Link
+							className="hm-link"
+							data-reveal="up"
+							href="/servicios"
+							style={delay(2)}
+						>
+							Ver todos los servicios
+							<ArrowUpRight aria-hidden="true" size={18} />
+						</Link>
+					</header>
+					<PublicServiceExplorer services={homeServices} />
 				</div>
 			</section>
 
-			<section
-				className="public-section public-section--muted public-about-section"
-				id="nosotros"
-			>
-				<div className="public-about">
-					<div className="public-about__media">
-						<Image
-							alt="Obra de HM Constructora en ejecución"
-							fill
-							sizes="(min-width: 960px) 38vw, 92vw"
-							src="/site/images/Rd.png"
-						/>
-					</div>
-					<div className="public-about__content">
-						<div>
-							<p className="public-eyebrow">Nosotros</p>
-							<h2>
-								{withDefault(
-									settings?.aboutHeading,
-									websiteDefaults.aboutHeading,
-								)}
-							</h2>
-							<p>
-								{withDefault(settings?.aboutText, websiteDefaults.aboutText)}
-							</p>
+			<section className="hm-section hm-about" id="nosotros">
+				<div className="hm-wrap hm-about__grid">
+					<div className="hm-about__media">
+						<div className="hm-about__main" data-reveal="clip">
+							<Image
+								alt="Cielo falso terminado por HM Constructora"
+								fill
+								sizes="(min-width: 960px) 40vw, 92vw"
+								src="/site/hd/blog3.jpg"
+							/>
 						</div>
-						<div className="public-about__cards">
-							<div className="public-about__card">
-								<span className="public-about__badge">
-									<ClipboardCheck aria-hidden="true" size={20} />
-								</span>
+						<div
+							className="hm-about__inset"
+							data-parallax="0.08"
+							data-reveal="clip"
+							style={delay(2)}
+						>
+							<Image
+								alt="Detalle de construcción de HM Constructora"
+								fill
+								sizes="(min-width: 960px) 18vw, 45vw"
+								src="/site/images/Rd3.jpg"
+							/>
+						</div>
+					</div>
+					<div className="hm-about__content">
+						<p className="hm-tag" data-reveal="up">
+							Nosotros
+						</p>
+						<h2 data-reveal="up" style={delay(1)}>
+							{withDefault(
+								settings?.aboutHeading,
+								websiteDefaults.aboutHeading,
+							)}
+						</h2>
+						<p className="hm-about__text" data-reveal="up" style={delay(2)}>
+							{withDefault(settings?.aboutText, websiteDefaults.aboutText)}
+						</p>
+						<div className="hm-pillars">
+							<article
+								className="hm-pillar"
+								data-glow
+								data-reveal="up"
+								style={delay(3)}
+							>
+								<Target aria-hidden="true" size={22} />
 								<h3>Misión</h3>
 								<p>
 									{withDefault(
@@ -156,11 +174,14 @@ export function PublicHomeContent(content: PublicWebsiteContent) {
 										websiteDefaults.missionText,
 									)}
 								</p>
-							</div>
-							<div className="public-about__card">
-								<span className="public-about__badge">
-									<ClipboardCheck aria-hidden="true" size={20} />
-								</span>
+							</article>
+							<article
+								className="hm-pillar"
+								data-glow
+								data-reveal="up"
+								style={delay(4)}
+							>
+								<Eye aria-hidden="true" size={22} />
 								<h3>Visión</h3>
 								<p>
 									{withDefault(
@@ -168,62 +189,47 @@ export function PublicHomeContent(content: PublicWebsiteContent) {
 										websiteDefaults.visionText,
 									)}
 								</p>
-							</div>
+							</article>
 						</div>
 					</div>
 				</div>
 			</section>
 
-			{featuredProject ? (
+			{albums.length ? (
 				<section
-					className="public-section public-projects-featured"
+					className="hm-section hm-section--lit hm-work"
 					id="proyectos-destacados"
 				>
-					<div className="public-projects-teaser">
-						<div className="public-projects-teaser__content">
-							<p className="public-eyebrow">Proyectos destacados</p>
-							<h2>Obras que dejan huella</h2>
-							<p>
-								Cada proyecto refleja nuestro compromiso con la calidad, la
-								funcionalidad y la confianza de nuestros clientes.
-							</p>
-							<div className="public-projects-teaser__actions">
-								<Link
-									className="public-button public-button--ghost"
-									href="/proyectos"
-								>
-									Ver todos los proyectos
-								</Link>
+					<div className="hm-wrap">
+						<header className="hm-heading">
+							<div>
+								<p className="hm-tag" data-reveal="up">
+									Construcciones y remodelaciones
+								</p>
+								<h2 data-reveal="up" style={delay(1)}>
+									Obras que dejan huella
+								</h2>
 							</div>
-						</div>
-						<div className="public-projects-teaser__media">
-							<Image
-								alt={featuredProject.altText ?? featuredProject.title}
-								fill
-								sizes="(min-width: 960px) 50vw, 92vw"
-								unoptimized
-								src={featuredProject.imageUrl}
-							/>
-							<div className="public-projects-teaser__caption">
-								<strong>{featuredProject.title}</strong>
-								<Link href="/proyectos">Ver proyecto →</Link>
-							</div>
-						</div>
+							<Link
+								className="hm-link"
+								data-reveal="up"
+								href="/proyectos"
+								style={delay(2)}
+							>
+								Explorar construcciones
+								<ArrowUpRight aria-hidden="true" size={18} />
+							</Link>
+						</header>
 					</div>
+					<PublicFeaturedProjects projects={albums} />
 				</section>
 			) : null}
 
-			<section className="public-cta">
-				<div>
-					<h2>
-						{withDefault(settings?.ctaHeading, websiteDefaults.ctaHeading)}
-					</h2>
-					<p>{withDefault(settings?.ctaText, websiteDefaults.ctaText)}</p>
-				</div>
-				<Link className="public-button public-button--primary" href="/contacto">
-					Solicitar cotización
-				</Link>
-			</section>
+			<PublicCtaBand
+				heading={withDefault(settings?.ctaHeading, websiteDefaults.ctaHeading)}
+				text={withDefault(settings?.ctaText, websiteDefaults.ctaText)}
+				whatsAppHref={whatsApp}
+			/>
 		</>
 	);
 }

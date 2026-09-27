@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import "./globals.css";
+import "./public-experience.css";
 
 export const metadata: Metadata = {
 	title: "Control de obra",

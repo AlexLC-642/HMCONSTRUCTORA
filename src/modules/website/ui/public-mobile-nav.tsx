@@ -1,15 +1,25 @@
 "use client";
 
-import { Menu, X } from "lucide-react";
+import { ArrowUpRight, Menu, Phone, X } from "lucide-react";
 import type { Route } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { publicFontVariables } from "./public-fonts";
 import { usePublicPathname } from "./public-preview-path";
 
 type NavLink = { href: Route; label: string };
 
-export function PublicMobileNav({ links }: { links: NavLink[] }) {
+export function PublicMobileNav({
+	links,
+	phone,
+	phoneHref,
+}: {
+	links: NavLink[];
+	phone?: string;
+	phoneHref?: string | null;
+}) {
 	const [isOpen, setIsOpen] = useState(false);
 	const pathname = usePublicPathname();
 	const dialogRef = useRef<HTMLDivElement>(null);
@@ -17,12 +27,14 @@ export function PublicMobileNav({ links }: { links: NavLink[] }) {
 
 	useEffect(() => {
 		if (!isOpen) return;
-		const previousOverflow = document.body.style.overflow;
-		const previousFocus = document.activeElement as HTMLElement | null;
-		document.body.style.overflow = "hidden";
+		const doc = triggerRef.current?.ownerDocument ?? document;
+		const view = doc.defaultView ?? window;
+		const previousOverflow = doc.body.style.overflow;
+		const previousFocus = doc.activeElement as HTMLElement | null;
+		doc.body.style.overflow = "hidden";
 		const focusableSelector =
 			'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
-		const focusFirstControl = window.requestAnimationFrame(() => {
+		const focusFirstControl = view.requestAnimationFrame(() => {
 			dialogRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus();
 		});
 		const containFocus = (event: KeyboardEvent) => {
@@ -38,19 +50,19 @@ export function PublicMobileNav({ links }: { links: NavLink[] }) {
 			if (controls.length === 0) return;
 			const first = controls[0];
 			const last = controls.at(-1);
-			if (event.shiftKey && document.activeElement === first) {
+			if (event.shiftKey && doc.activeElement === first) {
 				event.preventDefault();
 				last?.focus();
-			} else if (!event.shiftKey && document.activeElement === last) {
+			} else if (!event.shiftKey && doc.activeElement === last) {
 				event.preventDefault();
 				first.focus();
 			}
 		};
-		window.addEventListener("keydown", containFocus);
+		view.addEventListener("keydown", containFocus);
 		return () => {
-			window.cancelAnimationFrame(focusFirstControl);
-			document.body.style.overflow = previousOverflow;
-			window.removeEventListener("keydown", containFocus);
+			view.cancelAnimationFrame(focusFirstControl);
+			doc.body.style.overflow = previousOverflow;
+			view.removeEventListener("keydown", containFocus);
 			(previousFocus ?? triggerRef.current)?.focus();
 		};
 	}, [isOpen]);
@@ -61,70 +73,83 @@ export function PublicMobileNav({ links }: { links: NavLink[] }) {
 				aria-expanded={isOpen}
 				aria-haspopup="dialog"
 				aria-label="Abrir menú"
-				className="public-nav__menu-btn focus-ring"
+				className="hm-nav__menu"
 				onClick={() => setIsOpen(true)}
 				ref={triggerRef}
 				type="button"
 			>
-				<Menu aria-hidden="true" size={24} />
+				<Menu aria-hidden="true" size={22} />
 			</button>
 
 			{isOpen
 				? createPortal(
 						<div
-							aria-label="Navegación"
+							aria-label="Menú"
 							aria-modal="true"
-							className="public-nav__mobile-panel"
+							className={`hm-mnav ${publicFontVariables}`}
 							ref={dialogRef}
 							role="dialog"
 						>
-							<button
-								aria-label="Cerrar menú"
-								className="public-nav__mobile-backdrop"
-								onClick={() => setIsOpen(false)}
-								type="button"
-							/>
-							<div className="public-nav__mobile-sheet">
-								<div className="public-nav__mobile-head">
-									<span>Menú</span>
-									<button
-										aria-label="Cerrar menú"
-										className="public-nav__menu-btn focus-ring"
-										onClick={() => setIsOpen(false)}
-										type="button"
-									>
-										<X aria-hidden="true" size={22} />
-									</button>
-								</div>
-								<nav aria-label="Navegación principal">
-									{links.map((link) => {
-										const active =
-											link.href === "/"
-												? pathname === "/"
-												: pathname.startsWith(link.href);
-										return (
-											<Link
-												aria-current={active ? "page" : undefined}
-												data-active={active}
-												href={link.href}
-												key={link.href}
-												onClick={() => setIsOpen(false)}
-											>
-												{link.label}
-											</Link>
-										);
-									})}
-								</nav>
+							<div className="hm-mnav__head">
+								<Image
+									alt="HM Constructora"
+									height={52}
+									src="/assets/plates/brand-logo.png"
+									width={57}
+								/>
+								<button
+									aria-label="Cerrar menú"
+									className="hm-nav__menu"
+									onClick={() => setIsOpen(false)}
+									type="button"
+								>
+									<X aria-hidden="true" size={22} />
+								</button>
+							</div>
+							<nav aria-label="Navegación principal" className="hm-mnav__links">
+								{links.map((link, index) => {
+									const active =
+										link.href === "/"
+											? pathname === "/"
+											: pathname.startsWith(link.href);
+									return (
+										<Link
+											aria-current={active ? "page" : undefined}
+											data-active={active}
+											href={link.href}
+											key={link.href}
+											onClick={() => setIsOpen(false)}
+											style={{ "--i": index } as React.CSSProperties}
+										>
+											{link.label}
+											<ArrowUpRight aria-hidden="true" size={26} />
+										</Link>
+									);
+								})}
+							</nav>
+							<div className="hm-mnav__foot">
 								<Link
-									className="public-nav__cta public-nav__cta--mobile"
+									className="hm-btn hm-btn--primary"
 									href={"/contacto" as Route}
 									onClick={() => setIsOpen(false)}
 								>
 									Solicitar cotización
+									<ArrowUpRight aria-hidden="true" size={18} />
 								</Link>
+								{phone && phoneHref ? (
+									<a
+										className="hm-mnav__phone"
+										href={phoneHref}
+										rel="noreferrer"
+										target="_blank"
+									>
+										<Phone aria-hidden="true" size={16} />
+										{phone}
+									</a>
+								) : null}
 							</div>
 						</div>,
-						document.body,
+						triggerRef.current?.ownerDocument.body ?? document.body,
 					)
 				: null}
 		</>
