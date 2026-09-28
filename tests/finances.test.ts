@@ -1,6 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { calculateFinanceSummary, expenseGroupLabel } from "@/modules/finances/application/statement";
+import {
+	calculateFinanceSummary,
+	expenseGroupLabel,
+	expenseSectionCode,
+} from "@/modules/finances/application/statement";
 
 describe("resumen financiero", () => {
 	it("separa compromisos, pagos a proveedores y caja sin contar anulados", () => {
@@ -23,5 +27,26 @@ describe("resumen financiero", () => {
 		expect(expenseGroupLabel({ phase: "Compra" })).toBe("Sin etapa asignada");
 		expect(expenseGroupLabel({ phase: "Compra", requisitionItem: { budgetLineItem: { section: { code: "2", name: "Movimiento de tierras" } } } })).toBe("2 - Movimiento de tierras");
 		expect(expenseGroupLabel({ phase: "Compra", requisitionItem: { scheduleActivity: { budgetSectionCode: "1", budgetSectionName: "Trabajos preliminares" } } })).toBe("1 - Trabajos preliminares");
+	});
+});
+
+describe("renglón de cada gasto para el resumen por renglón", () => {
+	it("usa el renglón estructurado antes que el número escrito y nunca la fase libre", () => {
+		expect(
+			expenseSectionCode({
+				budgetSectionNo: "9",
+				requisitionItem: {
+					budgetLineItem: { section: { code: "2", name: "Tierras" } },
+				},
+			}),
+		).toBe("2");
+		expect(
+			expenseSectionCode({
+				requisitionItem: { scheduleActivity: { budgetSectionCode: " 1 " } },
+			}),
+		).toBe("1");
+		expect(expenseSectionCode({ budgetSectionNo: " 3 " })).toBe("3");
+		expect(expenseSectionCode({ phase: "Fase 1" })).toBeNull();
+		expect(expenseSectionCode({ budgetSectionNo: "  " })).toBeNull();
 	});
 });

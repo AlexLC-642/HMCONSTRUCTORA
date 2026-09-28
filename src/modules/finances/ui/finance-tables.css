@@ -1,0 +1,477 @@
+/* Finance workspace tables and filters.
+   Theme-aware: only uses the app-shell tokens (--surface, --foreground,
+   --border, --muted, ...) so light and dark modes both work. Print keeps the
+   separate sheet-style AccountStatement, so none of this is print-specific. */
+
+.fin-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 0.75rem;
+	padding: 1rem 1.25rem;
+	border-bottom: 1px solid var(--border);
+	background: var(--surface-raised);
+}
+.fin-field {
+	display: grid;
+	gap: 0.35rem;
+	min-width: 9.5rem;
+}
+.fin-field--grow {
+	flex: 1 1 16rem;
+}
+.fin-field > span {
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+.fin-input {
+	width: 100%;
+	height: 2.6rem;
+	border: 1px solid var(--border);
+	border-radius: 0.6rem;
+	padding: 0 0.75rem;
+	background: var(--surface);
+	color: var(--foreground);
+	font-size: 0.875rem;
+	transition:
+		border-color 150ms ease,
+		box-shadow 150ms ease;
+}
+.fin-input:hover {
+	border-color: color-mix(in srgb, var(--foreground) 30%, var(--border));
+}
+.fin-input:focus {
+	border-color: var(--brand-red);
+	outline: none;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-red) 18%, transparent);
+}
+.fin-search {
+	position: relative;
+}
+.fin-search svg {
+	position: absolute;
+	top: 50%;
+	left: 0.75rem;
+	color: var(--muted);
+	transform: translateY(-50%);
+	pointer-events: none;
+}
+.fin-search .fin-input {
+	padding-left: 2.3rem;
+}
+.fin-toolbar__meta {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-left: auto;
+	min-height: 2.6rem;
+	color: var(--muted);
+	font-size: 0.8rem;
+	white-space: nowrap;
+}
+.fin-link-button {
+	border: 0;
+	background: none;
+	color: var(--brand-red);
+	font-size: 0.8rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+.fin-link-button:hover {
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+.fin-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+.fin-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	height: 2.6rem;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	padding: 0 0.9rem;
+	background: var(--surface);
+	color: var(--foreground);
+	font-size: 0.82rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		background-color 150ms ease,
+		border-color 150ms ease;
+}
+.fin-chip small {
+	border-radius: 999px;
+	padding: 0.05rem 0.45rem;
+	background: var(--surface-inset);
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-variant-numeric: tabular-nums;
+}
+.fin-chip:hover {
+	background: var(--surface-hover);
+}
+.fin-chip[aria-pressed="true"] {
+	border-color: var(--foreground);
+	background: var(--foreground);
+	color: var(--surface);
+}
+.fin-chip[aria-pressed="true"] small {
+	background: color-mix(in srgb, var(--surface) 18%, transparent);
+	color: var(--surface);
+}
+
+/* Project selector inside the graphite command bar. */
+.fin-field--on-dark > span {
+	color: rgb(255 255 255 / 68%);
+}
+.fin-field--on-dark .fin-input {
+	border-color: rgb(255 255 255 / 18%);
+	background: #fff;
+	color: #111719;
+}
+
+/* ---- Tabs: same segmented look as Compras, one accent per section ---- */
+.fin-tabs {
+	--tab-color: var(--brand-red);
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.5rem;
+	border-bottom: 1px solid var(--border);
+	padding: 0.65rem;
+	background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+}
+.fin-tabs a {
+	display: flex;
+	min-height: 3.1rem;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	border-radius: 11px;
+	color: var(--muted);
+	font-size: 0.85rem;
+	font-weight: 700;
+	white-space: nowrap;
+	text-decoration: none;
+	transition:
+		background-color 180ms ease,
+		color 180ms ease,
+		box-shadow 180ms ease;
+}
+.fin-tabs a[data-tab="resumen"] {
+	--tab-color: #35647b;
+}
+.fin-tabs a[data-tab="gastos"] {
+	--tab-color: var(--brand-red);
+}
+.fin-tabs a[data-tab="proveedores"] {
+	--tab-color: #b47705;
+}
+.fin-tabs a[data-tab="abonos"] {
+	--tab-color: var(--success);
+}
+.fin-tabs a:hover:not([aria-current]) {
+	background: var(--surface-hover);
+	color: var(--foreground);
+}
+.fin-tabs a > span {
+	display: grid;
+	min-width: 1.55rem;
+	height: 1.55rem;
+	place-items: center;
+	border-radius: 999px;
+	padding: 0 0.35rem;
+	background: var(--surface-inset);
+	font-size: 0.68rem;
+	font-variant-numeric: tabular-nums;
+}
+.fin-tabs a[aria-current] {
+	background: color-mix(in srgb, var(--tab-color) 10%, var(--surface));
+	color: var(--tab-color);
+	box-shadow:
+		inset 0 0 0 1px color-mix(in srgb, var(--tab-color) 30%, transparent),
+		0 8px 20px color-mix(in srgb, var(--tab-color) 12%, transparent);
+}
+.fin-tabs a[aria-current] > span {
+	background: var(--tab-color);
+	color: #fff;
+}
+@media (max-width: 767px) {
+	.fin-tabs {
+		display: flex;
+		overflow-x: auto;
+	}
+	.fin-tabs a {
+		flex: 0 0 auto;
+		padding: 0 0.9rem;
+	}
+}
+
+/* ---- Table ---- */
+.fin-table-wrap {
+	overflow-x: auto;
+}
+.fin-table {
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	color: var(--foreground);
+	font-size: 0.875rem;
+}
+.fin-table th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	border-bottom: 1px solid var(--border);
+	padding: 0.7rem 1rem;
+	background: var(--surface-raised);
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-align: left;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+.fin-table td {
+	border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+	padding: 0.8rem 1rem;
+	vertical-align: middle;
+}
+.fin-table tbody tr:hover > td {
+	background: color-mix(in srgb, var(--surface-hover) 55%, transparent);
+}
+.fin-table .num {
+	text-align: right;
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+.fin-table .strong {
+	font-weight: 600;
+}
+.fin-table .muted,
+.fin-table small {
+	color: var(--muted);
+}
+.fin-table small {
+	display: block;
+	margin-top: 0.15rem;
+	font-size: 0.75rem;
+}
+.fin-table .nowrap {
+	white-space: nowrap;
+}
+.fin-table tr.is-void > td {
+	color: var(--muted);
+}
+.fin-table tr.is-void .fin-strike {
+	text-decoration: line-through;
+}
+/* Group header + subtotal rows (expenses grouped by renglón). */
+.fin-table tr.fin-group > td {
+	border-bottom: 1px solid var(--border);
+	padding-top: 1.1rem;
+	background: color-mix(in srgb, var(--brand-red) 4%, var(--surface));
+	color: var(--foreground);
+	font-weight: 600;
+}
+.fin-table tr.fin-group:hover > td {
+	background: color-mix(in srgb, var(--brand-red) 4%, var(--surface));
+}
+.fin-group__label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.fin-group__label::before {
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 2px;
+	background: var(--brand-red);
+	content: "";
+}
+.fin-table tr.fin-subtotal > td {
+	background: var(--surface-raised);
+	color: var(--muted);
+	font-size: 0.8rem;
+}
+.fin-table tr.fin-subtotal:hover > td {
+	background: var(--surface-raised);
+}
+.fin-table tr.fin-subtotal .num {
+	color: var(--foreground);
+	font-weight: 600;
+}
+.fin-table tfoot td {
+	border-top: 2px solid color-mix(in srgb, var(--foreground) 35%, var(--border));
+	border-bottom: 0;
+	padding: 0.9rem 1rem;
+	background: var(--surface-raised);
+	font-weight: 700;
+}
+.fin-table tr.fin-detail > td {
+	padding: 0 1rem 0.9rem;
+	background: var(--surface-raised);
+}
+.fin-empty {
+	padding: 2.75rem 1rem;
+	color: var(--muted);
+	text-align: center;
+}
+.fin-empty strong {
+	display: block;
+	margin-bottom: 0.25rem;
+	color: var(--foreground);
+}
+
+/* Status badges */
+.fin-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	border-radius: 999px;
+	padding: 0.2rem 0.6rem;
+	font-size: 0.72rem;
+	font-weight: 700;
+	white-space: nowrap;
+}
+.fin-badge--ok {
+	background: color-mix(in srgb, var(--success) 14%, transparent);
+	color: var(--success);
+}
+.fin-badge--warn {
+	background: color-mix(in srgb, var(--warning) 16%, transparent);
+	color: var(--warning);
+}
+.fin-badge--danger {
+	background: color-mix(in srgb, var(--danger) 13%, transparent);
+	color: var(--danger);
+}
+.fin-badge--neutral {
+	background: var(--surface-inset);
+	color: var(--muted);
+}
+
+.fin-meter {
+	height: 0.4rem;
+	overflow: hidden;
+	border-radius: 999px;
+	background: var(--surface-inset);
+}
+.fin-meter > span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: var(--success);
+}
+.fin-meter > span.is-over {
+	background: var(--danger);
+}
+
+.fin-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	height: 2.6rem;
+	color: var(--foreground);
+	font-size: 0.82rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+.fin-toggle input {
+	width: 1rem;
+	height: 1rem;
+	accent-color: var(--brand-red);
+}
+
+/* Phones: each row becomes a labelled card instead of a squeezed table. */
+@media (max-width: 767px) {
+	.fin-toolbar {
+		padding: 0.85rem;
+	}
+	.fin-field,
+	.fin-field--grow {
+		flex: 1 1 100%;
+	}
+	.fin-toolbar__meta {
+		margin-left: 0;
+	}
+	.fin-table--stack thead {
+		display: none;
+	}
+	.fin-table--stack,
+	.fin-table--stack tbody,
+	.fin-table--stack tfoot,
+	.fin-table--stack tr,
+	.fin-table--stack td {
+		display: block;
+		width: 100%;
+	}
+	.fin-table--stack
+		tbody
+		tr:not(.fin-group):not(.fin-subtotal):not(.fin-detail) {
+		margin: 0.75rem;
+		width: auto;
+		overflow: hidden;
+		border: 1px solid var(--border);
+		border-radius: 0.9rem;
+		background: var(--surface);
+	}
+	.fin-table--stack td {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+		padding: 0.6rem 0.9rem;
+		text-align: right;
+	}
+	.fin-table--stack td:last-child {
+		border-bottom: 0;
+	}
+	.fin-table--stack td[data-label]::before {
+		flex-shrink: 0;
+		color: var(--muted);
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-align: left;
+		text-transform: uppercase;
+		content: attr(data-label);
+	}
+	.fin-table--stack td.fin-row-title {
+		display: block;
+		background: var(--surface-raised);
+		text-align: left;
+	}
+	.fin-table--stack tr.fin-group > td,
+	.fin-table--stack tr.fin-subtotal > td,
+	.fin-table--stack tfoot td {
+		text-align: left;
+	}
+	.fin-table--stack tfoot tr {
+		display: block;
+		margin: 0.75rem;
+		overflow: hidden;
+		border-radius: 0.9rem;
+	}
+	.fin-table--stack tfoot td:empty {
+		display: none;
+	}
+}
+
+/* Semantic money colours used across the finance tables. */
+.fin-money-in {
+	color: var(--success);
+}
+.fin-money-out {
+	color: var(--danger);
+}
+.fin-money-warn {
+	color: var(--warning);
+}

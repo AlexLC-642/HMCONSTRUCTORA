@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { SystemAppShell } from "@/shared/components/system-app-shell";
+import "@/modules/finances/ui/finance-tables.css";
 import { getCurrentUser } from "@/modules/auth/application/current-user";
+import { SystemAppShell } from "@/shared/components/system-app-shell";
 
 export default async function FinancesLayout({
 	children,

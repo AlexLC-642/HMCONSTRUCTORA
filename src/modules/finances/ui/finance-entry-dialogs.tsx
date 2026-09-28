@@ -129,6 +129,7 @@ export function FinanceEntryDialogs({
 	const [invoiceOrderId, setInvoiceOrderId] = useState(
 		invoiceOrders.find((order) => order.available > 0)?.id ?? "",
 	);
+	const canInvoice = invoiceOrders.some((order) => order.available > 0);
 	const selectedInvoiceOrder = invoiceOrders.find(
 		(order) => order.id === invoiceOrderId,
 	);
@@ -140,54 +141,36 @@ export function FinanceEntryDialogs({
 
 	return (
 		<>
-			<section className="flex flex-col gap-4 rounded-xl bg-[linear-gradient(115deg,#ffffff_0%,#f6f8f4_65%,#fff2f3_100%)] p-4 shadow-[0_18px_46px_rgba(22,27,29,0.1)] sm:flex-row sm:items-center sm:justify-between">
-				<div>
-					<h2 className="text-lg font-semibold text-[#172023]">
-						Movimientos financieros
-					</h2>
-					<p className="mt-1 text-sm text-[var(--muted)]">
-						Registra cada operación en una ventana clara y vinculada al
-						presupuesto.
-					</p>
-				</div>
-				<div className="grid grid-cols-1 gap-2 sm:flex sm:items-start">
-					<div>
-						<button
-							className="focus-ring inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--brand-red)] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(200,32,47,0.22)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
-							disabled={!invoiceOrders.some((order) => order.available > 0)}
-							onClick={() => setDialog("invoice")}
-							title={
-								invoiceOrders.some((order) => order.available > 0)
-									? undefined
-									: "Necesitas una orden de compra emitida con saldo pendiente por facturar. Emítela desde Compras primero."
-							}
-							type="button"
-						>
-							<FileCheck2 size={17} /> Registrar factura
-						</button>
-						{!invoiceOrders.some((order) => order.available > 0) ? (
-							<p className="mt-1.5 max-w-56 text-xs text-[var(--muted)]">
-								Emite una orden de compra en Compras con saldo pendiente para
-								poder facturarla aquí.
-							</p>
-						) : null}
-					</div>
-					<button
-						className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#cbd3cc] bg-white px-4 text-sm font-semibold shadow-[0_8px_20px_rgba(22,27,29,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(22,27,29,0.12)]"
-						onClick={() => setDialog("expense")}
-						type="button"
-					>
-						<ReceiptText size={17} /> Registrar gasto
-					</button>
-					<button
-						className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[var(--success)] px-4 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(31,122,91,0.24)] transition hover:-translate-y-0.5"
-						onClick={() => setDialog("payment")}
-						type="button"
-					>
-						<Banknote size={17} /> Registrar abono
-					</button>
-				</div>
-			</section>
+			{/* Same colour-coded buttons as the Compras command bar. */}
+			<div className="flex flex-wrap items-center gap-2">
+				<button
+					className="purchases-button purchases-button--red focus-ring"
+					disabled={!canInvoice}
+					onClick={() => setDialog("invoice")}
+					title={
+						canInvoice
+							? "Registrar la factura de una orden de compra"
+							: "Necesitas una orden de compra emitida con saldo pendiente por facturar. Emítela desde Compras primero."
+					}
+					type="button"
+				>
+					<FileCheck2 aria-hidden="true" size={17} /> Registrar factura
+				</button>
+				<button
+					className="purchases-button purchases-button--amber focus-ring"
+					onClick={() => setDialog("expense")}
+					type="button"
+				>
+					<ReceiptText aria-hidden="true" size={17} /> Registrar gasto
+				</button>
+				<button
+					className="purchases-button purchases-button--green focus-ring"
+					onClick={() => setDialog("payment")}
+					type="button"
+				>
+					<Banknote aria-hidden="true" size={17} /> Registrar abono
+				</button>
+			</div>
 
 			{dialog === "invoice" ? (
 				<ModalShell

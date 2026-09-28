@@ -45,6 +45,18 @@ export function expenseGroupLabel(expense: StatementExpenseGroupInput) {
 	return "Sin etapa asignada";
 }
 
+// Budget section code an expense belongs to, using the same priority as
+// expenseGroupLabel (structured links first, then the selected renglón
+// number). Free-text "phase" never maps to a section. Null = unassigned.
+export function expenseSectionCode(expense: StatementExpenseGroupInput) {
+	const section = expense.requisitionItem?.budgetLineItem?.section;
+	if (section) return section.code;
+	const activityCode =
+		expense.requisitionItem?.scheduleActivity?.budgetSectionCode?.trim();
+	if (activityCode) return activityCode;
+	return expense.budgetSectionNo?.trim() || null;
+}
+
 export function classifiedExpenseTotal<
 	T extends { type?: string | null; subtotal: { toNumber(): number } },
 >(expenses: T[], terms: string[]) {
