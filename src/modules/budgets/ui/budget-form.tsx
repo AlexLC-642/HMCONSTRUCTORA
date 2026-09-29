@@ -3,6 +3,10 @@
 import { Handshake, Plus, Ruler, Save, Trash2, UsersRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
+	calculateBudgetPreview,
+	calculateLinePreview,
+} from "../domain/preview-totals";
+import {
 	generalUnitOptions,
 	laborQuantityLabel,
 	laborUnitOptions,
@@ -34,12 +38,6 @@ function toNumber(value: string | undefined) {
 	return Number.isFinite(parsed) ? parsed : 0;
 }
 
-// Mirrors the server's money() rounding (half-up to cents at every step) so
-// the preview total matches what gets stored.
-function roundMoney(value: number) {
-	return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
 function acceptsDecimalInput(value: string) {
 	return /^\d*(\.\d{0,2})?$/.test(value);
 }
@@ -54,17 +52,6 @@ function isCompleteDecimalInput(value: string | undefined, maximum?: number) {
 	);
 }
 
-function lineSubtotal(line: BudgetLine) {
-	const quantity = toNumber(line.quantity);
-	const unitPrice = toNumber(line.unitPrice);
-	const days = toNumber(line.days);
-
-	if (line.type === "LABOR" && laborUnitUsesJornadas(line.unit) && days > 0) {
-		return roundMoney(quantity * days * unitPrice);
-	}
-
-	return roundMoney(quantity * unitPrice);
-}
 function emptyLine(type: BudgetLineType, position: number): BudgetLine {
 	return {
 		id: crypto.randomUUID(),
@@ -122,65 +109,7 @@ export function BudgetForm({
 				),
 		);
 
-	const totals = useMemo(() => {
-		const sections = value.sections.map((section) => {
-			const materialSubtotal = section.lineItems
-				.filter((line) => line.type === "MATERIAL")
-				.reduce((sum, line) => sum + lineSubtotal(line), 0);
-			const laborSubtotal = section.lineItems
-				.filter((line) => line.type === "LABOR")
-				.reduce((sum, line) => sum + lineSubtotal(line), 0);
-			const otherSubtotal = section.lineItems
-				.filter((line) => line.type === "OTHER")
-				.reduce((sum, line) => sum + lineSubtotal(line), 0);
-
-			return {
-				materialSubtotal,
-				laborSubtotal,
-				otherSubtotal,
-				total: materialSubtotal + laborSubtotal + otherSubtotal,
-			};
-		});
-		const lineSubtotalTotal = sections.reduce(
-			(sum, section) => sum + section.total,
-			0,
-		);
-		const siteManagerCost = toNumber(value.siteManagerCost);
-		const directCost = lineSubtotalTotal + siteManagerCost;
-		const contingencyAmount = roundMoney(
-			directCost * (toNumber(value.contingencyPercentage) / 100),
-		);
-		const subtotal = roundMoney(directCost + contingencyAmount);
-		const administrationAmount = roundMoney(
-			subtotal * (toNumber(value.administrationPercentage) / 100),
-		);
-		const afterAdministration = subtotal + administrationAmount;
-		const profitAmount = roundMoney(
-			afterAdministration * (toNumber(value.profitPercentage) / 100),
-		);
-		const afterProfit = afterAdministration + profitAmount;
-		const vatAmount = roundMoney(
-			afterProfit * (toNumber(value.vatPercentage) / 100),
-		);
-		const afterVat = afterProfit + vatAmount;
-		const financingAmount = roundMoney(
-			afterVat * (toNumber(value.financingPercentage) / 100),
-		);
-
-		return {
-			sections,
-			lineSubtotalTotal,
-			siteManagerCost,
-			directCost,
-			contingencyAmount,
-			subtotal,
-			administrationAmount,
-			profitAmount,
-			vatAmount,
-			financingAmount,
-			grandTotal: roundMoney(afterVat + financingAmount),
-		};
-	}, [value]);
+	const totals = useMemo(() => calculateBudgetPreview(value), [value]);
 
 	function updateSection(index: number, patch: Partial<BudgetSection>) {
 		setValue((current) => ({
@@ -566,7 +495,7 @@ export function BudgetForm({
 											</label>
 										</td>
 										<td className="px-3 py-1.5 text-right align-middle font-medium tabular-nums">
-											{currencyFormatter.format(lineSubtotal(line))}
+											{currencyFormatter.format(calculateLinePreview(line))}
 										</td>
 										<td className="px-3 py-1.5 text-right align-middle">
 											{!readOnly ? (
