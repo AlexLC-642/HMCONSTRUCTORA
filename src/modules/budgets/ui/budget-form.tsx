@@ -34,6 +34,12 @@ function toNumber(value: string | undefined) {
 	return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// Mirrors the server's money() rounding (half-up to cents at every step) so
+// the preview total matches what gets stored.
+function roundMoney(value: number) {
+	return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function acceptsDecimalInput(value: string) {
 	return /^\d*(\.\d{0,2})?$/.test(value);
 }
@@ -54,10 +60,10 @@ function lineSubtotal(line: BudgetLine) {
 	const days = toNumber(line.days);
 
 	if (line.type === "LABOR" && laborUnitUsesJornadas(line.unit) && days > 0) {
-		return quantity * days * unitPrice;
+		return roundMoney(quantity * days * unitPrice);
 	}
 
-	return quantity * unitPrice;
+	return roundMoney(quantity * unitPrice);
 }
 function emptyLine(type: BudgetLineType, position: number): BudgetLine {
 	return {
@@ -141,19 +147,25 @@ export function BudgetForm({
 		);
 		const siteManagerCost = toNumber(value.siteManagerCost);
 		const directCost = lineSubtotalTotal + siteManagerCost;
-		const contingencyAmount =
-			directCost * (toNumber(value.contingencyPercentage) / 100);
-		const subtotal = directCost + contingencyAmount;
-		const administrationAmount =
-			subtotal * (toNumber(value.administrationPercentage) / 100);
+		const contingencyAmount = roundMoney(
+			directCost * (toNumber(value.contingencyPercentage) / 100),
+		);
+		const subtotal = roundMoney(directCost + contingencyAmount);
+		const administrationAmount = roundMoney(
+			subtotal * (toNumber(value.administrationPercentage) / 100),
+		);
 		const afterAdministration = subtotal + administrationAmount;
-		const profitAmount =
-			afterAdministration * (toNumber(value.profitPercentage) / 100);
+		const profitAmount = roundMoney(
+			afterAdministration * (toNumber(value.profitPercentage) / 100),
+		);
 		const afterProfit = afterAdministration + profitAmount;
-		const vatAmount = afterProfit * (toNumber(value.vatPercentage) / 100);
+		const vatAmount = roundMoney(
+			afterProfit * (toNumber(value.vatPercentage) / 100),
+		);
 		const afterVat = afterProfit + vatAmount;
-		const financingAmount =
-			afterVat * (toNumber(value.financingPercentage) / 100);
+		const financingAmount = roundMoney(
+			afterVat * (toNumber(value.financingPercentage) / 100),
+		);
 
 		return {
 			sections,
@@ -166,7 +178,7 @@ export function BudgetForm({
 			profitAmount,
 			vatAmount,
 			financingAmount,
-			grandTotal: afterVat + financingAmount,
+			grandTotal: roundMoney(afterVat + financingAmount),
 		};
 	}, [value]);
 
