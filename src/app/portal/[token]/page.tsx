@@ -43,6 +43,7 @@ import {
 } from "@/modules/schedules/domain/validation";
 import { ThemeToggle } from "@/shared/components/theme-toggle";
 import { requestIp } from "@/shared/lib/request-ip";
+import { PrintDocumentHeader } from "@/shared/ui/print-document-header";
 
 const ZERO = new Prisma.Decimal(0);
 const currencyFormatter = new Intl.NumberFormat("es-GT", {
@@ -620,7 +621,9 @@ export default async function ClientPortalPage({
 								<BudgetPreview
 									budget={approvedBudget}
 									projectName={project.name}
-									projectLocation={project.location ?? project.code}
+									clientName={project.client?.name ?? ""}
+									projectCode={project.code}
+									projectLocation={project.location ?? ""}
 								/>
 							</section>
 						) : null}
@@ -964,68 +967,68 @@ function BudgetSummary({
 		// Left-aligned in the portal (unlike the print sheet) since this is the
 		// first thing the client should read on the tab, not a corner detail.
 		<div className="mt-5 mr-auto w-full max-w-[520px] bg-white p-1 text-xs text-black">
-			<h3 className="border-2 border-[#172023] bg-[#172023] px-3 py-2 text-center font-bold uppercase tracking-[0.08em] text-white">
+			<h3 className="border border-[#1b2325] bg-[#1b2325] px-3 py-1.5 text-center font-bold uppercase tracking-[0.08em] text-white">
 				Resumen financiero
 			</h3>
 			<table className="w-full border-collapse">
 				<tbody>
 					<tr>
-						<td className="border border-black px-2 py-1">
+						<td className="border border-[#8f9994] px-2 py-1">
 							Total de renglones
 						</td>
-						<td className="border border-black px-2 py-1 text-right">
+						<td className="border border-[#8f9994] px-2 py-1 text-right">
 							{money(budget.lineSubtotal)}
 						</td>
 					</tr>
 					<tr>
-						<td className="border border-black px-2 py-1">Encargado de obra</td>
-						<td className="border border-black px-2 py-1 text-right">
+						<td className="border border-[#8f9994] px-2 py-1">Encargado de obra</td>
+						<td className="border border-[#8f9994] px-2 py-1 text-right">
 							{money(budget.siteManagerCost)}
 						</td>
 					</tr>
-					<tr className="bg-[#eef2ef] font-semibold">
-						<td className="border border-black px-2 py-1">Base directa</td>
-						<td className="border border-black px-2 py-1 text-right">
+					<tr className="bg-[#f5f6f5] font-semibold">
+						<td className="border border-[#8f9994] px-2 py-1">Base directa</td>
+						<td className="border border-[#8f9994] px-2 py-1 text-right">
 							{money(directBase)}
 						</td>
 					</tr>
 					<tr>
-						<td className="border border-black px-2 py-1">
+						<td className="border border-[#8f9994] px-2 py-1">
 							Imprevistos {budget.contingencyPercentage.toString()}%
 						</td>
-						<td className="border border-black px-2 py-1 text-right">
+						<td className="border border-[#8f9994] px-2 py-1 text-right">
 							{money(budget.contingencyAmount)}
 						</td>
 					</tr>
-					<tr className="bg-[#eef2ef] font-semibold">
-						<td className="border border-black px-2 py-1">Subtotal</td>
-						<td className="border border-black px-2 py-1 text-right">
+					<tr className="bg-[#f5f6f5] font-semibold">
+						<td className="border border-[#8f9994] px-2 py-1">Subtotal</td>
+						<td className="border border-[#8f9994] px-2 py-1 text-right">
 							{money(budget.subtotal)}
 						</td>
 					</tr>
 					{extraRows.map(([label, percentage, amount]) => (
 						<tr key={label}>
-							<td className="border border-black px-2 py-1">
+							<td className="border border-[#8f9994] px-2 py-1">
 								{label} {percentage.toString()}%
 							</td>
-							<td className="border border-black px-2 py-1 text-right">
+							<td className="border border-[#8f9994] px-2 py-1 text-right">
 								{money(amount)}
 							</td>
 						</tr>
 					))}
 					<tr>
-						<td className="border border-black px-2 py-1">
+						<td className="border border-[#8f9994] px-2 py-1">
 							Variaciones autorizadas
 						</td>
-						<td className="border border-black bg-[#fff0b8] px-2 py-1 text-right">
+						<td className="border border-[#8f9994] px-2 py-1 text-right">
 							{money(budgetChanges.total)}
 						</td>
 					</tr>
 					<tr>
-						<td className="border-2 border-[#172023] bg-[#d5eee1] px-3 py-2 font-bold uppercase">
+						<td className="border border-[#1b2325] bg-[#1b2325] px-3 py-2 font-bold uppercase text-white">
 							Presupuesto vigente
 						</td>
-						<td className="border-2 border-[#172023] bg-[#d5eee1] px-3 py-2 text-right text-sm font-bold">
+						<td className="border border-[#1b2325] bg-[#1b2325] px-3 py-2 text-right text-sm font-bold text-white">
 							{money(currentBudget)}
 						</td>
 					</tr>
@@ -1039,12 +1042,16 @@ function BudgetPreview({
 	budget,
 	projectName,
 	projectLocation,
+	projectCode,
+	clientName,
 }: {
 	budget: NonNullable<
 		Awaited<ReturnType<typeof getClientPortalByToken>>
 	>["approvedBudget"];
 	projectName: string;
 	projectLocation: string;
+	projectCode: string;
+	clientName: string;
 }) {
 	if (!budget) return null;
 
@@ -1054,16 +1061,29 @@ function BudgetPreview({
 			    real paper budget sheet clients already know, so it never follows
 			    the portal's light/dark toggle. */}
 			<div className="min-w-[960px] space-y-5 bg-white p-1 text-black">
-				<div className="border-2 border-black text-center text-xs uppercase">
-					<p>Nombre del proyecto:</p>
-					<h3 className="border-t border-black bg-[#d9d9d9] py-1 text-base font-bold">
-						{projectName}
-					</h3>
-					<p className="border-t border-black py-1">{projectLocation}</p>
-					<p className="border-t border-black bg-[#55c7e8] py-2 text-sm font-bold">
-						Presupuesto
-					</p>
-				</div>
+				<PrintDocumentHeader
+					details={[
+						{ label: "Código", value: projectCode },
+						{ label: "Cliente", value: clientName || "Sin especificar" },
+						{
+							label: "Ejecutor",
+							value: budget.executorName || "HM Constructora",
+						},
+						{ label: "Ubicación", value: projectLocation || "Sin especificar" },
+					]}
+					documentMeta={[
+						`Versión ${budget.versionNumber} · Aprobado`,
+						...(budget.approvedAt
+							? [
+									new Intl.DateTimeFormat("es-GT", {
+										dateStyle: "long",
+									}).format(budget.approvedAt),
+								]
+							: []),
+					]}
+					documentTitle="Presupuesto"
+					projectName={projectName}
+				/>
 				{budget.sections.map((section) => {
 					const groups = ["MATERIAL", "LABOR", "OTHER"]
 						.map((type) => {
@@ -1081,12 +1101,12 @@ function BudgetPreview({
 					return (
 						<section className="text-[11px]" key={section.id}>
 							{section.category ? (
-								<h4 className="mb-3 border-2 border-black bg-[#55c7e8] py-1 text-center font-bold uppercase">
+								<h4 className="mb-2 border-b-2 border-[#1b2325] pb-1 text-left text-[10px] font-bold uppercase tracking-[0.08em] text-[#5d6a66]">
 									{section.category}
 								</h4>
 							) : null}
-							<div className="grid grid-cols-[110px_1fr] border-2 border-black bg-[#d9d9d9] font-bold uppercase">
-								<div className="border-r border-black bg-[#55c7e8] px-2 py-1">
+							<div className="grid grid-cols-[110px_1fr] border border-[#8f9994] bg-[#eceeed] font-bold uppercase">
+								<div className="border-r border-[#8f9994] bg-[#1b2325] px-2 py-1 text-white">
 									Renglon {section.code}
 								</div>
 								<div className="px-2 py-1 text-center">{section.name}</div>
@@ -1099,34 +1119,34 @@ function BudgetPreview({
 									<thead>
 										<tr>
 											<th
-												className="border-x-2 border-black bg-[#d9d9d9] py-1 text-center font-bold uppercase"
+												className="border-x border-[#8f9994] bg-[#eceeed] py-1 text-center font-bold uppercase"
 												colSpan={group.type === "LABOR" ? 7 : 6}
 											>
 												{groupLabel(group.type)}
 											</th>
 										</tr>
-										<tr className="bg-[#eeeeee]">
-											<th className="w-16 border border-black px-1 py-1">
+										<tr className="bg-[#f5f6f5]">
+											<th className="w-16 border border-[#8f9994] px-1 py-1">
 												No.
 											</th>
-											<th className="border border-black px-1 py-1">
+											<th className="border border-[#8f9994] px-1 py-1">
 												Descripcion
 											</th>
-											<th className="w-20 border border-black px-1 py-1">
+											<th className="w-20 border border-[#8f9994] px-1 py-1">
 												Cantidad
 											</th>
 											{group.type === "LABOR" ? (
-												<th className="w-16 border border-black px-1 py-1">
+												<th className="w-16 border border-[#8f9994] px-1 py-1">
 													Jornadas
 												</th>
 											) : null}
-											<th className="w-20 border border-black px-1 py-1">
+											<th className="w-20 border border-[#8f9994] px-1 py-1">
 												Unidad
 											</th>
-											<th className="w-24 border border-black px-1 py-1">
+											<th className="w-24 border border-[#8f9994] px-1 py-1">
 												P/U
 											</th>
-											<th className="w-28 border border-black px-1 py-1">
+											<th className="w-28 border border-[#8f9994] px-1 py-1">
 												Subtotal
 											</th>
 										</tr>
@@ -1134,17 +1154,17 @@ function BudgetPreview({
 									<tbody>
 										{group.lines.map((line) => (
 											<tr key={line.id}>
-												<td className="border border-black px-1 py-1 text-center">
+												<td className="border border-[#8f9994] px-1 py-1 text-center">
 													{line.position}
 												</td>
-												<td className="border border-black px-1 py-1">
+												<td className="border border-[#8f9994] px-1 py-1">
 													{line.description}
 												</td>
-												<td className="border border-black px-1 py-1 text-center">
+												<td className="border border-[#8f9994] px-1 py-1 text-center">
 													{line.quantity.toString()}
 												</td>
 												{group.type === "LABOR" ? (
-													<td className="border border-black px-1 py-1 text-center">
+													<td className="border border-[#8f9994] px-1 py-1 text-center">
 														{persistedLaborLineUsesJornadas(
 															line.unit,
 															line.days,
@@ -1153,36 +1173,36 @@ function BudgetPreview({
 															: "—"}
 													</td>
 												) : null}
-												<td className="border border-black px-1 py-1 text-center">
+												<td className="border border-[#8f9994] px-1 py-1 text-center">
 													{budgetUnitLabel(line.unit)}
 												</td>
-												<td className="border border-black px-1 py-1 text-right">
+												<td className="border border-[#8f9994] px-1 py-1 text-right">
 													{money(line.unitPrice)}
 												</td>
-												<td className="border border-black px-1 py-1 text-right">
+												<td className="border border-[#8f9994] px-1 py-1 text-right">
 													{money(lineSubtotal(line))}
 												</td>
 											</tr>
 										))}
 										<tr>
 											<td
-												className="border border-black px-1 py-1 text-right font-bold uppercase"
+												className="border border-[#8f9994] px-1 py-1 text-right font-bold uppercase"
 												colSpan={group.type === "LABOR" ? 6 : 5}
 											>
 												Sub total de {groupLabel(group.type)}
 											</td>
-											<td className="border border-black px-1 py-1 text-right font-bold">
+											<td className="border border-[#8f9994] px-1 py-1 text-right font-bold">
 												{money(group.subtotal)}
 											</td>
 										</tr>
 									</tbody>
 								</table>
 							))}
-							<div className="grid grid-cols-[1fr_140px] border-x-2 border-b-2 border-black text-[11px] font-bold uppercase">
-								<div className="bg-[#d9d9d9] px-2 py-1 text-right">
+							<div className="grid grid-cols-[1fr_140px] border-x border-b border-[#8f9994] text-[11px] font-bold uppercase">
+								<div className="bg-[#eceeed] px-2 py-1 text-right">
 									Total del renglon
 								</div>
-								<div className="border-l border-black bg-[#55c7e8] px-2 py-1 text-right">
+								<div className="border-l border-[#8f9994] bg-[#1b2325] px-2 py-1 text-right text-white">
 									{money(sectionTotal)}
 								</div>
 							</div>
