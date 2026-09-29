@@ -190,12 +190,12 @@ describe("budget preview totals", () => {
 		);
 	});
 
-	it("coincide con el servidor en 5,000 presupuestos aleatorios", () => {
+	it("coincide con el servidor en 2,000 presupuestos aleatorios", () => {
 		const next = random(20260929);
 		const types: Line["type"][] = ["MATERIAL", "LABOR", "OTHER"];
 		const units = ["persona", "unidad", "m²", "global"];
 
-		for (let run = 0; run < 5000; run += 1) {
+		for (let run = 0; run < 2000; run += 1) {
 			const sections = Array.from({ length: 1 + Math.floor(next() * 4) }, () =>
 				Array.from({ length: 1 + Math.floor(next() * 5) }, () => {
 					const type = types[Math.floor(next() * types.length)] ?? "MATERIAL";

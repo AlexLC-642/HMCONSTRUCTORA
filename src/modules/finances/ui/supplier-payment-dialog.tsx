@@ -3,6 +3,7 @@
 import { CreditCard, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { recordSupplierPaymentAction } from "@/modules/finances/application/actions";
+import { FinanceSubmitButton } from "./finance-submit-button";
 
 const inputClass =
 	"focus-ring h-11 w-full rounded-xl border border-[#cbd3cc] bg-white px-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:border-[#98a69d]";
@@ -167,12 +168,11 @@ export function SupplierPaymentDialog({
 								>
 									Cancelar
 								</button>
-								<button
+								<FinanceSubmitButton
 									className="focus-ring inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--success)] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(31,122,91,0.24)]"
-									type="submit"
-								>
-									<CreditCard size={17} /> Guardar pago
-								</button>
+									icon={<CreditCard size={17} />}
+									label="Guardar pago"
+								/>
 							</footer>
 						</form>
 					</section>

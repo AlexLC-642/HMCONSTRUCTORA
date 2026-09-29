@@ -42,3 +42,33 @@ describe("purchase finance validation", () => {
 		).toBe(false);
 	});
 });
+
+describe("finance money inputs", () => {
+	it("acepta montos con hasta 2 decimales y rechaza más decimales", () => {
+		const payment = {
+			financialExpenseId: "expense-1",
+			paymentDate: "2026-10-29",
+			method: "Transferencia",
+			reference: "TRX-2291",
+		};
+		for (const amount of [20807.36, 0.01, 10807.35, "18578.00"]) {
+			expect(
+				supplierPaymentInputSchema.safeParse({ ...payment, amount }).success,
+			).toBe(true);
+		}
+		for (const amount of [20807.365, 0.001, "100.999"]) {
+			expect(
+				supplierPaymentInputSchema.safeParse({ ...payment, amount }).success,
+			).toBe(false);
+		}
+		expect(
+			purchaseInvoiceInputSchema.safeParse({
+				projectId: "project-1",
+				purchaseOrderId: "order-1",
+				expenseDate: "2026-10-06",
+				documentNumber: "B-2291",
+				subtotal: 1500.555,
+			}).success,
+		).toBe(false);
+	});
+});

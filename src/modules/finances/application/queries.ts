@@ -150,10 +150,16 @@ export async function getFinanceWorkspace(
 		orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }],
 	});
 	const invoiceOrders = invoiceOrdersRaw.map((order) => {
+		// Decimal, not float: "available" pre-fills the invoice amount, and a
+		// float like 10807.349999 breaks the input's step="0.01" validation.
 		const invoiced = order.financialExpenses.reduce(
-			(sum, expense) => sum + expense.subtotal.toNumber(),
-			0,
+			(sum, expense) => sum.add(expense.subtotal),
+			new Prisma.Decimal(0),
 		);
+		const available = Prisma.Decimal.max(
+			order.total.sub(invoiced),
+			new Prisma.Decimal(0),
+		).toDecimalPlaces(2);
 		return {
 			id: order.id,
 			number: order.number,
@@ -161,8 +167,8 @@ export async function getFinanceWorkspace(
 			paymentType: order.paymentType,
 			paymentDueDate: order.paymentDueDate?.toISOString() ?? null,
 			total: order.total.toNumber(),
-			invoiced,
-			available: Math.max(0, order.total.toNumber() - invoiced),
+			invoiced: invoiced.toNumber(),
+			available: available.toNumber(),
 			supplier: order.supplier,
 		};
 	});

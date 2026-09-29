@@ -16,6 +16,7 @@ import {
 	createExpenseAction,
 	createPurchaseInvoiceAction,
 } from "@/modules/finances/application/actions";
+import { FinanceSubmitButton } from "./finance-submit-button";
 
 type BudgetSectionOption = {
 	id: string;
@@ -318,12 +319,11 @@ export function FinanceEntryDialogs({
 							>
 								Cancelar
 							</button>
-							<button
+							<FinanceSubmitButton
 								className="focus-ring inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--brand-red)] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(200,32,47,0.22)]"
-								type="submit"
-							>
-								<FileCheck2 size={17} /> Guardar factura
-							</button>
+								icon={<FileCheck2 size={17} />}
+								label="Guardar factura"
+							/>
 						</footer>
 					</form>
 				</ModalShell>
@@ -535,12 +535,11 @@ export function FinanceEntryDialogs({
 							>
 								Cancelar
 							</button>
-							<button
+							<FinanceSubmitButton
 								className="focus-ring inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--brand-red)] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(200,32,47,0.22)]"
-								type="submit"
-							>
-								<FilePlus2 size={17} /> Guardar gasto
-							</button>
+								icon={<FilePlus2 size={17} />}
+								label="Guardar gasto"
+							/>
 						</footer>
 					</form>
 				</ModalShell>
@@ -651,12 +650,11 @@ export function FinanceEntryDialogs({
 							>
 								Cancelar
 							</button>
-							<button
+							<FinanceSubmitButton
 								className="focus-ring inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--success)] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(31,122,91,0.22)]"
-								type="submit"
-							>
-								<Banknote size={17} /> Guardar abono
-							</button>
+								icon={<Banknote size={17} />}
+								label="Guardar abono"
+							/>
 						</footer>
 					</form>
 				</ModalShell>

@@ -104,6 +104,32 @@ export async function createPurchaseInvoice(
 	);
 
 	return prisma.$transaction(async (tx) => {
+		// Las validaciones de arriba evitan guardar el archivo en vano, pero se
+		// hicieron sin bloqueo: dos facturas enviadas a la vez contra la misma
+		// orden podrían leer el mismo saldo y facturar más que su total. Se
+		// bloquea la orden y se vuelven a validar saldo y duplicado aquí dentro.
+		await tx.$executeRaw`SELECT id FROM PurchaseOrder WHERE id = ${order.id} FOR UPDATE`;
+		const invoicedNow = await tx.financialExpense.aggregate({
+			where: { purchaseOrderId: order.id, status: "VALID" },
+			_sum: { subtotal: true },
+		});
+		const availableNow = order.total
+			.sub(invoicedNow._sum.subtotal ?? new Prisma.Decimal(0))
+			.toDecimalPlaces(2);
+		if (invoiceTotal.gt(availableNow)) {
+			throw new Error(
+				`La factura supera el saldo por facturar de la orden (${availableNow.toString()}).`,
+			);
+		}
+		const duplicateNow = await tx.financialExpense.findFirst({
+			where: { supplierId: order.supplierId, documentNumber, status: "VALID" },
+			select: { id: true },
+		});
+		if (duplicateNow)
+			throw new Error(
+				`La factura ${documentNumber} ya esta registrada para este proveedor.`,
+			);
+
 		await tx.projectDocument.create({
 			data: {
 				id: documentId,

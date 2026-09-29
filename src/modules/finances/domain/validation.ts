@@ -5,6 +5,13 @@ const decimalInput = z.coerce
 	.finite()
 	.min(0, "No puede ser negativo.");
 
+// Money is stored with 2 decimals; reject extra decimals instead of silently
+// rounding what the user typed.
+const moneyInput = decimalInput.refine(
+	(value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6,
+	"Use como máximo 2 decimales.",
+);
+
 export const expenseInputSchema = z.object({
 	projectId: z.string().trim().min(1, "Seleccione un proyecto."),
 	expenseDate: z.string().trim().min(1, "La fecha es obligatoria."),
@@ -12,7 +19,7 @@ export const expenseInputSchema = z.object({
 	vendor: z.string().trim().optional(),
 	quantity: decimalInput.default(1),
 	unit: z.string().trim().optional(),
-	subtotal: decimalInput.refine(
+	subtotal: moneyInput.refine(
 		(value) => value > 0,
 		"El subtotal debe ser mayor que cero.",
 	),
@@ -39,7 +46,7 @@ export const paymentInputSchema = z.object({
 	projectId: z.string().trim().min(1, "Seleccione un proyecto."),
 	paymentNumber: z.string().trim().optional(),
 	paymentDate: z.string().trim().min(1, "La fecha es obligatoria."),
-	amount: decimalInput.refine(
+	amount: moneyInput.refine(
 		(value) => value > 0,
 		"El abono debe ser mayor que cero.",
 	),
@@ -53,7 +60,7 @@ export const paymentInputSchema = z.object({
 export const supplierPaymentInputSchema = z.object({
 	financialExpenseId: z.string().trim().min(1, "Seleccione la compra a pagar."),
 	paymentDate: z.string().trim().min(1, "La fecha es obligatoria."),
-	amount: decimalInput.refine(
+	amount: moneyInput.refine(
 		(value) => value > 0,
 		"El pago debe ser mayor que cero.",
 	),
@@ -73,7 +80,7 @@ export const purchaseInvoiceInputSchema = z.object({
 		.string()
 		.trim()
 		.min(1, "El numero de factura es obligatorio."),
-	subtotal: decimalInput.refine(
+	subtotal: moneyInput.refine(
 		(value) => value > 0,
 		"El total de la factura debe ser mayor que cero.",
 	),

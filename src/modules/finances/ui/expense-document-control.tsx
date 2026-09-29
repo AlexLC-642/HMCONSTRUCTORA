@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { DocumentPreviewData } from "@/modules/documents/application/queries";
 import { DocumentPreviewModal } from "@/modules/documents/ui/document-preview-modal";
 import { attachExpenseDocumentAction } from "../application/actions";
+import { FinanceSubmitButton } from "./finance-submit-button";
 
 type Props = {
 	canRegister: boolean;
@@ -81,7 +82,7 @@ export function ExpenseDocumentControl({
 									<input accept=".pdf,.png,.jpg,.jpeg,.webp" className="sr-only" name="documentFile" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? "")} required type="file" />
 								</label>
 							</div>
-							<footer className="flex justify-end gap-2 border-t border-[#d8ddd7] bg-white px-5 py-4"><button className="focus-ring h-11 rounded-lg border border-[#cbd3cc] bg-white px-4 font-semibold" onClick={() => setShowUpload(false)} type="button">Cancelar</button><button className="focus-ring inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--brand-red)] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(200,32,47,0.22)]" type="submit"><FileUp size={16} /> Guardar y vincular</button></footer>
+							<footer className="flex justify-end gap-2 border-t border-[#d8ddd7] bg-white px-5 py-4"><button className="focus-ring h-11 rounded-lg border border-[#cbd3cc] bg-white px-4 font-semibold" onClick={() => setShowUpload(false)} type="button">Cancelar</button><FinanceSubmitButton className="focus-ring inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--brand-red)] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(200,32,47,0.22)]" icon={<FileUp size={16} />} label="Guardar y vincular" /></footer>
 						</form>
 					</section>
 				</div>
