@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { projectScopeWhere } from "@/modules/auth/application/authorization";
 import type { AuthenticatedUser } from "@/modules/auth/domain/types";
 import { prisma } from "@/shared/lib/prisma";
+import { allocateClientPrices } from "../domain/client-pricing";
 import { calculateFinanceSummary } from "./statement";
 
 export async function getFinanceWorkspace(
@@ -102,6 +103,7 @@ export async function getFinanceWorkspace(
 				orderBy: { versionNumber: "desc" },
 				select: {
 					versionNumber: true,
+					grandTotal: true,
 					sections: {
 						orderBy: { position: "asc" },
 						select: {
@@ -124,12 +126,22 @@ export async function getFinanceWorkspace(
 			}),
 		]);
 
+	const clientPrices = approvedBudget
+		? allocateClientPrices(
+				approvedBudget.sections.map((section) => ({
+					id: section.id,
+					total: section.total.toFixed(2),
+				})),
+				approvedBudget.grandTotal.toFixed(2),
+			)
+		: new Map<string, string>();
 	const budgetSections =
 		approvedBudget?.sections.map((section) => ({
 			id: section.id,
 			code: section.code,
 			name: section.name,
 			total: section.total,
+			clientPrice: new Prisma.Decimal(clientPrices.get(section.id) ?? "0"),
 			lineItemCount: section.lineItems.length,
 		})) ?? [];
 

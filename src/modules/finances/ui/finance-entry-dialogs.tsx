@@ -588,15 +588,20 @@ export function FinanceEntryDialogs({
 											<option value="">Abono general del proyecto</option>
 											{sections.map((section) => (
 												<option key={section.id} value={section.id}>
-													Renglón {section.code} · {section.name}
+													Renglón {section.code} · {section.name} · hasta{" "}
+													{new Intl.NumberFormat("es-GT", {
+														style: "currency",
+														currency: "GTQ",
+													}).format(Number(section.total))}
 												</option>
 											))}
 										</select>
 									</Field>
 								</div>
 								<div className="sm:col-span-2 rounded-xl border border-[#d9dfd8] bg-[#eef4ef] px-4 py-3 text-sm text-[#40504a]">
-									Cada opción corresponde a un renglón completo del presupuesto
-									aprobado, no a sus materiales o mano de obra por separado.
+									Cada renglón se cobra a su precio al cliente: su costo más su
+									parte proporcional de encargado, imprevistos, administración,
+									utilidad e IVA. Entre todos suman el total del presupuesto.
 								</div>
 								<Field label="Concepto">
 									<input

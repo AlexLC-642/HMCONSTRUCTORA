@@ -273,6 +273,7 @@ export default async function FinancesPage({
 	}
 	const sectionRows = budgetSections.map((section) => {
 		const budget = section.total.toNumber();
+		const clientPrice = section.clientPrice.toNumber();
 		const spent = spentBySection.get(section.code) ?? 0;
 		const received = registeredPayments
 			.filter((payment) => payment.budgetSectionId === section.id)
@@ -280,6 +281,7 @@ export default async function FinancesPage({
 		return {
 			...section,
 			budget,
+			clientPrice,
 			spent,
 			received,
 			execution: percentOf(spent, budget),
@@ -289,6 +291,10 @@ export default async function FinancesPage({
 		.filter((payment) => !payment.budgetSectionId)
 		.reduce((sum, payment) => sum + payment.amount.toNumber(), 0);
 	const sectionsBudget = sectionRows.reduce((sum, row) => sum + row.budget, 0);
+	const sectionsClientPrice = sectionRows.reduce(
+		(sum, row) => sum + row.clientPrice,
+		0,
+	);
 
 	const checks = [
 		[
@@ -401,7 +407,7 @@ export default async function FinancesPage({
 								id: section.id,
 								code: section.code,
 								name: section.name,
-								total: section.total.toString(),
+								total: section.clientPrice.toString(),
 							}))}
 							today={today}
 						/>
@@ -494,7 +500,8 @@ export default async function FinancesPage({
 											<thead>
 												<tr>
 													<th>Renglón</th>
-													<th className="num">Presupuesto</th>
+													<th className="num">Costo</th>
+													<th className="num">Precio al cliente</th>
 													<th className="num">Gastado</th>
 													<th style={{ width: "22%" }}>Ejecución</th>
 													<th className="num">Abonado</th>
@@ -511,8 +518,11 @@ export default async function FinancesPage({
 																{row.lineItemCount} conceptos presupuestados
 															</small>
 														</td>
-														<td className="num" data-label="Presupuesto">
+														<td className="num" data-label="Costo">
 															{money.format(row.budget)}
+														</td>
+														<td className="num" data-label="Precio al cliente">
+															{money.format(row.clientPrice)}
 														</td>
 														<td className="num strong" data-label="Gastado">
 															{money.format(row.spent)}
@@ -566,7 +576,13 @@ export default async function FinancesPage({
 																Gastos sin renglón y abonos generales a caja
 															</small>
 														</td>
-														<td className="num muted" data-label="Presupuesto">
+														<td className="num muted" data-label="Costo">
+															—
+														</td>
+														<td
+															className="num muted"
+															data-label="Precio al cliente"
+														>
 															—
 														</td>
 														<td className="num strong" data-label="Gastado">
@@ -586,7 +602,7 @@ export default async function FinancesPage({
 												unassignedSpent === 0 &&
 												generalReceived === 0 ? (
 													<tr>
-														<td className="fin-empty" colSpan={5}>
+														<td className="fin-empty" colSpan={6}>
 															Sin renglones aprobados ni movimientos todavía.
 														</td>
 													</tr>
@@ -596,8 +612,11 @@ export default async function FinancesPage({
 												<tfoot>
 													<tr>
 														<td>Total</td>
-														<td className="num" data-label="Presupuesto">
+														<td className="num" data-label="Costo">
 															{money.format(sectionsBudget)}
+														</td>
+														<td className="num" data-label="Precio al cliente">
+															{money.format(sectionsClientPrice)}
 														</td>
 														<td className="num" data-label="Gastado">
 															{money.format(totalExpenses)}

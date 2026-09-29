@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { ensureDocumentCategories } from "@/modules/documents/application/service";
 import { storeProjectDocumentFile } from "@/modules/documents/application/storage";
 import { prisma } from "@/shared/lib/prisma";
+import { allocateClientPrices } from "../domain/client-pricing";
 import {
 	type ExpenseDocumentInput,
 	type ExpenseInput,
@@ -451,10 +452,15 @@ export async function createClientPayment(
 				},
 				select: {
 					id: true,
-					total: true,
 					clientPayments: {
 						where: { status: "REGISTERED" },
 						select: { amount: true },
+					},
+					budgetVersion: {
+						select: {
+							grandTotal: true,
+							sections: { select: { id: true, total: true } },
+						},
 					},
 				},
 			});
@@ -462,11 +468,22 @@ export async function createClientPayment(
 				throw new Error(
 					"El renglón seleccionado no pertenece al presupuesto aprobado del proyecto.",
 				);
+			// El cliente paga el precio del renglón (su costo más su parte de
+			// indirectos e IVA), no solo su costo directo.
+			const clientPrice = new Prisma.Decimal(
+				allocateClientPrices(
+					section.budgetVersion.sections.map((item) => ({
+						id: item.id,
+						total: item.total.toFixed(2),
+					})),
+					section.budgetVersion.grandTotal.toFixed(2),
+				).get(section.id) ?? "0",
+			);
 			const applied = section.clientPayments.reduce(
 				(sum, payment) => sum.add(payment.amount),
 				new Prisma.Decimal(0),
 			);
-			const pending = section.total.sub(applied).toDecimalPlaces(2);
+			const pending = clientPrice.sub(applied).toDecimalPlaces(2);
 			if (decimal(parsed.amount).gt(pending)) {
 				throw new Error(
 					`El abono excede el saldo pendiente del renglón (${pending.toString()}).`,

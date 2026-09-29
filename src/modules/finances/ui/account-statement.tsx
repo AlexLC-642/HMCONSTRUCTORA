@@ -62,7 +62,6 @@ function rowClass(expense: ExpenseRow) {
 }
 
 export function AccountStatement({
-	projectName,
 	expenses,
 	documentPreviews,
 	canRegister = false,
