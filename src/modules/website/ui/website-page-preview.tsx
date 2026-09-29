@@ -75,7 +75,7 @@ export function WebsitePagePreview({
 	return (
 		<aside className="website-live-preview website-page-preview">
 			<div className="website-live-preview__bar">
-				<strong>Vista previa real</strong>
+				<strong>Vista previa</strong>
 			</div>
 			<div className="website-preview-controls">
 				<label>
