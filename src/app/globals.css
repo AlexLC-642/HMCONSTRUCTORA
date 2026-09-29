@@ -23730,3 +23730,75 @@ input[id^="tab-seguridad-"]:checked
 .website-preview-note { padding: 0 1rem 1rem; margin: 0; background: #fff; color: #525252; font-size: 0.8rem; }
 .public-empty-message { color: #fff; max-width: 65ch; margin: 0 auto; }
 .public-empty-message a { text-decoration: underline; }
+
+/*
+ * Impresión / "Descargar PDF" de todo el sistema.
+ * Debe ir sin @layer y con !important: las reglas propias del AppShell de
+ * arriba no están en una capa de Tailwind, así que le ganan a utilidades como
+ * print:hidden (por eso el menú lateral salía en los PDF). Cada página de
+ * impresión sigue definiendo su propio @page (tamaño y orientación).
+ */
+@media print {
+	html,
+	body {
+		background: #ffffff !important;
+		color: #111111 !important;
+	}
+
+	.app-shell-sidebar,
+	.app-shell-topbar,
+	.app-shell-mobile-backdrop,
+	.app-shell-notifications,
+	.no-print {
+		display: none !important;
+	}
+
+	.app-shell,
+	.app-shell-content,
+	.app-shell-main {
+		display: block !important;
+		min-height: 0 !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		background: #ffffff !important;
+		box-shadow: none !important;
+	}
+
+	.print-surface {
+		width: 100% !important;
+		max-width: none !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		background: #ffffff !important;
+		color: #111111 !important;
+		box-shadow: none !important;
+	}
+
+	.print-surface *,
+	.print-surface *::before,
+	.print-surface *::after {
+		backdrop-filter: none !important;
+		-webkit-backdrop-filter: none !important;
+		text-shadow: none !important;
+	}
+
+	/* Tablas largas: encabezado repetido en cada hoja y filas sin cortar. */
+	.print-surface thead {
+		display: table-header-group;
+	}
+
+	.print-surface tr,
+	.print-surface img,
+	.print-surface figure {
+		break-inside: avoid;
+		page-break-inside: avoid;
+	}
+
+	.print-surface h1,
+	.print-surface h2,
+	.print-surface h3 {
+		break-after: avoid;
+		page-break-after: avoid;
+	}
+}
+

@@ -42,12 +42,19 @@ export function ExpenseDocumentControl({
 				</button>
 			) : canRegister ? (
 				<button
-					className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[#aebbb4] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#52615c] transition hover:-translate-y-0.5 hover:border-[#278362] hover:bg-[#eff8f3] hover:text-[#176f54]"
+					className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[#aebbb4] bg-white px-2.5 py-1.5 text-xs font-semibold print:border-0 print:bg-transparent text-[#52615c] transition hover:-translate-y-0.5 hover:border-[#278362] hover:bg-[#eff8f3] hover:text-[#176f54]"
 					onClick={() => setShowUpload(true)}
 					type="button"
 				>
 					<Paperclip aria-hidden="true" size={14} />
-					{documentNumber ? `Adjuntar ${documentNumber}` : "Adjuntar comprobante"}
+					{documentNumber ? (
+						<>
+							<span className="print:hidden">Adjuntar </span>
+							{documentNumber}
+						</>
+					) : (
+						"Adjuntar comprobante"
+					)}
 				</button>
 			) : (
 				<span className="text-[#7a8581]">{documentNumber ?? "Sin comprobante"}</span>

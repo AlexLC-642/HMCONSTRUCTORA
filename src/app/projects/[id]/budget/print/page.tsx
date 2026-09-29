@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/modules/auth/application/authorization";
 import {
@@ -10,6 +11,9 @@ import {
 	persistedLaborLineUsesJornadas,
 } from "@/modules/budgets/domain/units";
 import { PrintActions } from "@/shared/ui/print-actions";
+import { PrintDocumentHeader } from "@/shared/ui/print-document-header";
+
+export const metadata: Metadata = { title: "Presupuesto | HM Constructora" };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -111,47 +115,34 @@ export default async function BudgetPrintPage({
 	return (
 		<>
 			<PrintActions backHref={`/projects/${id}/budget`} />
-			<main className="print-surface mx-auto max-w-[1120px] bg-white px-8 py-6 text-[#111] print:p-0">
-				<style>{`@media print { body { background: white; } * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none; } table { page-break-inside: avoid; } section { page-break-inside: avoid; } }`}</style>
+			<main className="print-surface mx-auto max-w-[8.5in] bg-white px-8 py-6 text-[#111] print:p-0">
+				<style>{`@page { size: letter portrait; margin: 0.35in; } @media print { body { background: white; } * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none; } table { page-break-inside: avoid; } section { page-break-inside: avoid; } }`}</style>
 
-				<header className="mb-6 text-xs uppercase">
-					<div className="overflow-hidden border-2 border-[#172023]">
-						<div className="flex items-center justify-between bg-[#172023] px-4 py-2 text-left text-white">
-							<div>
-								<p className="font-bold tracking-[0.12em]">HM Constructora</p>
-								<p className="mt-0.5 text-[9px] font-medium text-[#c8d4cf]">
-									Control de obra
-								</p>
-							</div>
-							<p className="font-bold tracking-[0.08em]">
-								Presupuesto integrado
-							</p>
-						</div>
-						<p className="px-3 py-1 text-center text-[9px] font-semibold tracking-[0.12em] text-[#52605b]">
-							Nombre del proyecto
-						</p>
-						<h1 className="border-t border-[#172023] bg-[#e9eeeb] px-3 py-1.5 text-center text-base font-bold">
-							{budget.project.name}
-						</h1>
-						<div className="grid grid-cols-2 border-t border-[#172023] text-[10px] normal-case">
-							<p className="border-r border-[#172023] px-3 py-1.5">
-								<span className="font-bold">Código:</span> {budget.project.code}
-							</p>
-							<p className="px-3 py-1.5">
-								<span className="font-bold">Ubicación:</span>{" "}
-								{budget.project.location || "Sin especificar"}
-							</p>
-							<p className="border-r border-t border-[#172023] px-3 py-1.5">
-								<span className="font-bold">Cliente:</span>{" "}
-								{budget.project.client?.name || "Sin especificar"}
-							</p>
-							<p className="border-t border-[#172023] px-3 py-1.5">
-								<span className="font-bold">Ejecutor:</span>{" "}
-								{version.executorName || "HM Constructora"}
-							</p>
-						</div>
-					</div>
-				</header>
+				<PrintDocumentHeader
+					details={[
+						{ label: "Código", value: budget.project.code },
+						{
+							label: "Cliente",
+							value: budget.project.client?.name || "Sin especificar",
+						},
+						{
+							label: "Ejecutor",
+							value: version.executorName || "HM Constructora",
+						},
+						{
+							label: "Ubicación",
+							value: budget.project.location || "Sin especificar",
+						},
+					]}
+					documentMeta={[
+						`Versión ${version.versionNumber} · ${version.status === "APPROVED" ? "Aprobado" : "Borrador"}`,
+						new Intl.DateTimeFormat("es-GT", { dateStyle: "long" }).format(
+							version.approvedAt ?? version.updatedAt,
+						),
+					]}
+					documentTitle="Presupuesto"
+					projectName={budget.project.name}
+				/>
 
 				{version.sections.map((section) => {
 					const groups = ["MATERIAL", "LABOR", "OTHER"]
@@ -169,11 +160,11 @@ export default async function BudgetPrintPage({
 
 					return (
 						<section className="mb-5 text-[11px]" key={section.id}>
-							<h3 className="mb-3 border-2 border-black bg-[#55c7e8] py-1 text-center font-bold uppercase">
+							<h3 className="mb-2 border-b-2 border-[#1b2325] pb-1 text-left text-[10px] font-bold uppercase tracking-[0.08em] text-[#5d6a66]">
 								{categoryTitle(section)}
 							</h3>
-							<div className="grid grid-cols-[96px_1fr] border-2 border-black bg-[#d9d9d9] font-bold uppercase">
-								<div className="border-r border-black bg-[#55c7e8] px-2 py-1">
+							<div className="grid grid-cols-[96px_1fr] border border-[#8f9994] bg-[#eceeed] font-bold uppercase">
+								<div className="border-r border-[#8f9994] bg-[#1b2325] px-2 py-1 text-white">
 									Renglon {section.code}
 								</div>
 								<div className="px-2 py-1 text-center">{section.name}</div>
@@ -184,34 +175,34 @@ export default async function BudgetPrintPage({
 									<thead>
 										<tr>
 											<th
-												className="border-x-2 border-black bg-[#d9d9d9] py-1 text-center font-bold"
+												className="border-x border-[#8f9994] bg-[#eceeed] py-1 text-center font-bold"
 												colSpan={group.type === "LABOR" ? 7 : 6}
 											>
 												{labelForType(group.type)}
 											</th>
 										</tr>
-										<tr className="bg-[#eeeeee]">
-											<th className="w-16 border border-black px-1 py-1">
+										<tr className="bg-[#f5f6f5]">
+											<th className="w-16 border border-[#8f9994] px-1 py-1">
 												No.
 											</th>
-											<th className="border border-black px-1 py-1">
+											<th className="border border-[#8f9994] px-1 py-1">
 												Descripcion
 											</th>
-											<th className="w-20 border border-black px-1 py-1">
+											<th className="w-20 border border-[#8f9994] px-1 py-1">
 												Cantidad
 											</th>
 											{group.type === "LABOR" ? (
-												<th className="w-16 border border-black px-1 py-1">
+												<th className="w-16 border border-[#8f9994] px-1 py-1">
 													Jornadas
 												</th>
 											) : null}
-											<th className="w-20 border border-black px-1 py-1">
+											<th className="w-20 border border-[#8f9994] px-1 py-1">
 												Unidad
 											</th>
-											<th className="w-24 border border-black px-1 py-1">
+											<th className="w-24 border border-[#8f9994] px-1 py-1">
 												P/U
 											</th>
-											<th className="w-28 border border-black px-1 py-1">
+											<th className="w-28 border border-[#8f9994] px-1 py-1">
 												Subtotal
 											</th>
 										</tr>
@@ -219,17 +210,17 @@ export default async function BudgetPrintPage({
 									<tbody>
 										{group.lines.map((line) => (
 											<tr key={line.id}>
-												<td className="border border-black px-1 py-1 text-center">
+												<td className="border border-[#8f9994] px-1 py-1 text-center">
 													{line.position}
 												</td>
-												<td className="border border-black px-1 py-1">
+												<td className="border border-[#8f9994] px-1 py-1">
 													{line.description}
 												</td>
-												<td className="border border-black px-1 py-1 text-center">
+												<td className="border border-[#8f9994] px-1 py-1 text-center">
 													{line.quantity.toString()}
 												</td>
 												{group.type === "LABOR" ? (
-													<td className="border border-black px-1 py-1 text-center">
+													<td className="border border-[#8f9994] px-1 py-1 text-center">
 														{persistedLaborLineUsesJornadas(
 															line.unit,
 															line.days,
@@ -238,25 +229,25 @@ export default async function BudgetPrintPage({
 															: "—"}
 													</td>
 												) : null}
-												<td className="border border-black px-1 py-1 text-center">
+												<td className="border border-[#8f9994] px-1 py-1 text-center">
 													{budgetUnitLabel(line.unit)}
 												</td>
-												<td className="border border-black px-1 py-1 text-right">
+												<td className="border border-[#8f9994] px-1 py-1 text-right">
 													{money(line.unitPrice)}
 												</td>
-												<td className="border border-black px-1 py-1 text-right">
+												<td className="border border-[#8f9994] px-1 py-1 text-right">
 													{money(lineSubtotal(line))}
 												</td>
 											</tr>
 										))}
 										<tr>
 											<td
-												className="border border-black px-1 py-1 text-right font-bold"
+												className="border border-[#8f9994] px-1 py-1 text-right font-bold"
 												colSpan={group.type === "LABOR" ? 6 : 5}
 											>
 												SUB TOTAL DE {labelForType(group.type)}
 											</td>
-											<td className="border border-black px-1 py-1 text-right font-bold">
+											<td className="border border-[#8f9994] px-1 py-1 text-right font-bold">
 												{money(group.subtotal)}
 											</td>
 										</tr>
@@ -268,12 +259,12 @@ export default async function BudgetPrintPage({
 								<tbody>
 									<tr>
 										<td
-											className="border border-black bg-[#d9d9d9] px-1 py-1 text-right font-bold"
+											className="border border-[#8f9994] bg-[#eceeed] px-1 py-1 text-right font-bold"
 											colSpan={5}
 										>
 											TOTAL DEL RENGLON
 										</td>
-										<td className="w-28 border border-black bg-[#55c7e8] px-1 py-1 text-right font-bold">
+										<td className="w-28 border border-[#8f9994] bg-[#1b2325] px-1 py-1 text-right font-bold text-white">
 											{money(sectionTotal)}
 										</td>
 									</tr>
@@ -284,44 +275,46 @@ export default async function BudgetPrintPage({
 				})}
 
 				<section className="ml-auto mt-8 w-full max-w-[520px] text-xs">
-					<h3 className="border-2 border-[#172023] bg-[#172023] px-3 py-2 text-center font-bold uppercase tracking-[0.08em] text-white">
+					<h3 className="border border-[#1b2325] bg-[#1b2325] px-3 py-1.5 text-center font-bold uppercase tracking-[0.08em] text-white">
 						Resumen financiero
 					</h3>
 					<table className="w-full border-collapse">
 						<tbody>
 							<tr>
-								<td className="border border-black px-2 py-1">
+								<td className="border border-[#8f9994] px-2 py-1">
 									Total de renglones
 								</td>
-								<td className="border border-black px-2 py-1 text-right">
+								<td className="border border-[#8f9994] px-2 py-1 text-right">
 									{money(financial.lineSubtotal)}
 								</td>
 							</tr>
 							<tr>
-								<td className="border border-black px-2 py-1">
+								<td className="border border-[#8f9994] px-2 py-1">
 									Encargado de obra
 								</td>
-								<td className="border border-black px-2 py-1 text-right">
+								<td className="border border-[#8f9994] px-2 py-1 text-right">
 									{money(financial.siteManagerCost)}
 								</td>
 							</tr>
-							<tr className="bg-[#eef2ef] font-semibold">
-								<td className="border border-black px-2 py-1">Base directa</td>
-								<td className="border border-black px-2 py-1 text-right">
+							<tr className="bg-[#f5f6f5] font-semibold">
+								<td className="border border-[#8f9994] px-2 py-1">
+									Base directa
+								</td>
+								<td className="border border-[#8f9994] px-2 py-1 text-right">
 									{money(directBase)}
 								</td>
 							</tr>
 							<tr>
-								<td className="border border-black px-2 py-1">
+								<td className="border border-[#8f9994] px-2 py-1">
 									Imprevistos {financial.contingencyPercentage.toString()}%
 								</td>
-								<td className="border border-black px-2 py-1 text-right">
+								<td className="border border-[#8f9994] px-2 py-1 text-right">
 									{money(financial.contingencyAmount)}
 								</td>
 							</tr>
-							<tr className="bg-[#eef2ef] font-semibold">
-								<td className="border border-black px-2 py-1">Subtotal</td>
-								<td className="border border-black px-2 py-1 text-right">
+							<tr className="bg-[#f5f6f5] font-semibold">
+								<td className="border border-[#8f9994] px-2 py-1">Subtotal</td>
+								<td className="border border-[#8f9994] px-2 py-1 text-right">
 									{money(financial.subtotal)}
 								</td>
 							</tr>
@@ -346,27 +339,27 @@ export default async function BudgetPrintPage({
 								] as const
 							).map(([label, percentage, amount]) => (
 								<tr key={label}>
-									<td className="border border-black px-2 py-1">
+									<td className="border border-[#8f9994] px-2 py-1">
 										{label} {percentage.toString()}%
 									</td>
-									<td className="border border-black px-2 py-1 text-right">
+									<td className="border border-[#8f9994] px-2 py-1 text-right">
 										{money(amount)}
 									</td>
 								</tr>
 							))}
 							<tr>
-								<td className="border border-black px-2 py-1">
+								<td className="border border-[#8f9994] px-2 py-1">
 									Variaciones autorizadas
 								</td>
-								<td className="border border-black bg-[#fff0b8] px-2 py-1 text-right">
+								<td className="border border-[#8f9994] px-2 py-1 text-right">
 									{money(budgetChanges.total)}
 								</td>
 							</tr>
 							<tr>
-								<td className="border-2 border-[#172023] bg-[#d5eee1] px-3 py-2 font-bold uppercase">
+								<td className="border border-[#1b2325] bg-[#1b2325] px-3 py-2 font-bold uppercase text-white">
 									Presupuesto vigente
 								</td>
-								<td className="border-2 border-[#172023] bg-[#d5eee1] px-3 py-2 text-right text-sm font-bold">
+								<td className="border border-[#1b2325] bg-[#1b2325] px-3 py-2 text-right text-sm font-bold text-white">
 									{money(currentBudget)}
 								</td>
 							</tr>

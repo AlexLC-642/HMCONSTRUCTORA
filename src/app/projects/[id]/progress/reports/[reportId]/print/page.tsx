@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/modules/auth/application/authorization";
 import { getDailyReportById } from "@/modules/progress/application/queries";
 import { DailyReportPrintDocument } from "@/modules/progress/ui/daily-report-print-document";
 import { PrintActions } from "@/shared/ui/print-actions";
+
+export const metadata: Metadata = { title: "Informe diario de avance | HM Constructora" };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

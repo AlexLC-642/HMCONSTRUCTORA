@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/modules/auth/application/authorization";
 import { daysBetweenInclusive } from "@/modules/schedules/application/dates";
 import { getProjectSchedule } from "@/modules/schedules/application/queries";
-import { scheduleActivityStatusLabels, type scheduleActivityStatuses } from "@/modules/schedules/domain/validation";
+import { type scheduleActivityStatuses, scheduleActivityStatusLabels } from "@/modules/schedules/domain/validation";
 import { PrintActions } from "@/shared/ui/print-actions";
+
+export const metadata: Metadata = { title: "Cronograma | HM Constructora" };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;

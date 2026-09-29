@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requirePermission } from "@/modules/auth/application/authorization";
 import { buildDocumentPreview } from "@/modules/documents/application/queries";
 import { getFinanceWorkspace } from "@/modules/finances/application/queries";
@@ -8,6 +9,11 @@ import {
 import { AccountStatement } from "@/modules/finances/ui/account-statement";
 import { FinanceStatementPrintSummary } from "@/modules/finances/ui/finance-statement-summary";
 import { PrintActions } from "@/shared/ui/print-actions";
+import { PrintDocumentHeader } from "@/shared/ui/print-document-header";
+
+export const metadata: Metadata = {
+	title: "Estado de cuenta | HM Constructora",
+};
 
 type FinancePrintPageProps = {
 	searchParams: Promise<{ projectId?: string }>;
@@ -69,8 +75,22 @@ export default async function FinancePrintPage({
 	return (
 		<>
 			<PrintActions backHref={backHref} />
-			<main className="print-surface mx-auto max-w-[1120px] bg-white px-8 py-6 text-[#111] print:p-0">
+			<main className="print-surface mx-auto max-w-[8.5in] bg-white px-8 py-6 text-[#111] print:p-0">
 				<style>{`@page { size: letter portrait; margin: 0.3in; } @media print { body { background: white; } * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none; } }`}</style>
+				<PrintDocumentHeader
+					details={[
+						{ label: "Código", value: selectedProject?.code ?? "—" },
+						{
+							label: "Fecha de corte",
+							value: new Intl.DateTimeFormat("es-GT", {
+								dateStyle: "long",
+							}).format(statementDate),
+						},
+					]}
+					documentMeta={[]}
+					documentTitle="Estado de cuenta"
+					projectName={selectedProject?.name ?? "Proyecto"}
+				/>
 				<AccountStatement
 					canRegister={user.permissions.includes("finanzas.registrar")}
 					documentPreviews={documentPreviews}

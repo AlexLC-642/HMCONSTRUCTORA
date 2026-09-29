@@ -77,16 +77,16 @@ export function AccountStatement({
         @media screen {
           .account-statement table { min-width: 720px; }
         }
-        .account-statement th, .account-statement td { border: 2px solid #111; padding: 3px 4px; font-size: 12px; line-height: 1.2; vertical-align: middle; }
-        .account-statement th { background: #d0d0d0; font-weight: 700; text-align: center; }
-        .account-statement .title-row th { font-size: 16px; padding: 4px 5px; }
+        .account-statement th, .account-statement td { border: 1px solid #8f9994; padding: 3px 5px; font-size: 11px; line-height: 1.2; vertical-align: middle; }
+        .account-statement th { background: #eceeed; font-weight: 700; text-align: center; }
+        .account-statement .title-row th { font-size: 12px; padding: 5px 6px; background: #1b2325; color: #fff; letter-spacing: 0.04em; }
         .account-statement .desc-cell { text-align: left; }
         .account-statement .center-cell { text-align: center; }
         .account-statement .money-cell { text-align: right; white-space: nowrap; }
         .account-statement .total-label { text-align: right; }
-        .account-statement .expense-row { background: #c9edf8; }
-        .account-statement .deposit-row { background: #dcefd2; }
-        .account-statement .total-amount { background: #55c3dd; font-weight: 700; }
+        .account-statement .expense-row { background: transparent; }
+        .account-statement .deposit-row { background: #f5f6f5; }
+        .account-statement .total-amount { background: #1b2325; color: #fff; font-weight: 700; }
         .account-statement .col-no { width: 34px; }
         .account-statement .col-desc { width: 43%; }
         .account-statement .col-company { width: 13%; }
@@ -97,7 +97,7 @@ export function AccountStatement({
         .account-statement .empty-row td { height: 34px; }
         @media print {
           .account-statement, .account-statement * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-          .account-statement th, .account-statement td { border-width: 1.5px; font-size: 9px; padding: 2px 3px; }
+          .account-statement th, .account-statement td { border-width: 1px; font-size: 9px; padding: 2px 3px; }
           .account-statement .title-row th { font-size: 12px; }
           .account-statement .empty-row td { height: 24px; }
           .account-statement section { page-break-inside: avoid; }
@@ -126,8 +126,7 @@ export function AccountStatement({
 							<thead>
 								<tr className="title-row">
 									<th colSpan={7}>
-										{phase} - COMPRAS Y GASTOS REGISTRADOS EN{" "}
-										{projectName.toUpperCase()}
+										COMPRAS Y GASTOS · {phase}
 									</th>
 								</tr>
 								<tr>
