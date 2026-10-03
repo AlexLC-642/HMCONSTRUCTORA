@@ -3,7 +3,15 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/modules/auth/application/authorization";
 import { daysBetweenInclusive } from "@/modules/schedules/application/dates";
 import { getProjectSchedule } from "@/modules/schedules/application/queries";
-import { type scheduleActivityStatuses, scheduleActivityStatusLabels } from "@/modules/schedules/domain/validation";
+import {
+	buildPrintTimeline,
+	dayOffset,
+	type TimelineUnit,
+} from "@/modules/schedules/domain/print-timeline";
+import {
+	type scheduleActivityStatuses,
+	scheduleActivityStatusLabels,
+} from "@/modules/schedules/domain/validation";
 import { PrintActions } from "@/shared/ui/print-actions";
 
 export const metadata: Metadata = { title: "Cronograma | HM Constructora" };
@@ -11,152 +19,240 @@ export const metadata: Metadata = { title: "Cronograma | HM Constructora" };
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const dayFormatter = new Intl.DateTimeFormat("es-GT", { day: "2-digit", month: "short", timeZone: "UTC" });
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+type Status = (typeof scheduleActivityStatuses)[number];
 
-function addDays(value: Date, days: number) {
-  const next = new Date(value);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
+const shortDate = new Intl.DateTimeFormat("es-GT", {
+	day: "2-digit",
+	month: "short",
+	timeZone: "UTC",
+});
+const longDate = new Intl.DateTimeFormat("es-GT", {
+	day: "2-digit",
+	month: "long",
+	year: "numeric",
+	timeZone: "UTC",
+});
+
+const statusColor: Record<Status, string> = {
+	PENDING: "#8a949a",
+	IN_PROGRESS: "#1f7a5b",
+	BLOCKED: "#c4312f",
+	COMPLETED: "#2563eb",
+};
+
+const unitLabel: Record<TimelineUnit, string> = {
+	day: "días",
+	week: "semanas (fecha de inicio de cada semana)",
+	month: "meses",
+};
+
+export default async function SchedulePrintPage({
+	params,
+}: {
+	params: Promise<{ id: string }>;
+}) {
+	await requirePermission("cronograma.ver");
+	const { id } = await params;
+	const schedule = await getProjectSchedule(id);
+
+	if (!schedule?.startDate || !schedule.endDate) notFound();
+
+	const scheduleStart = schedule.startDate;
+	const timeline = buildPrintTimeline(scheduleStart, schedule.endDate);
+	const hasLabor = schedule.activities.some((activity) =>
+		activity.labor?.trim(),
+	);
+	// Columnas fijas en % del ancho; el resto es la línea de tiempo.
+	const fixed = {
+		no: 3,
+		description: hasLabor ? 18 : 23,
+		labor: hasLabor ? 9 : 0,
+		start: 6,
+		end: 6,
+		days: 4,
+		status: 7,
+	};
+	const timelineWidth =
+		100 - Object.values(fixed).reduce((sum, value) => sum + value, 0);
+	const fixedColumns = hasLabor ? 7 : 6;
+	const pct = (days: number) => (days / timeline.totalDays) * 100;
+
+	return (
+		<>
+			<PrintActions backHref={`/projects/${id}/schedule`} />
+			<main className="schedule-print print-surface mx-auto max-w-[1280px] bg-white p-8 text-[#111] print:max-w-none print:p-0">
+				<style>{`
+@page { size: letter landscape; margin: 0.35in; }
+.schedule-print * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.schedule-print-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 10px; }
+.schedule-print-table th, .schedule-print-table td { border: 1px solid #9aa3a0; padding: 4px 5px; vertical-align: middle; }
+.schedule-print-table thead th { background: #eef2ef; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.schedule-print-table thead tr:first-child th { background: #dfe6e1; }
+.schedule-print-table .period { padding: 3px 0; text-align: center; font-size: 9px; text-transform: none; white-space: nowrap; overflow: hidden; }
+.schedule-print-table .period small { display: block; font-weight: 500; color: #555; }
+.schedule-print-table tbody tr { break-inside: avoid; page-break-inside: avoid; }
+.schedule-print-table tbody tr:nth-child(even) td { background: #fafbfa; }
+.schedule-print-table .bar-cell { position: relative; padding: 0; height: 26px; }
+.schedule-print-table .grid-line { position: absolute; top: 0; bottom: 0; border-left: 1px solid #e1e6e2; }
+.schedule-print-table .bar { position: absolute; top: 7px; bottom: 7px; border-radius: 3px; border: 1.5px solid; overflow: hidden; }
+.schedule-print-table .bar > span { position: absolute; inset: 0 auto 0 0; }
+.schedule-print-table thead { display: table-header-group; }
+@media print {
+  html, body { background: white; }
+  .schedule-print-table { font-size: 9px; }
+  .schedule-print-table .bar-cell { height: 22px; }
+  .schedule-print-table .bar { top: 6px; bottom: 6px; }
 }
+`}</style>
+				<header className="mb-5 flex items-end justify-between gap-6 border-b-2 border-[#1b2528] pb-3">
+					<div>
+						<p className="text-[11px] font-semibold uppercase tracking-wide text-[#555]">
+							Proyecto {schedule.project.code}
+						</p>
+						<h1 className="text-lg font-bold uppercase leading-tight">
+							{schedule.project.name}
+						</h1>
+						{schedule.project.location ? (
+							<p className="text-[11px] uppercase text-[#444]">
+								{schedule.project.location}
+							</p>
+						) : null}
+					</div>
+					<div className="text-right">
+						<h2 className="text-lg font-bold uppercase">Cronograma</h2>
+						<p className="text-[11px] text-[#444]">
+							{longDate.format(scheduleStart)} –{" "}
+							{longDate.format(schedule.endDate)} · {timeline.totalDays} días
+						</p>
+					</div>
+				</header>
 
-function offset(start: Date, value: Date) {
-  return Math.max(0, Math.round((value.getTime() - start.getTime()) / MS_PER_DAY));
-}
+				<table className="schedule-print-table">
+					<colgroup>
+						<col style={{ width: `${fixed.no}%` }} />
+						<col style={{ width: `${fixed.description}%` }} />
+						{hasLabor ? <col style={{ width: `${fixed.labor}%` }} /> : null}
+						<col style={{ width: `${fixed.start}%` }} />
+						<col style={{ width: `${fixed.end}%` }} />
+						<col style={{ width: `${fixed.days}%` }} />
+						<col style={{ width: `${fixed.status}%` }} />
+						{timeline.periods.map((period) => (
+							<col
+								key={period.key}
+								style={{
+									width: `${(period.days / timeline.totalDays) * timelineWidth}%`,
+								}}
+							/>
+						))}
+					</colgroup>
+					<thead>
+						<tr>
+							<th colSpan={fixedColumns} />
+							{timeline.groups.map((group) => (
+								<th className="period" colSpan={group.span} key={group.key}>
+									{group.label}
+								</th>
+							))}
+						</tr>
+						<tr>
+							<th>No.</th>
+							<th className="text-left">Actividad</th>
+							{hasLabor ? <th>Mano de obra</th> : null}
+							<th>Inicio</th>
+							<th>Fin</th>
+							<th>Días</th>
+							<th>Estado</th>
+							{timeline.periods.map((period) => (
+								<th className="period" key={period.key}>
+									{period.label}
+									{period.sublabel ? <small>{period.sublabel}</small> : null}
+								</th>
+							))}
+						</tr>
+					</thead>
+					<tbody>
+						{schedule.activities.map((activity) => {
+							const status = activity.status as Status;
+							const color = statusColor[status];
+							const start = Math.max(
+								0,
+								dayOffset(scheduleStart, activity.plannedStart),
+							);
+							const duration = daysBetweenInclusive(
+								activity.plannedStart,
+								activity.plannedEnd,
+							);
+							const progress = Math.min(
+								100,
+								Math.max(0, activity.progress.toNumber()),
+							);
+							return (
+								<tr key={activity.id}>
+									<td className="text-center">{activity.code}</td>
+									<td>{activity.description}</td>
+									{hasLabor ? (
+										<td className="text-center">{activity.labor ?? ""}</td>
+									) : null}
+									<td className="text-center tabular-nums">
+										{shortDate.format(activity.plannedStart)}
+									</td>
+									<td className="text-center tabular-nums">
+										{shortDate.format(activity.plannedEnd)}
+									</td>
+									<td className="text-center tabular-nums">{duration}</td>
+									<td className="text-center">
+										{scheduleActivityStatusLabels[status]}
+										{progress > 0 && progress < 100 ? (
+											<span className="block text-[8px] text-[#555]">
+												{progress.toFixed(0)}%
+											</span>
+										) : null}
+									</td>
+									<td className="bar-cell" colSpan={timeline.periods.length}>
+										{timeline.periods.slice(1).map((period) => (
+											<span
+												className="grid-line"
+												key={period.key}
+												style={{ left: `${pct(period.startDay)}%` }}
+											/>
+										))}
+										<span
+											className="bar"
+											style={{
+												left: `${pct(start)}%`,
+												width: `max(3px, ${pct(duration)}%)`,
+												borderColor: color,
+												background: `${color}22`,
+											}}
+										>
+											<span
+												style={{ width: `${progress}%`, background: color }}
+											/>
+										</span>
+									</td>
+								</tr>
+							);
+						})}
+					</tbody>
+				</table>
 
-function weekKey(startOfTimeline: Date, value: Date) {
-  const diffDays = Math.floor((value.getTime() - startOfTimeline.getTime()) / MS_PER_DAY);
-  return `${startOfTimeline.toISOString().slice(0, 10)}-${Math.floor(diffDays / 7)}`;
-}
-
-function weekLabel(days: Date[]) {
-  const first = days[0];
-  const last = days[days.length - 1];
-  return `${dayFormatter.format(first)} - ${dayFormatter.format(last)}`;
-}
-
-function groupDaysByWeek(days: Date[]) {
-  if (days.length === 0) return [];
-
-  return days.reduce<Array<{ key: string; label: string; days: Date[] }>>((groups, day) => {
-    const startOfTimeline = days[0];
-    const key = weekKey(startOfTimeline, day);
-    const current = groups.at(-1);
-
-    if (!current || current.key !== key) {
-      groups.push({ key, label: weekLabel([day]), days: [day] });
-      return groups;
-    }
-
-    current.days.push(day);
-    current.label = weekLabel(current.days);
-    return groups;
-  }, []);
-}
-
-function printScale(totalDays: number) {
-  const estimatedWidth = 560 + totalDays * 24;
-  return Math.min(1, Math.max(0.48, 1000 / estimatedWidth));
-}
-
-function printFontSize(totalDays: number) {
-  if (totalDays > 45) return 5.6;
-  if (totalDays > 32) return 6.4;
-  if (totalDays > 20) return 7.2;
-  return 8.2;
-}
-
-export default async function SchedulePrintPage({ params }: { params: Promise<{ id: string }> }) {
-  await requirePermission("cronograma.ver");
-  const { id } = await params;
-  const schedule = await getProjectSchedule(id);
-
-  if (!schedule?.startDate || !schedule.endDate) notFound();
-
-  const scheduleStart = schedule.startDate;
-  const scheduleEnd = schedule.endDate;
-  const totalDays = daysBetweenInclusive(scheduleStart, scheduleEnd);
-  const days = Array.from({ length: totalDays }, (_, index) => addDays(scheduleStart, index));
-  const weeks = groupDaysByWeek(days);
-  const scale = printScale(totalDays);
-  const fontSize = printFontSize(totalDays);
-
-  return (
-    <>
-      <PrintActions backHref={`/projects/${id}/schedule`} />
-      <main className="print-surface mx-auto max-w-[1280px] bg-white p-8 text-[#111] print:w-full print:max-w-none print:p-0">
-        <style>{`@page { size: letter landscape; margin: 0.25in; } @media print { html, body { width: 100%; background: white; } * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .no-print { display: none; } .schedule-print-page { width: calc(100% / var(--schedule-print-scale)); transform: scale(var(--schedule-print-scale)); transform-origin: top left; } .schedule-print-header { margin-bottom: 12px !important; } .schedule-print-header h1 { font-size: 15px !important; line-height: 1.1 !important; } .schedule-print-header h2 { font-size: 13px !important; margin-top: 10px !important; } .schedule-print-header p { font-size: 8px !important; line-height: 1.1 !important; } .schedule-print-wrap { overflow: visible !important; width: 100% !important; } .schedule-print-table { width: 100% !important; min-width: 0 !important; table-layout: fixed; border-collapse: collapse; font-size: var(--schedule-print-font-size); } .schedule-print-table th, .schedule-print-table td { padding: 2px 3px !important; line-height: 1.1; overflow: hidden; vertical-align: middle; } .schedule-print-table .col-no { width: 4%; } .schedule-print-table .col-description { width: 31%; } .schedule-print-table .col-labor { width: 12%; } .schedule-print-table .col-status { width: 9%; } .schedule-print-table .day-cell { width: auto; min-width: 0; padding-left: 0 !important; padding-right: 0 !important; text-align: center; } .schedule-print-note { font-size: 8px !important; margin-top: 12px !important; } section { page-break-inside: avoid; } }`}</style>
-        <div
-          className="schedule-print-page"
-          style={{
-            "--schedule-print-scale": scale,
-            "--schedule-print-font-size": `${fontSize}px`
-          } as React.CSSProperties}
-        >
-          <header className="schedule-print-header mb-6 text-center">
-            <p className="text-xs font-semibold uppercase">{schedule.project.code}</p>
-            <h1 className="text-xl font-bold uppercase">{schedule.project.name}</h1>
-            <p className="text-sm uppercase">{schedule.project.location ?? ""}</p>
-            <h2 className="mt-4 text-lg font-bold uppercase">Cronograma</h2>
-          </header>
-
-          <section className="schedule-print-wrap overflow-x-auto">
-            <table className="schedule-print-table w-full min-w-[1100px] border-collapse text-[11px]">
-              <colgroup>
-                <col className="col-no" />
-                <col className="col-description" />
-                <col className="col-labor" />
-                <col className="col-status" />
-                {days.map((day) => <col className="day-cell" key={`col-${day.toISOString()}`} />)}
-              </colgroup>
-              <thead>
-                <tr className="bg-[#e7ece8]">
-                  <th className="border border-[#777] px-2 py-1" colSpan={4}></th>
-                  {weeks.map((week) => <th className="border border-[#777] px-1 py-1 text-center uppercase" colSpan={week.days.length} key={week.key}>Semana {week.label}</th>)}
-                </tr>
-                <tr className="bg-[#f4f7f4]">
-                  <th className="col-no border border-[#777] px-2 py-1">No.</th>
-                  <th className="col-description border border-[#777] px-2 py-1 text-left">DESCRIPCION</th>
-                  <th className="col-labor border border-[#777] px-2 py-1">MANO DE OBRA</th>
-                  <th className="col-status border border-[#777] px-2 py-1">ESTADO</th>
-                  {days.map((day) => <th className="day-cell border border-[#777] px-1 py-1" key={day.toISOString()}>{day.getUTCDate()}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {schedule.activities.map((activity) => {
-                  const startOffset = offset(scheduleStart, activity.plannedStart);
-                  const duration = daysBetweenInclusive(activity.plannedStart, activity.plannedEnd);
-                  return (
-                    <tr key={activity.id}>
-                      <td className="border border-[#777] px-2 py-1 text-center">{activity.code}</td>
-                      <td className="border border-[#777] px-2 py-1">{activity.description}</td>
-                      <td className="border border-[#777] px-2 py-1 text-center">{activity.labor ?? ""}</td>
-                      <td className="border border-[#777] px-2 py-1 text-center">{scheduleActivityStatusLabels[activity.status as (typeof scheduleActivityStatuses)[number]]}</td>
-                      {days.map((day, index) => {
-                        const active = index >= startOffset && index < startOffset + duration;
-                        const progressDays = Math.ceil(duration * Math.min(100, Math.max(0, activity.progress.toNumber())) / 100);
-                        const advanced = active && index < startOffset + progressDays;
-                        const fillClass = advanced
-                          ? activity.status === "COMPLETED"
-                            ? "bg-[#2563eb]"
-                            : activity.status === "IN_PROGRESS"
-                              ? "bg-[#1f6b4f]"
-                              : activity.status === "BLOCKED"
-                                ? "bg-[#c4312f]"
-                                : "bg-[#e2e8e4]"
-                          : "";
-                        return <td className={`day-cell border border-[#777] px-1 py-1 ${fillClass}`} key={`${activity.id}-${day.toISOString()}`}>&nbsp;</td>;
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </section>
-
-          <p className="schedule-print-note mt-6 text-xs uppercase">Nota: {schedule.notes}</p>
-        </div>
-      </main>
-    </>
-  );
+				<footer className="mt-4 flex flex-wrap items-center justify-between gap-4 text-[10px] text-[#333]">
+					<div className="flex flex-wrap items-center gap-4">
+						<span className="inline-flex items-center gap-1.5">
+							<span className="inline-block h-2.5 w-6 rounded-sm border-[1.5px] border-[#8a949a] bg-[#8a949a22]" />
+							Planificado
+						</span>
+						<span className="inline-flex items-center gap-1.5">
+							<span className="inline-block h-2.5 w-6 rounded-sm bg-[#1f7a5b]" />
+							Avance real
+						</span>
+						<span>Escala: {unitLabel[timeline.unit]}</span>
+					</div>
+					{schedule.notes ? (
+						<p className="uppercase">Nota: {schedule.notes}</p>
+					) : null}
+				</footer>
+			</main>
+		</>
+	);
 }
