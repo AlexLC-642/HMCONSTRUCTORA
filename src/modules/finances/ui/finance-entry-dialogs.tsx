@@ -1,13 +1,11 @@
 "use client";
 
 import {
-	ArrowRight,
 	Banknote,
 	ChevronDown,
 	FileCheck2,
 	FilePlus2,
 	FileUp,
-	Info,
 	ReceiptText,
 	ShoppingCart,
 	X,
@@ -19,6 +17,7 @@ import {
 	createExpenseAction,
 	createPurchaseInvoiceAction,
 } from "@/modules/finances/application/actions";
+import { HelpTip } from "@/shared/ui/help-tip";
 import { SelectMenu, type SelectMenuOption } from "@/shared/ui/select-menu";
 import { FinanceSubmitButton } from "./finance-submit-button";
 
@@ -44,7 +43,7 @@ type DialogKind = "invoice" | "expense" | "payment" | null;
 const inputClass =
 	"focus-ring h-11 w-full rounded-lg border border-[#cbd3cc] bg-white px-3 text-sm text-[#172023] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:border-[#9daaa1]";
 const labelClass =
-	"mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-[#53615c]";
+	"text-[11px] font-semibold uppercase tracking-[0.08em] text-[#53615c]";
 
 const currency = new Intl.NumberFormat("es-GT", {
 	style: "currency",
@@ -60,115 +59,97 @@ const paymentMethodOptions: SelectMenuOption[] = [
 ].map((method) => ({ value: method, label: method }));
 
 const expenseTypeOptions: SelectMenuOption[] = [
-	{
-		value: "Mano de obra",
-		label: "Mano de obra",
-		description: "Planillas, jornales y destajos",
-	},
-	{
-		value: "Servicio",
-		label: "Servicio",
-		description: "Fletes, alquiler de maquinaria, subcontratos",
-	},
-	{
-		value: "Material",
-		label: "Material sin orden de compra",
-		description: "Compras menores pagadas al momento",
-	},
+	{ value: "Mano de obra", label: "Mano de obra" },
+	{ value: "Servicio", label: "Servicio o flete" },
+	{ value: "Material", label: "Material (compra menor)" },
 	{ value: "Supervisión", label: "Supervisión" },
 	{ value: "Trabajo adicional", label: "Trabajo adicional" },
-	{ value: "Gasto externo", label: "Gasto externo distinto de obra" },
+	{ value: "Gasto externo", label: "Gasto externo" },
 	{ value: "Otro", label: "Otro" },
 ];
 
 const documentTypeOptions: SelectMenuOption[] = [
+	{ value: "", label: "Sin comprobante" },
 	{ value: "FACTURA", label: "Factura" },
 	{ value: "RECIBO", label: "Recibo" },
-	{ value: "OTRO", label: "Otro comprobante" },
+	{ value: "OTRO", label: "Otro" },
 ];
 
-/** Etiqueta visible ligada al control por id (el selector no es un <input>). */
 function Field({
 	label,
-	hint,
+	help,
 	children,
 	labelId,
+	className,
 }: {
 	label: string;
-	hint?: string;
+	help?: ReactNode;
 	children: ReactNode;
 	labelId?: string;
+	className?: string;
 }) {
 	return (
-		<div className="block">
-			<span className={labelClass} id={labelId}>
-				{label}
-			</span>
+		<div className={className}>
+			<div className="mb-1.5 flex items-center gap-1.5">
+				<span className={labelClass} id={labelId}>
+					{label}
+				</span>
+				{help ? <HelpTip label={`Ayuda: ${label}`}>{help}</HelpTip> : null}
+			</div>
 			{children}
-			{hint ? (
-				<small className="mt-1 block text-xs text-[#6b7974]">{hint}</small>
-			) : null}
 		</div>
 	);
 }
 
-function SectionTitle({
-	title,
-	description,
+function FileField({
+	name,
+	fileName,
+	onFile,
+	required = false,
 }: {
-	title: string;
-	description?: string;
+	name: string;
+	fileName: string;
+	onFile: (name: string) => void;
+	required?: boolean;
 }) {
 	return (
-		<div className="sm:col-span-2 border-b border-[#e1e6e1] pb-2 pt-1 first:pt-0">
-			<h3 className="finance-entry-section text-sm font-semibold text-[#1d2a27]">
-				{title}
-			</h3>
-			{description ? (
-				<p className="mt-0.5 text-xs text-[#66746f]">{description}</p>
-			) : null}
-		</div>
-	);
-}
-
-function Callout({
-	children,
-	tone = "info",
-}: {
-	children: ReactNode;
-	tone?: "info" | "warning";
-}) {
-	return (
-		<div
-			className={`finance-callout sm:col-span-2 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
-				tone === "warning"
-					? "border-[#ecd9a6] bg-[#fff8e6] text-[#5b4512]"
-					: "border-[#cfdcea] bg-[#eef4fa] text-[#2c3d4f]"
-			}`}
-			data-tone={tone}
-		>
-			<Info aria-hidden="true" className="mt-0.5 shrink-0" size={17} />
-			<div className="min-w-0 leading-relaxed">{children}</div>
-		</div>
+		<label className="finance-invoice-upload flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[#9db4a8] bg-white px-3 text-sm text-[#263330] transition hover:border-[#25815f]">
+			{fileName ? (
+				<FileCheck2 className="shrink-0 text-[#167154]" size={16} />
+			) : (
+				<FileUp className="shrink-0" size={16} />
+			)}
+			<span className="truncate">{fileName || "Adjuntar PDF o foto"}</span>
+			<input
+				accept=".pdf,.png,.jpg,.jpeg,.webp"
+				className="sr-only"
+				name={name}
+				onChange={(event) => onFile(event.target.files?.[0]?.name ?? "")}
+				required={required}
+				type="file"
+			/>
+		</label>
 	);
 }
 
 function ModalShell({
 	title,
 	description,
+	help,
 	icon: Icon,
 	onClose,
 	children,
 }: {
 	title: string;
 	description: string;
+	help?: ReactNode;
 	icon: typeof Banknote;
 	onClose: () => void;
 	children: ReactNode;
 }) {
 	useEffect(() => {
 		const closeOnEscape = (event: KeyboardEvent) => {
-			// Un Escape ya atendido por un selector interno no cierra el diálogo.
+			// Un Escape ya atendido por un selector o ayuda no cierra el diálogo.
 			if (event.key === "Escape" && !event.defaultPrevented) onClose();
 		};
 		window.addEventListener("keydown", closeOnEscape);
@@ -185,19 +166,26 @@ function ModalShell({
 			/>
 			<section
 				aria-modal="true"
-				className="relative flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/70 bg-[#f8f8f5] shadow-[0_36px_100px_rgba(9,16,18,0.38),0_4px_20px_rgba(9,16,18,0.18)]"
+				className="relative flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/70 bg-[#f8f8f5] shadow-[0_36px_100px_rgba(9,16,18,0.38),0_4px_20px_rgba(9,16,18,0.18)]"
 				role="dialog"
 			>
-				<header className="relative overflow-hidden border-b border-white/10 bg-[#182225] px-5 py-5 text-white sm:px-6">
+				<header className="relative overflow-hidden border-b border-white/10 bg-[#182225] px-5 py-4 text-white sm:px-6">
 					<div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_82%_18%,rgba(200,32,47,0.2),transparent_38%)]" />
-					<div className="relative flex items-start justify-between gap-4">
-						<div className="flex min-w-0 items-start gap-3">
-							<span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[var(--brand-red)] shadow-[0_10px_24px_rgba(200,32,47,0.28)]">
-								<Icon aria-hidden="true" size={20} />
+					<div className="relative flex items-center justify-between gap-4">
+						<div className="flex min-w-0 items-center gap-3">
+							<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--brand-red)] shadow-[0_10px_24px_rgba(200,32,47,0.28)]">
+								<Icon aria-hidden="true" size={19} />
 							</span>
-							<div>
-								<h2 className="text-xl font-semibold">{title}</h2>
-								<p className="mt-1 text-sm text-white/70">{description}</p>
+							<div className="min-w-0">
+								<div className="flex items-center gap-1.5">
+									<h2 className="text-lg font-semibold">{title}</h2>
+									{help ? (
+										<span className="finance-header-help">
+											<HelpTip label={`Ayuda: ${title}`}>{help}</HelpTip>
+										</span>
+									) : null}
+								</div>
+								<p className="text-sm text-white/70">{description}</p>
 							</div>
 						</div>
 						<button
@@ -237,18 +225,12 @@ function DialogFooter({
 	);
 }
 
-/** Campos opcionales plegados para que el formulario no abrume. */
-function OptionalDetails({
-	summary,
-	children,
-}: {
-	summary: string;
-	children: ReactNode;
-}) {
+/** Campos opcionales plegados: el formulario muestra solo lo esencial. */
+function MoreDetails({ children }: { children: ReactNode }) {
 	return (
 		<details className="finance-optional group sm:col-span-2 rounded-xl border border-[#dde2dc] bg-white">
 			<summary className="focus-ring flex cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-[#2b3835]">
-				{summary}
+				Más detalles
 				<ChevronDown
 					aria-hidden="true"
 					className="shrink-0 transition group-open:rotate-180"
@@ -277,9 +259,7 @@ export function FinanceEntryDialogs({
 	const [dialog, setDialog] = useState<DialogKind>(null);
 	const [expenseFileName, setExpenseFileName] = useState("");
 	const [invoiceFileName, setInvoiceFileName] = useState("");
-	const invoiceableOrders = invoiceOrders.filter(
-		(order) => order.available > 0,
-	);
+	const invoiceableOrders = invoiceOrders.filter((order) => order.available > 0);
 	const [invoiceOrderId, setInvoiceOrderId] = useState(
 		invoiceableOrders[0]?.id ?? "",
 	);
@@ -309,26 +289,22 @@ export function FinanceEntryDialogs({
 		(order) => ({
 			value: order.id,
 			label: `${order.number} · ${order.supplier.businessName}`,
-			description: `Por facturar ${currency.format(order.available)} de ${currency.format(order.total)}`,
+			description: `Por facturar ${currency.format(order.available)}`,
 		}),
 	);
 	const expenseSectionOptions: SelectMenuOption[] = [
-		{ value: "", label: "Sin renglón asignado" },
+		{ value: "", label: "Sin renglón" },
 		...sections.map((section) => ({
 			value: section.code,
 			label: `${section.code} · ${section.name}`,
 		})),
 	];
 	const paymentSectionOptions: SelectMenuOption[] = [
-		{
-			value: "",
-			label: "Abono general del proyecto",
-			description: "No se aplica a un renglón en particular",
-		},
+		{ value: "", label: "Abono general" },
 		...sections.map((section) => ({
 			value: section.id,
-			label: `Renglón ${section.code} · ${section.name}`,
-			description: `Precio al cliente hasta ${currency.format(Number(section.total))}`,
+			label: `${section.code} · ${section.name}`,
+			description: `Hasta ${currency.format(Number(section.total))}`,
 		})),
 	];
 
@@ -342,8 +318,8 @@ export function FinanceEntryDialogs({
 					onClick={() => setDialog("invoice")}
 					title={
 						canInvoice
-							? "Factura del proveedor por material comprado con orden de compra"
-							: "No hay órdenes de compra emitidas con saldo por facturar. Emítelas desde Compras."
+							? "Factura de una orden de compra"
+							: "No hay órdenes de compra emitidas por facturar"
 					}
 					type="button"
 				>
@@ -352,7 +328,7 @@ export function FinanceEntryDialogs({
 				<button
 					className="purchases-button purchases-button--amber focus-ring"
 					onClick={() => setDialog("expense")}
-					title="Mano de obra, fletes, servicios o compras menores sin orden de compra"
+					title="Pagos sin orden de compra"
 					type="button"
 				>
 					<ReceiptText aria-hidden="true" size={17} /> Gasto directo
@@ -360,7 +336,7 @@ export function FinanceEntryDialogs({
 				<button
 					className="purchases-button purchases-button--green focus-ring"
 					onClick={() => setDialog("payment")}
-					title="Dinero que el cliente pagó a HM"
+					title="Dinero recibido del cliente"
 					type="button"
 				>
 					<Banknote aria-hidden="true" size={17} /> Abono del cliente
@@ -369,7 +345,8 @@ export function FinanceEntryDialogs({
 
 			{dialog === "invoice" ? (
 				<ModalShell
-					description="Para material comprado con orden de compra en Compras."
+					description="De una orden emitida en Compras"
+					help="Los pagos al proveedor se registran después en Cuentas por pagar."
 					icon={ShoppingCart}
 					onClose={close}
 					title="Factura de compra"
@@ -381,49 +358,23 @@ export function FinanceEntryDialogs({
 						<input name="projectId" type="hidden" value={projectId} />
 						<div className="overflow-y-auto p-5 sm:p-6">
 							<div className="grid gap-4 sm:grid-cols-2">
-								<div className="sm:col-span-2">
-									<Field label="Orden de compra" labelId={`${ids}-order`}>
-										<SelectMenu
-											aria-labelledby={`${ids}-order`}
-											emptyMessage="Ninguna orden coincide."
-											name="purchaseOrderId"
-											onChange={setInvoiceOrderId}
-											options={invoiceOrderOptions}
-											placeholder="Elegir orden emitida"
-											searchPlaceholder="Buscar por número o proveedor"
-											searchable
-											value={invoiceOrderId}
-										/>
-									</Field>
-								</div>
-								{selectedInvoiceOrder ? (
-									<div className="finance-invoice-summary sm:col-span-2 grid gap-3 rounded-xl border border-[#cfded6] bg-[linear-gradient(120deg,#eff7f2,#ffffff)] p-4 shadow-[inset_0_1px_0_white] sm:grid-cols-3">
-										<div>
-											<small className="block text-[11px] font-semibold uppercase tracking-[.07em] text-[#65736e]">
-												Proveedor
-											</small>
-											<strong className="mt-1 block text-sm text-[#172023]">
-												{selectedInvoiceOrder.supplier.businessName}
-											</strong>
-										</div>
-										<div>
-											<small className="block text-[11px] font-semibold uppercase tracking-[.07em] text-[#65736e]">
-												Total de la orden
-											</small>
-											<strong className="mt-1 block text-sm tabular-nums text-[#172023]">
-												{currency.format(selectedInvoiceOrder.total)}
-											</strong>
-										</div>
-										<div>
-											<small className="block text-[11px] font-semibold uppercase tracking-[.07em] text-[#65736e]">
-												Por facturar
-											</small>
-											<strong className="mt-1 block text-sm tabular-nums text-[#167154]">
-												{currency.format(selectedInvoiceOrder.available)}
-											</strong>
-										</div>
-									</div>
-								) : null}
+								<Field
+									className="sm:col-span-2"
+									label="Orden de compra"
+									labelId={`${ids}-order`}
+								>
+									<SelectMenu
+										aria-labelledby={`${ids}-order`}
+										emptyMessage="Ninguna orden coincide."
+										name="purchaseOrderId"
+										onChange={setInvoiceOrderId}
+										options={invoiceOrderOptions}
+										placeholder="Elegir orden"
+										searchPlaceholder="Buscar orden o proveedor"
+										searchable
+										value={invoiceOrderId}
+									/>
+								</Field>
 								<Field label="Número de factura">
 									<input
 										className={inputClass}
@@ -432,7 +383,7 @@ export function FinanceEntryDialogs({
 										required
 									/>
 								</Field>
-								<Field label="Fecha de factura">
+								<Field label="Fecha">
 									<input
 										className={inputClass}
 										defaultValue={today}
@@ -442,8 +393,12 @@ export function FinanceEntryDialogs({
 									/>
 								</Field>
 								<Field
-									hint="Puede ser parcial si el proveedor factura por entregas."
-									label="Total facturado"
+									help={
+										selectedInvoiceOrder
+											? `Pendiente de facturar: ${currency.format(selectedInvoiceOrder.available)} de ${currency.format(selectedInvoiceOrder.total)}. Puede ser parcial.`
+											: "Puede ser parcial si el proveedor factura por entregas."
+									}
+									label="Monto"
 								>
 									<input
 										className={inputClass}
@@ -457,41 +412,22 @@ export function FinanceEntryDialogs({
 										type="number"
 									/>
 								</Field>
-								<label className="group grid cursor-pointer content-start gap-1.5 text-[11px] font-semibold uppercase tracking-[.08em] text-[#53615c]">
-									<span>Archivo de factura</span>
-									<span className="finance-invoice-upload flex h-11 items-center gap-2 rounded-lg border border-dashed border-[#9db4a8] bg-white px-3 normal-case tracking-normal text-[#263330] transition hover:border-[#25815f]">
-										{invoiceFileName ? (
-											<FileCheck2 size={16} className="text-[#167154]" />
-										) : (
-											<FileUp size={16} />
-										)}
-										<span className="truncate">
-											{invoiceFileName || "Seleccionar PDF o imagen"}
-										</span>
-									</span>
-									<input
-										accept=".pdf,.png,.jpg,.jpeg,.webp"
-										className="sr-only"
+								<Field label="Archivo">
+									<FileField
+										fileName={invoiceFileName}
 										name="documentFile"
-										onChange={(event) =>
-											setInvoiceFileName(event.target.files?.[0]?.name ?? "")
-										}
+										onFile={setInvoiceFileName}
 										required
-										type="file"
 									/>
-								</label>
-								<div className="sm:col-span-2">
-									<Field label="Observaciones (opcional)">
+								</Field>
+								<MoreDetails>
+									<Field className="sm:col-span-2" label="Observaciones">
 										<textarea
 											className={`${inputClass} min-h-20 py-3`}
 											name="notes"
 										/>
 									</Field>
-								</div>
-								<Callout>
-									Después de guardarla, los pagos al proveedor se registran en{" "}
-									<strong>Cuentas por pagar</strong>.
-								</Callout>
+								</MoreDetails>
 							</div>
 						</div>
 						<DialogFooter
@@ -510,7 +446,15 @@ export function FinanceEntryDialogs({
 
 			{dialog === "expense" ? (
 				<ModalShell
-					description="Lo que se paga sin orden de compra: mano de obra, fletes, servicios o compras menores."
+					description="Pagos sin orden de compra"
+					help={
+						<>
+							Mano de obra, fletes, servicios o compras menores.
+							<br />
+							Si el material se compró con orden de compra, usa{" "}
+							<strong>Factura de compra</strong> para no duplicarlo.
+						</>
+					}
 					icon={ReceiptText}
 					onClose={close}
 					title="Gasto directo"
@@ -522,74 +466,16 @@ export function FinanceEntryDialogs({
 						<input name="projectId" type="hidden" value={projectId} />
 						<div className="overflow-y-auto p-5 sm:p-6">
 							<div className="grid gap-4 sm:grid-cols-2">
-								<Callout tone="warning">
-									<p>
-										<strong>¿Es material comprado con orden de compra?</strong>{" "}
-										No lo registres aquí: usa “Factura de compra” para no
-										duplicar el gasto. Si el material debe entrar a bodega,
-										cómpralo desde Compras.
-									</p>
-									<div className="mt-2 flex flex-wrap gap-2">
-										{canInvoice ? (
-											<button
-												className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-[#d9c48d] bg-white px-3 py-1.5 text-xs font-semibold"
-												onClick={() => setDialog("invoice")}
-												type="button"
-											>
-												<FileCheck2 aria-hidden="true" size={14} /> Ir a Factura
-												de compra
-											</button>
-										) : null}
-										<a
-											className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-[#d9c48d] bg-white px-3 py-1.5 text-xs font-semibold"
-											href="/purchases"
-										>
-											Abrir Compras <ArrowRight aria-hidden="true" size={14} />
-										</a>
-									</div>
-								</Callout>
-
-								<SectionTitle title="Qué se pagó" />
-								<div className="sm:col-span-2">
-									<Field label="Descripción del gasto">
-										<input
-											className={inputClass}
-											minLength={3}
-											name="description"
-											placeholder="Ej. Planilla semana 32, flete de arena, renta de mezcladora"
-											required
-										/>
-									</Field>
-								</div>
-								<Field label="Tipo de gasto" labelId={`${ids}-type`}>
-									<SelectMenu
-										aria-labelledby={`${ids}-type`}
-										name="type"
-										onChange={setExpenseType}
-										options={expenseTypeOptions}
-										placeholder="Elegir tipo"
-										value={expenseType}
+								<Field className="sm:col-span-2" label="Descripción">
+									<input
+										className={inputClass}
+										minLength={3}
+										name="description"
+										placeholder="Ej. Planilla semana 32"
+										required
 									/>
 								</Field>
-								<Field
-									label="Renglón del presupuesto"
-									labelId={`${ids}-section`}
-								>
-									<SelectMenu
-										aria-labelledby={`${ids}-section`}
-										emptyMessage="Ningún renglón coincide."
-										name="budgetSectionNo"
-										onChange={setExpenseSection}
-										options={expenseSectionOptions}
-										placeholder="Sin renglón asignado"
-										searchPlaceholder="Buscar renglón"
-										searchable={sections.length > 6}
-										value={expenseSection}
-									/>
-								</Field>
-
-								<SectionTitle title="Monto y pago" />
-								<Field label="Total del gasto">
+								<Field label="Monto">
 									<input
 										className={inputClass}
 										inputMode="decimal"
@@ -610,21 +496,14 @@ export function FinanceEntryDialogs({
 										type="date"
 									/>
 								</Field>
-								<Field label="Cantidad">
-									<input
-										className={inputClass}
-										defaultValue="1"
-										min="0.01"
-										name="quantity"
-										step="0.01"
-										type="number"
-									/>
-								</Field>
-								<Field label="Unidad (opcional)">
-									<input
-										className={inputClass}
-										name="unit"
-										placeholder="jornal, viaje, día, global"
+								<Field label="Tipo" labelId={`${ids}-type`}>
+									<SelectMenu
+										aria-labelledby={`${ids}-type`}
+										name="type"
+										onChange={setExpenseType}
+										options={expenseTypeOptions}
+										placeholder="Elegir tipo"
+										value={expenseType}
 									/>
 								</Field>
 								<Field label="Medio de pago" labelId={`${ids}-method`}>
@@ -637,66 +516,72 @@ export function FinanceEntryDialogs({
 										value={expenseMethod}
 									/>
 								</Field>
-								<Field label="Pagado a (opcional)">
-									<input
-										className={inputClass}
-										name="vendor"
-										placeholder="Empresa o persona que cobró"
-									/>
-								</Field>
-
-								<SectionTitle
-									description="Si adjuntas el archivo, indica también su número."
-									title="Comprobante (opcional)"
-								/>
-								<Field label="Tipo de comprobante" labelId={`${ids}-doc`}>
+								<Field
+									className="sm:col-span-2"
+									help="Permite comparar lo gastado contra lo presupuestado."
+									label="Renglón del presupuesto"
+									labelId={`${ids}-section`}
+								>
 									<SelectMenu
-										aria-labelledby={`${ids}-doc`}
-										name="documentType"
-										onChange={setDocumentType}
-										options={documentTypeOptions}
-										placeholder="Sin comprobante"
-										value={documentType}
+										aria-labelledby={`${ids}-section`}
+										emptyMessage="Ningún renglón coincide."
+										name="budgetSectionNo"
+										onChange={setExpenseSection}
+										options={expenseSectionOptions}
+										searchPlaceholder="Buscar renglón"
+										searchable={sections.length > 6}
+										value={expenseSection}
 									/>
 								</Field>
-								<Field label="Número de factura o recibo">
-									<input
-										className={inputClass}
-										name="documentNumber"
-										placeholder="Ej. FACE-63A9-001245"
-										required={Boolean(expenseFileName)}
-									/>
-								</Field>
-								<label className="sm:col-span-2 group flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-[#9db4a8] bg-white px-3 py-2 text-sm transition hover:border-[#25815f] hover:shadow-[0_8px_20px_rgba(31,122,91,0.11)]">
-									<span
-										className={`grid size-8 shrink-0 place-items-center rounded-lg ${expenseFileName ? "bg-[#e2f3ea] text-[#167154]" : "bg-[#f0f2ef] text-[#61716b]"}`}
-									>
-										{expenseFileName ? (
-											<FileCheck2 size={16} />
-										) : (
-											<FileUp size={16} />
-										)}
-									</span>
-									<span className="min-w-0">
-										<strong className="block truncate text-xs text-[#263330]">
-											{expenseFileName || "Adjuntar factura o recibo"}
-										</strong>
-										<small className="text-[#71807a]">
-											PDF, JPG, PNG o WEBP
-										</small>
-									</span>
-									<input
-										accept=".pdf,.png,.jpg,.jpeg,.webp"
-										className="sr-only"
-										name="documentFile"
-										onChange={(event) =>
-											setExpenseFileName(event.target.files?.[0]?.name ?? "")
-										}
-										type="file"
-									/>
-								</label>
-
-								<OptionalDetails summary="Más detalles (fase, actividad, notas)">
+								<MoreDetails>
+									<Field label="Pagado a">
+										<input
+											className={inputClass}
+											name="vendor"
+											placeholder="Empresa o persona"
+										/>
+									</Field>
+									<Field label="Comprobante" labelId={`${ids}-doc`}>
+										<SelectMenu
+											aria-labelledby={`${ids}-doc`}
+											name="documentType"
+											onChange={setDocumentType}
+											options={documentTypeOptions}
+											value={documentType}
+										/>
+									</Field>
+									<Field label="Número de comprobante">
+										<input
+											className={inputClass}
+											name="documentNumber"
+											placeholder="Serie y número"
+											required={Boolean(expenseFileName)}
+										/>
+									</Field>
+									<Field label="Archivo">
+										<FileField
+											fileName={expenseFileName}
+											name="documentFile"
+											onFile={setExpenseFileName}
+										/>
+									</Field>
+									<Field label="Cantidad">
+										<input
+											className={inputClass}
+											defaultValue="1"
+											min="0.01"
+											name="quantity"
+											step="0.01"
+											type="number"
+										/>
+									</Field>
+									<Field label="Unidad">
+										<input
+											className={inputClass}
+											name="unit"
+											placeholder="jornal, viaje, global"
+										/>
+									</Field>
 									<Field label="Fase">
 										<input
 											className={inputClass}
@@ -704,22 +589,16 @@ export function FinanceEntryDialogs({
 											placeholder="Fase 1"
 										/>
 									</Field>
-									<Field label="Actividad o detalle">
-										<input
-											className={inputClass}
-											name="activity"
-											placeholder="Actividad relacionada"
+									<Field label="Actividad">
+										<input className={inputClass} name="activity" />
+									</Field>
+									<Field className="sm:col-span-2" label="Notas">
+										<textarea
+											className={`${inputClass} min-h-20 py-3`}
+											name="notes"
 										/>
 									</Field>
-									<div className="sm:col-span-2">
-										<Field label="Notas">
-											<textarea
-												className={`${inputClass} min-h-20 py-3`}
-												name="notes"
-											/>
-										</Field>
-									</div>
-								</OptionalDetails>
+								</MoreDetails>
 							</div>
 						</div>
 						<DialogFooter
@@ -738,7 +617,8 @@ export function FinanceEntryDialogs({
 
 			{dialog === "payment" ? (
 				<ModalShell
-					description="Dinero que el cliente pagó a HM por este proyecto."
+					description="Dinero recibido del cliente"
+					help="Es un ingreso. Los pagos a proveedores van en Cuentas por pagar."
 					icon={Banknote}
 					onClose={close}
 					title="Abono del cliente"
@@ -750,12 +630,7 @@ export function FinanceEntryDialogs({
 						<input name="projectId" type="hidden" value={projectId} />
 						<div className="overflow-y-auto p-5 sm:p-6">
 							<div className="grid gap-4 sm:grid-cols-2">
-								<Callout>
-									Es un <strong>ingreso</strong>. Los pagos que HM hace a
-									proveedores se registran en <strong>Cuentas por pagar</strong>
-									, no aquí.
-								</Callout>
-								<Field label="Monto recibido">
+								<Field label="Monto">
 									<input
 										className={inputClass}
 										inputMode="decimal"
@@ -785,43 +660,40 @@ export function FinanceEntryDialogs({
 										value={paymentMethod}
 									/>
 								</Field>
-								<Field label="Referencia (opcional)">
+								<Field label="Referencia">
 									<input
 										className={inputClass}
 										name="reference"
-										placeholder="Boleta, recibo o cheque"
+										placeholder="Boleta o cheque"
 									/>
 								</Field>
-								<div className="sm:col-span-2">
-									<Field
-										hint="Cada renglón se cobra a su precio al cliente: su costo más su parte de encargado, imprevistos, administración, utilidad e IVA."
-										label="Aplicar a"
-										labelId={`${ids}-payment-section`}
-									>
-										<SelectMenu
-											aria-labelledby={`${ids}-payment-section`}
-											emptyMessage="Ningún renglón coincide."
-											name="budgetSectionId"
-											onChange={setPaymentSection}
-											options={paymentSectionOptions}
-											searchPlaceholder="Buscar renglón"
-											searchable={sections.length > 6}
-											value={paymentSection}
-										/>
-									</Field>
-								</div>
-								<div className="sm:col-span-2">
-									<Field label="Concepto (opcional)">
+								<Field
+									className="sm:col-span-2"
+									help="Cada renglón se cobra a su precio al cliente: costo más encargado, imprevistos, administración, utilidad e IVA."
+									label="Aplicar a"
+									labelId={`${ids}-payment-section`}
+								>
+									<SelectMenu
+										aria-labelledby={`${ids}-payment-section`}
+										emptyMessage="Ningún renglón coincide."
+										name="budgetSectionId"
+										onChange={setPaymentSection}
+										options={paymentSectionOptions}
+										searchPlaceholder="Buscar renglón"
+										searchable={sections.length > 6}
+										value={paymentSection}
+									/>
+								</Field>
+								<MoreDetails>
+									<Field label="Concepto">
 										<input
 											className={inputClass}
 											name="concept"
-											placeholder="Anticipo, abono 1, estimación..."
+											placeholder="Anticipo, abono 1..."
 										/>
 									</Field>
-								</div>
-								<OptionalDetails summary="Más detalles (número de abono, observaciones)">
 									<Field
-										hint="Si lo dejas vacío se genera automáticamente."
+										help="Si lo dejas vacío se genera solo."
 										label="Número de abono"
 									>
 										<input
@@ -830,15 +702,13 @@ export function FinanceEntryDialogs({
 											placeholder="AB-000001"
 										/>
 									</Field>
-									<div className="sm:col-span-2">
-										<Field label="Observaciones">
-											<textarea
-												className={`${inputClass} min-h-20 py-3`}
-												name="observations"
-											/>
-										</Field>
-									</div>
-								</OptionalDetails>
+									<Field className="sm:col-span-2" label="Observaciones">
+										<textarea
+											className={`${inputClass} min-h-20 py-3`}
+											name="observations"
+										/>
+									</Field>
+								</MoreDetails>
 							</div>
 						</div>
 						<DialogFooter

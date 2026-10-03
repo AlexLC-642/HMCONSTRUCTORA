@@ -49,6 +49,7 @@ import {
 } from "../application/actions";
 import type { getPurchaseWorkspace } from "../application/queries";
 import { ConfirmSubmitButton } from "@/shared/components/confirm-submit-button";
+import { HelpTip } from "@/shared/ui/help-tip";
 import { SelectMenu, type SelectMenuOption } from "@/shared/ui/select-menu";
 import {
 	purchaseOrderCancelBlocker,
@@ -230,17 +231,17 @@ const paymentChoices: Array<{
 	{
 		value: "IMMEDIATE",
 		label: "Al contado",
-		detail: "Se paga al emitir la orden.",
+		detail: "Se paga al emitir",
 	},
 	{
 		value: "ON_DELIVERY",
 		label: "Contra entrega",
-		detail: "Se paga cuando llega el material.",
+		detail: "Se paga al recibir",
 	},
 	{
 		value: "CREDIT",
 		label: "A crédito",
-		detail: "Con plazo; Finanzas controla factura, abonos y vencimiento.",
+		detail: "Con fecha límite de pago",
 	},
 ];
 
@@ -256,7 +257,7 @@ function PaymentConditionFields({
 	today,
 	errorFor,
 	creditAvailable = true,
-	creditUnavailableReason = "Disponible solo para compras de un proyecto.",
+	creditUnavailableReason = "Solo para proyectos",
 }: {
 	today: string;
 	errorFor: (field: string) => string | undefined;
@@ -311,9 +312,6 @@ function PaymentConditionFields({
 						required
 						type="date"
 					/>
-					<small className="purchases-field-hint">
-						Fecha límite acordada con el proveedor.
-					</small>
 					<FieldError message={errorFor("paymentDueDate")} />
 				</label>
 			) : null}
@@ -344,7 +342,12 @@ function OrderTotals({
 			</div>
 			<div className="purchases-order-total__tax">
 				<label>
-					<span>IVA</span>
+					<span className="purchases-label">
+						IVA
+						<HelpTip label="Ayuda: IVA">
+							Déjalo en 0 si los precios ya incluyen IVA.
+						</HelpTip>
+					</span>
 					<span className="purchases-input-suffix">
 						<input
 							aria-invalid={Boolean(error)}
@@ -360,9 +363,6 @@ function OrderTotals({
 					</span>
 				</label>
 				<strong>{formatCurrency(total - subtotal)}</strong>
-				<small className="purchases-field-hint">
-					Déjalo en 0 si los precios ya incluyen IVA.
-				</small>
 				<FieldError message={error} />
 			</div>
 			<div className="purchases-order-total__grand">
@@ -370,37 +370,6 @@ function OrderTotals({
 				<strong>{formatCurrency(total)}</strong>
 			</div>
 		</div>
-	);
-}
-
-/** Explica qué registrará Finanzas antes de guardar, según el destino. */
-function FinanceImpactNote({
-	tracked,
-	projectLabel,
-}: {
-	tracked: boolean;
-	projectLabel?: string;
-}) {
-	return (
-		<p className="purchases-finance-note" data-tracked={tracked}>
-			<ReceiptText aria-hidden="true" size={16} />
-			{tracked ? (
-				<span>
-					Después de emitirla, la factura y los pagos se registran en{" "}
-					<strong>
-						{projectLabel
-							? `Finanzas · ${projectLabel}`
-							: "Finanzas del proyecto"}
-					</strong>
-					.
-				</span>
-			) : (
-				<span>
-					Compra para bodega: se controla en Inventario y{" "}
-					<strong>no genera gasto de proyecto en Finanzas</strong>.
-				</span>
-			)}
-		</p>
 	);
 }
 
@@ -841,13 +810,10 @@ function OrderForm({
 			? "el costo de cada renglón"
 			: null,
 	].filter((item): item is string => Boolean(item));
-	const projectLabel = requisition.project
-		? `${requisition.project.code} · ${requisition.project.name}`
-		: null;
 
 	return (
 		<ModalShell
-			description="Asigna proveedor, precios y entrega a la solicitud autorizada."
+			description="Desde una solicitud autorizada"
 			onClose={onClose}
 			title="Comprar solicitud"
 		>
@@ -903,7 +869,6 @@ function OrderForm({
 						<Store aria-hidden="true" size={18} />
 						<div>
 							<h3>Proveedor y entrega</h3>
-							<p>Quién vende y cuándo debe llegar el material.</p>
 						</div>
 					</header>
 					<div className="purchases-order-form__meta">
@@ -960,30 +925,27 @@ function OrderForm({
 						<CircleDollarSign aria-hidden="true" size={18} />
 						<div>
 							<h3>Pago</h3>
-							<p>Cómo se le pagará al proveedor.</p>
 						</div>
 					</header>
 					<div className="purchases-order-form__stack">
 						<PaymentConditionFields
 							creditAvailable={Boolean(requisition.project)}
-							creditUnavailableReason="La solicitud es para bodega; el crédito requiere proyecto."
+							creditUnavailableReason="Solo para proyectos"
 							errorFor={errorFor}
 							today={today}
-						/>
-						<FinanceImpactNote
-							projectLabel={projectLabel ?? undefined}
-							tracked={Boolean(projectLabel)}
 						/>
 					</div>
 				</div>
 				<div className="purchases-order-lines">
 					<div className="purchases-order-lines__heading">
 						<div>
-							<h3>Precios acordados</h3>
-							<p>
-								Las cantidades vienen de la solicitud; escribe el costo unitario
-								de cada renglón.
-							</p>
+							<h3 className="purchases-label">
+								Precios acordados
+								<HelpTip label="Ayuda: precios">
+									Las cantidades vienen de la solicitud; escribe el costo
+									unitario acordado.
+								</HelpTip>
+							</h3>
 							<FieldError message={errorFor("items")} />
 						</div>
 						<span>
@@ -1080,7 +1042,7 @@ function OrderFormFooter({
 						Falta completar {joinSpanish(missing)}.
 					</strong>
 				) : (
-					"Se guarda como borrador; podrás revisarla antes de emitirla."
+					"Se guarda como borrador."
 				)}
 			</p>
 			<button
@@ -1144,7 +1106,7 @@ function QuickMaterialForm({
 		<div className="purchases-quick-material">
 			<div className="purchases-quick-material__head">
 				<strong>Nuevo artículo del catálogo</strong>
-				<small>Se guarda en Inventario y se agrega a esta compra.</small>
+				<small>Queda guardado en Inventario.</small>
 			</div>
 			<label>
 				<span>Nombre</span>
@@ -1422,9 +1384,6 @@ function DirectPurchaseForm({
 	const missingMaterials = materials.length === 0;
 	const cannotSave = missingSupplier || missingWarehouse;
 	const forProject = destination === "PROJECT";
-	const selectedProject = data.projects.find(
-		(project) => project.id === projectId,
-	);
 	const missing = [
 		!supplierId ? "el proveedor" : null,
 		!expectedDate ? "la entrega prevista" : null,
@@ -1441,7 +1400,7 @@ function DirectPurchaseForm({
 
 	return (
 		<ModalShell
-			description="Compra sin solicitud previa. Se guarda como borrador hasta que la emitas."
+			description="Sin solicitud previa"
 			onClose={onClose}
 			title="Nueva compra"
 		>
@@ -1506,7 +1465,6 @@ function DirectPurchaseForm({
 						<Store aria-hidden="true" size={18} />
 						<div>
 							<h3>Proveedor y entrega</h3>
-							<p>Quién vende y cuándo debe llegar el material.</p>
 						</div>
 					</header>
 					<div className="purchases-order-form__meta">
@@ -1569,7 +1527,6 @@ function DirectPurchaseForm({
 						<Warehouse aria-hidden="true" size={18} />
 						<div>
 							<h3>Destino y pago</h3>
-							<p>Dónde se recibe, a quién se carga y cómo se paga.</p>
 						</div>
 					</header>
 					<div className="purchases-order-form__stack">
@@ -1584,10 +1541,8 @@ function DirectPurchaseForm({
 									value="WAREHOUSE"
 								/>
 								<span>
-									<strong>Existencia de bodega</strong>
-									<small>
-										Material de uso general. Se controla en Inventario.
-									</small>
+									<strong>Para bodega</strong>
+									<small>Se controla en Inventario</small>
 								</span>
 							</label>
 							<label
@@ -1606,8 +1561,8 @@ function DirectPurchaseForm({
 									<strong>Para un proyecto</strong>
 									<small>
 										{data.projects.length === 0
-											? "No tienes proyectos disponibles."
-											: "Se carga al proyecto y su factura se registra en Finanzas."}
+											? "No hay proyectos disponibles"
+											: "Se factura en Finanzas del proyecto"}
 									</small>
 								</span>
 							</label>
@@ -1655,9 +1610,14 @@ function DirectPurchaseForm({
 						</div>
 						{forProject ? (
 							<label className="purchases-reveal">
-								<span>¿Por qué se compra sin solicitud?</span>
+								<span className="purchases-label">
+									Motivo de la compra
+									<HelpTip label="Ayuda: motivo">
+										Las compras de proyecto normalmente salen de una solicitud.
+										Explica por qué esta no (mínimo 10 caracteres).
+									</HelpTip>
+								</span>
 								<textarea
-									aria-describedby="direct-order-justification-hint"
 									aria-invalid={
 										Boolean(errorFor("budgetExceptionReason")) ||
 										(showMissing && justification.trim().length < 10)
@@ -1665,33 +1625,18 @@ function DirectPurchaseForm({
 									maxLength={1000}
 									name="budgetExceptionReason"
 									onChange={(event) => setJustification(event.target.value)}
-									placeholder="Ej. Material urgente para terminar la losa; no estaba en la solicitud."
+									placeholder="Ej. Material urgente para la losa"
 									rows={2}
 									value={justification}
 								/>
-								<small
-									className="purchases-field-hint"
-									id="direct-order-justification-hint"
-								>
-									Las compras de proyecto normalmente salen de una solicitud
-									autorizada. Mínimo 10 caracteres.
-								</small>
 								<FieldError message={errorFor("budgetExceptionReason")} />
 							</label>
 						) : null}
 						<PaymentConditionFields
 							creditAvailable={forProject}
-							creditUnavailableReason="Elige “Para un proyecto” para comprar a crédito."
+							creditUnavailableReason="Solo para proyectos"
 							errorFor={errorFor}
 							today={today}
-						/>
-						<FinanceImpactNote
-							projectLabel={
-								selectedProject
-									? `${selectedProject.code} · ${selectedProject.name}`
-									: undefined
-							}
-							tracked={forProject}
 						/>
 					</div>
 				</div>
@@ -1700,10 +1645,6 @@ function DirectPurchaseForm({
 					<div className="purchases-order-lines__heading">
 						<div>
 							<h3>Artículos</h3>
-							<p>
-								Elige del catálogo de Inventario o crea uno nuevo; el costo se
-								puede ajustar.
-							</p>
 						</div>
 						<div className="purchases-order-lines__actions">
 							<span aria-live="polite" className="purchases-order-lines__count">
@@ -1840,15 +1781,8 @@ function DirectPurchaseForm({
 						>
 							<PackageCheck aria-hidden="true" size={26} />
 							<strong>
-								{missingMaterials
-									? "El catálogo de Inventario está vacío"
-									: "Aún no agregas artículos"}
+								{missingMaterials ? "El catálogo está vacío" : "Sin artículos"}
 							</strong>
-							<p>
-								{missingMaterials
-									? "Crea el primer artículo aquí mismo; quedará guardado en el catálogo de Inventario."
-									: "Marca varios del catálogo a la vez, o crea uno nuevo si no existe."}
-							</p>
 							<button
 								className="purchases-order-lines__add focus-ring"
 								onClick={() => {
@@ -2778,9 +2712,7 @@ export function PurchasesWorkspace({
 										<p className="purchases-finance-note" data-tracked="false">
 											<ReceiptText aria-hidden="true" size={16} />
 											<span>
-												Compra para bodega: se controla en Inventario y{" "}
-												<strong>no genera gasto de proyecto en Finanzas</strong>
-												.
+												Compra de bodega: no genera gasto en Finanzas.
 											</span>
 										</p>
 									) : null}

@@ -24405,3 +24405,79 @@ input[id^="tab-seguridad-"]:checked
 :root[data-theme="dark"] .finance-entry-cancel {
 	color: #eef4f1;
 }
+
+/* Ayuda contextual "?" (HelpTip). */
+.help-tip__trigger {
+	display: inline-grid;
+	width: 1.35rem;
+	height: 1.35rem;
+	flex-shrink: 0;
+	place-items: center;
+	border-radius: 999px;
+	color: #7b8984;
+	cursor: help;
+	transition:
+		color 140ms ease,
+		background-color 140ms ease;
+}
+.help-tip__trigger:hover,
+.help-tip__trigger[aria-expanded="true"] {
+	background: rgba(31, 122, 91, 0.1);
+	color: #1f7a5b;
+}
+.help-tip__bubble {
+	position: fixed;
+	z-index: 140;
+	width: min(16rem, calc(100vw - 1rem));
+	border-radius: 10px;
+	background: #1b2528;
+	padding: 0.6rem 0.75rem;
+	color: #eef3f1;
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: normal;
+	line-height: 1.45;
+	text-transform: none;
+	box-shadow: 0 14px 34px rgba(10, 16, 18, 0.3);
+	animation: help-tip-enter 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.help-tip__bubble strong {
+	color: #fff;
+}
+@keyframes help-tip-enter {
+	from {
+		opacity: 0;
+		transform: translateY(-3px);
+	}
+}
+.finance-header-help .help-tip__trigger {
+	color: rgba(255, 255, 255, 0.65);
+}
+.finance-header-help .help-tip__trigger:hover,
+.finance-header-help .help-tip__trigger[aria-expanded="true"] {
+	background: rgba(255, 255, 255, 0.14);
+	color: #fff;
+}
+:root[data-theme="dark"] .help-tip__trigger {
+	color: #93a29d;
+}
+:root[data-theme="dark"] .help-tip__trigger:hover,
+:root[data-theme="dark"] .help-tip__trigger[aria-expanded="true"] {
+	background: rgba(62, 207, 150, 0.14);
+	color: #75e6c0;
+}
+:root[data-theme="dark"] .help-tip__bubble {
+	border: 1px solid #3a4a4e;
+	background: #24343a;
+}
+@media (prefers-reduced-motion: reduce) {
+	.help-tip__bubble {
+		animation: none;
+	}
+}
+
+.purchases-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+}
