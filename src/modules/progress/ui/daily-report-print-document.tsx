@@ -1,10 +1,19 @@
 import Image from "next/image";
 import { scheduleActivityStatusLabels } from "@/modules/schedules/domain/validation";
+import { PrintDocumentHeader } from "@/shared/ui/print-document-header";
 import type { getDailyReportById } from "../application/queries";
 
 type DailyReportPrintData = NonNullable<
 	Awaited<ReturnType<typeof getDailyReportById>>
 >;
+
+const reportStatusLabels: Record<DailyReportPrintData["status"], string> = {
+	DRAFT: "Borrador",
+	SUBMITTED: "En revisión",
+	REVIEWED: "Revisado",
+	APPROVED: "Aprobado",
+	PUBLISHED: "Publicado",
+};
 
 const mediaTypeLabels = {
 	BEFORE: "Antes",
@@ -12,46 +21,51 @@ const mediaTypeLabels = {
 	AFTER: "Después",
 	OTHER: "Otro",
 } as const;
-const currencyFormatter = new Intl.NumberFormat("es-GT", {
+
+const currency = new Intl.NumberFormat("es-GT", {
 	style: "currency",
 	currency: "GTQ",
 });
+const longDate = new Intl.DateTimeFormat("es-GT", {
+	weekday: "long",
+	day: "numeric",
+	month: "long",
+	year: "numeric",
+	timeZone: "UTC",
+});
+const number = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 2 });
 
-function money(value: { toNumber(): number }) {
-	return currencyFormatter.format(value.toNumber());
-}
+type Decimalish = { toNumber(): number } | null | undefined;
 
-function valueText(value: { toString(): string } | null | undefined) {
-	return value ? value.toString() : "";
+function num(value: Decimalish) {
+	return value ? value.toNumber() : 0;
 }
 
 function mediaActivityLabel(
 	report: DailyReportPrintData,
 	media: DailyReportPrintData["mediaEntries"][number],
 ) {
-	if (media.dailyReportActivityId) {
-		const activity = report.activities.find(
-			(item) => item.id === media.dailyReportActivityId,
-		);
-		if (activity)
-			return `Actividad ${activity.activityCode} - ${activity.activityName}`;
-	}
-	if (media.activityCode) {
-		const activity = report.activities.find(
-			(item) => item.activityCode === media.activityCode,
-		);
-		if (activity)
-			return `Actividad ${activity.activityCode} - ${activity.activityName}`;
-	}
+	const activity =
+		report.activities.find((item) => item.id === media.dailyReportActivityId) ??
+		report.activities.find((item) => item.activityCode === media.activityCode);
+	if (activity) return `${activity.activityCode} · ${activity.activityName}`;
 	if (media.activityCode) return `Actividad ${media.activityCode}`;
-	return "General del informe";
+	return "General";
 }
 
-function mediaTitle(
-	media: DailyReportPrintData["mediaEntries"][number],
-	index: number,
-) {
-	return media.title || `Evidencia ${String(index + 1).padStart(2, "0")}`;
+function SectionTitle({
+	children,
+	aside,
+}: {
+	children: string;
+	aside?: string;
+}) {
+	return (
+		<div className="report-doc__section-title">
+			<h2>{children}</h2>
+			{aside ? <span>{aside}</span> : null}
+		</div>
+	);
 }
 
 export function DailyReportPrintDocument({
@@ -59,459 +73,359 @@ export function DailyReportPrintDocument({
 }: {
 	report: DailyReportPrintData;
 }) {
-	const laborTotal = report.laborEntries.reduce(
-		(sum, entry) => sum + entry.amount.toNumber(),
+	const worked = report.activities.filter(
+		(activity) => num(activity.todayQuantity) > 0,
+	);
+	const idle = report.activities.filter(
+		(activity) => num(activity.todayQuantity) <= 0,
+	);
+	const people = report.laborEntries.reduce(
+		(sum, entry) => sum + num(entry.people),
 		0,
 	);
+	const hours = report.laborEntries.reduce(
+		(sum, entry) => sum + num(entry.hours) * Math.max(1, num(entry.people)),
+		0,
+	);
+	const laborTotal = report.laborEntries.reduce(
+		(sum, entry) => sum + num(entry.amount),
+		0,
+	);
+	const preliminary =
+		report.status === "DRAFT" ||
+		report.status === "SUBMITTED" ||
+		report.status === "REVIEWED";
+	const schedule =
+		report.startTime || report.endTime
+			? `${report.startTime ?? "—"} a ${report.endTime ?? "—"}`
+			: null;
 
 	return (
 		<div className="print-page-container">
 			<style>{`
-        @page {
-          size: letter portrait;
-          margin: 0.5in;
-        }
-
+        @page { size: letter portrait; margin: 0.5in; }
         @media screen {
-          body {
-            background-color: #f3f4f6 !important;
-          }
-          .print-page-container {
-            background-color: #f3f4f6;
-            min-height: 100vh;
-            padding: 2rem 1rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-          }
-          .print-sheet {
-            background-color: white;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-            width: 8.5in;
-            min-height: 11in;
-            padding: 0.5in;
-            margin: 0 auto;
-            box-sizing: border-box;
-          }
+          body { background-color: #f3f4f6 !important; }
+          .print-page-container { background-color: #f3f4f6; min-height: 100vh; padding: 2rem 1rem; }
+          .print-sheet { background: white; box-shadow: 0 10px 25px -5px rgba(0,0,0,.1), 0 8px 10px -6px rgba(0,0,0,.1); width: 8.5in; min-height: 11in; padding: 0.5in; margin: 0 auto; box-sizing: border-box; }
         }
-
         @media print {
-          body {
-            background-color: white !important;
-          }
-          .print-page-container {
-            padding: 0 !important;
-            background-color: white !important;
-            min-height: 0 !important;
-          }
-          .print-sheet {
-            width: 100% !important;
-            min-height: 0 !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-          tr, figure, section, table {
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-          h2, h3, thead {
-            page-break-after: avoid;
-            break-after: avoid;
-          }
+          body { background-color: white !important; }
+          .print-page-container { padding: 0 !important; background: white !important; min-height: 0 !important; }
+          .print-sheet { width: 100% !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; }
         }
       `}</style>
 
-			<main className="print-surface print-sheet text-[#111] text-[11px] leading-relaxed">
-				{/* Encabezado Profesional del Informe */}
-				<header className="mb-5 border-b-2 border-black pb-4">
-					<div className="flex justify-between items-start">
-						<div>
-							<h1 className="text-xl font-bold uppercase tracking-wide text-[var(--brand-red)]">
-								Control de obra
-							</h1>
-							<p className="text-xs uppercase font-semibold text-[var(--muted)]">
-								Informe Diario de Avance
-							</p>
-						</div>
-						<div className="text-right border-l border-black pl-4">
-							<p className="text-sm font-bold bg-[#55c7e8] px-3 py-1 rounded border border-black inline-block">
-								Reporte: {report.reportNumber}
-							</p>
-							<p className="text-[10px] uppercase text-[var(--muted)] mt-1.5">
-								Estado:{" "}
-								<span className="font-semibold text-black">
-									{report.status}
-								</span>
-							</p>
-						</div>
-					</div>
+			<main className="print-surface print-sheet report-doc">
+				<PrintDocumentHeader
+					details={[
+						{ label: "Proyecto", value: report.project.code ?? "—" },
+						{
+							label: "Cliente",
+							value: report.project.client?.name ?? "—",
+						},
+						...(report.project.location
+							? [
+									{
+										label: "Ubicación",
+										value: report.project.location,
+										wide: true,
+									},
+								]
+							: []),
+						{ label: "Encargado", value: report.siteManager },
+						{
+							label: "Jornada",
+							value:
+								[report.workShift, schedule].filter(Boolean).join(" · ") || "—",
+						},
+						{ label: "Clima", value: report.weather ?? "—" },
+						{
+							label: "Estado",
+							value: reportStatusLabels[report.status],
+						},
+					]}
+					documentMeta={[
+						`No. ${report.reportNumber}`,
+						longDate.format(report.reportDate),
+					]}
+					documentTitle="Informe diario"
+					projectName={report.project.name}
+				/>
 
-					<div className="mt-4 grid grid-cols-4 gap-2 text-xs bg-[#f4f5f1] border border-black p-2.5 rounded">
-						<div className="col-span-1">
-							<strong>Proyecto:</strong>{" "}
-							<span className="font-medium text-black">
-								{report.project.code}
-							</span>
-						</div>
-						<div className="col-span-3">
-							<strong>Nombre:</strong>{" "}
-							<span className="font-medium text-black">
-								{report.project.name}
-							</span>
-						</div>
-						{report.project.location && (
-							<div className="col-span-4 border-t border-[#cfd5ce] pt-1.5 mt-1">
-								<strong>Ubicación:</strong>{" "}
-								<span className="font-medium text-black">
-									{report.project.location}
-								</span>
-							</div>
-						)}
-					</div>
-				</header>
+				{preliminary ? (
+					<p className="report-doc__notice">
+						Documento preliminar: el avance se aplica al cronograma cuando el
+						informe es aprobado.
+					</p>
+				) : null}
 
-				{/* Metadatos Generales */}
-				<section className="mb-5 grid grid-cols-4 border border-black text-[11px] bg-white">
-					<div className="border-r border-b border-black px-2 py-1.5">
-						<b>Fecha:</b>
-						<br />
-						{report.reportDate.toLocaleDateString("es-GT")}
+				<section className="report-doc__summary">
+					<div>
+						<span>Actividades con avance</span>
+						<strong>
+							{worked.length} de {report.activities.length}
+						</strong>
 					</div>
-					<div className="border-r border-b border-black px-2 py-1.5">
-						<b>Encargado:</b>
-						<br />
-						{report.siteManager}
+					<div>
+						<span>Personal</span>
+						<strong>
+							{number.format(people)} · {number.format(hours)} h
+						</strong>
 					</div>
-					<div className="border-r border-b border-black px-2 py-1.5">
-						<b>Jornada:</b>
-						<br />
-						{report.workShift ?? "N/D"}
+					<div>
+						<span>Mano de obra</span>
+						<strong>{currency.format(laborTotal)}</strong>
 					</div>
-					<div className="border-b border-black px-2 py-1.5">
-						<b>Clima:</b>
-						<br />
-						{report.weather ?? "N/D"}
-					</div>
-					<div className="col-span-4 px-2 py-1.5 bg-[#fbfbf8]">
-						<b>Horario Laboral:</b> {report.startTime ?? "N/D"} -{" "}
-						{report.endTime ?? "N/D"}
+					<div>
+						<span>Materiales · fotos</span>
+						<strong>
+							{report.materialEntries.length} · {report.mediaEntries.length}
+						</strong>
 					</div>
 				</section>
 
-				{/* Actividades Ejecutadas */}
-				<section className="mb-5">
-					<h3 className="border border-black bg-[#55c7e8] py-1 text-center font-bold uppercase text-[10px]">
-						Actividades Ejecutadas
-					</h3>
-					<table className="w-full border-collapse border-l border-r border-b border-black">
-						<thead className="bg-[#eeeeee]">
-							<tr>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px] w-12">
-									No.
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-left text-[9px] w-1/4">
-									Actividad
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-left text-[9px] w-1/3">
-									Trabajo Ejecutado
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px]">
-									Hoy
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px]">
-									Acumulado
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px]">
-									Avance
-								</th>
-								<th className="border-b border-black px-1.5 py-1 text-center text-[9px]">
-									Estado
-								</th>
-							</tr>
-						</thead>
-						<tbody>
-							{report.activities.map((activity) => (
-								<tr
-									className="border-b border-black last:border-b-0 hover:bg-[#fbfbf8]"
-									key={activity.id}
-								>
-									<td className="border-r border-black px-1.5 py-1 text-center font-medium">
-										{activity.activityCode}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 whitespace-normal break-words">
-										{activity.activityName}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 whitespace-normal break-words">
-										{activity.workDescription}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-center">
-										{valueText(activity.todayQuantity)} {activity.unit ?? ""}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-center">
-										{valueText(activity.accumulatedQuantity)}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-center font-semibold">
-										{valueText(activity.newProgress)}%
-									</td>
-									<td className="px-1.5 py-1 text-center">
-										{scheduleActivityStatusLabels[activity.status]}
-									</td>
-								</tr>
-							))}
-							{report.activities.length === 0 && (
+				<section className="report-doc__section">
+					<SectionTitle>Avance del día</SectionTitle>
+					{worked.length > 0 ? (
+						<table className="report-doc__table">
+							<colgroup>
+								<col style={{ width: "7%" }} />
+								<col />
+								<col style={{ width: "14%" }} />
+								<col style={{ width: "24%" }} />
+								<col style={{ width: "13%" }} />
+							</colgroup>
+							<thead>
 								<tr>
-									<td
-										className="px-2 py-4 text-center text-[var(--muted)]"
-										colSpan={7}
-									>
-										Sin actividades registradas hoy.
-									</td>
+									<th>No.</th>
+									<th className="text-left">Actividad</th>
+									<th>Hoy</th>
+									<th>Avance acumulado</th>
+									<th>Estado</th>
 								</tr>
-							)}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{worked.map((activity) => {
+									const progress = Math.min(
+										100,
+										Math.max(0, num(activity.newProgress)),
+									);
+									const detail =
+										activity.workDescription?.trim() &&
+										activity.workDescription.trim() !==
+											activity.activityName.trim()
+											? activity.workDescription
+											: null;
+									return (
+										<tr key={activity.id}>
+											<td className="text-center">{activity.activityCode}</td>
+											<td>
+												<strong>{activity.activityName}</strong>
+												{detail ? <small>{detail}</small> : null}
+											</td>
+											<td className="text-center tabular-nums">
+												{number.format(num(activity.todayQuantity))}{" "}
+												{activity.unit ?? "%"}
+											</td>
+											<td>
+												<div className="report-doc__progress">
+													<span>
+														<i style={{ width: `${progress}%` }} />
+													</span>
+													<b>{number.format(progress)}%</b>
+												</div>
+											</td>
+											<td className="text-center">
+												{scheduleActivityStatusLabels[activity.status]}
+											</td>
+										</tr>
+									);
+								})}
+							</tbody>
+						</table>
+					) : (
+						<p className="report-doc__empty">Sin avance registrado hoy.</p>
+					)}
+					{idle.length > 0 && worked.length > 0 ? (
+						<p className="report-doc__footnote">
+							Sin avance hoy:{" "}
+							{idle
+								.map(
+									(activity) =>
+										`${activity.activityCode} ${activity.activityName}`,
+								)
+								.join(" · ")}
+						</p>
+					) : null}
 				</section>
 
-				{/* Personal */}
-				<section className="mb-5">
-					<h3 className="border border-black bg-[#55c7e8] py-1 text-center font-bold uppercase text-[10px]">
-						Personal en Obra
-					</h3>
-					<table className="w-full border-collapse border-l border-r border-b border-black">
-						<thead className="bg-[#eeeeee]">
-							<tr>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px] w-12">
-									No.
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-left text-[9px] w-1/3">
-									Nombre / Cuadrilla
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-left text-[9px]">
-									Puesto / Rol
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px] w-16">
-									Personas
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px] w-16">
-									Horas
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-right text-[9px] w-24">
-									Tarifa
-								</th>
-								<th className="border-b border-black px-1.5 py-1 text-right text-[9px] w-24">
-									Monto
-								</th>
-							</tr>
-						</thead>
-						<tbody>
-							{report.laborEntries.map((entry) => (
-								<tr
-									className="border-b border-black last:border-b-0 hover:bg-[#fbfbf8]"
-									key={entry.id}
-								>
-									<td className="border-r border-black px-1.5 py-1 text-center">
-										{entry.position}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 whitespace-normal break-words">
-										{entry.workerLabel}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 whitespace-normal break-words">
-										{entry.role ?? ""}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-center">
-										{valueText(entry.people)}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-center">
-										{valueText(entry.hours)}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-right">
-										{money(entry.rate)}
-									</td>
-									<td className="px-1.5 py-1 text-right">
-										{money(entry.amount)}
-									</td>
-								</tr>
-							))}
-							<tr className="border-t border-black bg-[#f4f5f1] font-bold">
-								<td className="px-1.5 py-1.5 text-right uppercase" colSpan={6}>
-									Total Personal
-								</td>
-								<td className="px-1.5 py-1.5 text-right text-[var(--brand-red)]">
-									{currencyFormatter.format(laborTotal)}
-								</td>
-							</tr>
-							{report.laborEntries.length === 0 && (
+				<section className="report-doc__section">
+					<SectionTitle
+						aside={
+							report.laborEntries.length > 0
+								? `Total ${currency.format(laborTotal)}`
+								: undefined
+						}
+					>
+						Personal en obra
+					</SectionTitle>
+					{report.laborEntries.length > 0 ? (
+						<table className="report-doc__table">
+							<colgroup>
+								<col />
+								<col style={{ width: "22%" }} />
+								<col style={{ width: "11%" }} />
+								<col style={{ width: "10%" }} />
+								<col style={{ width: "14%" }} />
+								<col style={{ width: "15%" }} />
+							</colgroup>
+							<thead>
 								<tr>
-									<td
-										className="px-2 py-4 text-center text-[var(--muted)]"
-										colSpan={7}
-									>
-										Sin registro de personal.
-									</td>
+									<th className="text-left">Nombre o cuadrilla</th>
+									<th className="text-left">Puesto</th>
+									<th>Personas</th>
+									<th>Horas</th>
+									<th className="text-right">Tarifa</th>
+									<th className="text-right">Monto</th>
 								</tr>
-							)}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{report.laborEntries.map((entry) => (
+									<tr key={entry.id}>
+										<td>{entry.workerLabel}</td>
+										<td>{entry.role ?? "—"}</td>
+										<td className="text-center tabular-nums">
+											{number.format(num(entry.people))}
+										</td>
+										<td className="text-center tabular-nums">
+											{number.format(num(entry.hours))}
+										</td>
+										<td className="text-right tabular-nums">
+											{currency.format(num(entry.rate))}
+										</td>
+										<td className="text-right tabular-nums">
+											{currency.format(num(entry.amount))}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					) : (
+						<p className="report-doc__empty">Sin registro de personal.</p>
+					)}
 				</section>
 
-				{/* Materiales */}
-				<section className="mb-5">
-					<h3 className="border border-black bg-[#55c7e8] py-1 text-center font-bold uppercase text-[10px]">
-						Materiales Usados
-					</h3>
-					<table className="w-full border-collapse border-l border-r border-b border-black">
-						<thead className="bg-[#eeeeee]">
-							<tr>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px] w-12">
-									No.
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-left text-[9px] w-1/3">
-									Material
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-left text-[9px]">
-									Bodega Origen
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px] w-20">
-									Cantidad
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px] w-16">
-									Unidad
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px] w-20">
-									Desperdicio
-								</th>
-								<th className="border-b border-r border-black px-1.5 py-1 text-center text-[9px] w-20">
-									Devuelto
-								</th>
-								<th className="border-b border-black px-1.5 py-1 text-center text-[9px] w-24">
-									Actividad
-								</th>
-							</tr>
-						</thead>
-						<tbody>
-							{report.materialEntries.map((entry) => (
-								<tr
-									className="border-b border-black last:border-b-0 hover:bg-[#fbfbf8]"
-									key={entry.id}
-								>
-									<td className="border-r border-black px-1.5 py-1 text-center">
-										{entry.position}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 whitespace-normal break-words">
-										{entry.materialName}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 whitespace-normal break-words">
-										{entry.warehouse ?? ""}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-center font-semibold">
-										{valueText(entry.quantityUsed)}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-center">
-										{entry.unit ?? ""}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-center text-[var(--warning)]">
-										{Number(entry.wasteQuantity ?? 0) > 0
-											? valueText(entry.wasteQuantity)
-											: "-"}
-									</td>
-									<td className="border-r border-black px-1.5 py-1 text-center text-[var(--success)]">
-										{Number(entry.returnedQuantity ?? 0) > 0
-											? valueText(entry.returnedQuantity)
-											: "-"}
-									</td>
-									<td className="px-1.5 py-1 text-center font-medium">
-										{entry.activityCode ?? ""}
-									</td>
-								</tr>
-							))}
-							{report.materialEntries.length === 0 && (
+				<section className="report-doc__section">
+					<SectionTitle>Materiales usados</SectionTitle>
+					{report.materialEntries.length > 0 ? (
+						<table className="report-doc__table">
+							<colgroup>
+								<col />
+								<col style={{ width: "18%" }} />
+								<col style={{ width: "13%" }} />
+								<col style={{ width: "13%" }} />
+								<col style={{ width: "12%" }} />
+								<col style={{ width: "10%" }} />
+							</colgroup>
+							<thead>
 								<tr>
-									<td
-										className="px-2 py-4 text-center text-[var(--muted)]"
-										colSpan={8}
-									>
-										Sin registro de materiales consumidos hoy.
-									</td>
+									<th className="text-left">Material</th>
+									<th className="text-left">Bodega</th>
+									<th>Usado</th>
+									<th>Desperdicio</th>
+									<th>Devuelto</th>
+									<th>Actividad</th>
 								</tr>
-							)}
-						</tbody>
-					</table>
+							</thead>
+							<tbody>
+								{report.materialEntries.map((entry) => (
+									<tr key={entry.id}>
+										<td>{entry.materialName}</td>
+										<td>{entry.warehouse ?? "—"}</td>
+										<td className="text-center tabular-nums">
+											{number.format(num(entry.quantityUsed))}{" "}
+											{entry.unit ?? ""}
+										</td>
+										<td className="text-center tabular-nums">
+											{num(entry.wasteQuantity) > 0
+												? number.format(num(entry.wasteQuantity))
+												: "—"}
+										</td>
+										<td className="text-center tabular-nums">
+											{num(entry.returnedQuantity) > 0
+												? number.format(num(entry.returnedQuantity))
+												: "—"}
+										</td>
+										<td className="text-center">{entry.activityCode ?? "—"}</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					) : (
+						<p className="report-doc__empty">Sin materiales consumidos.</p>
+					)}
 				</section>
 
-				{/* Evidencias (Fotos de avance diario) */}
-				<section className="mb-5">
-					<h3 className="border border-black bg-[#55c7e8] py-1 text-center font-bold uppercase text-[10px]">
-						Evidencias Fotográficas
-					</h3>
-					{report.mediaEntries.length ? (
-						<div className="grid grid-cols-2 gap-4 border border-black p-4 bg-white rounded-b">
+				{report.mediaEntries.length > 0 ? (
+					<section className="report-doc__section">
+						<SectionTitle>Evidencia fotográfica</SectionTitle>
+						<div className="report-doc__photos">
 							{report.mediaEntries.map((media, index) => (
-								<figure
-									className="break-inside-avoid border border-[#cfd5ce] p-2.5 rounded bg-[#fbfbf8]"
-									key={media.id}
-								>
-									<div className="mb-2 flex items-center justify-between border-b border-[#cfd5ce] pb-1.5 font-bold text-[9px] text-[var(--steel)] uppercase">
-										<span>{mediaTitle(media, index)}</span>
-										<span className="bg-[#e8f5ff] text-[#1e40af] px-1 rounded">
-											{mediaTypeLabels[media.mediaType]}
-										</span>
-									</div>
+								<figure key={media.id}>
 									{media.mimeType.startsWith("image/") ? (
 										<Image
 											alt={media.title ?? media.originalName}
-											className="h-44 w-full object-cover rounded border border-[#dfe3dc]"
 											height={352}
 											src={media.publicUrl}
 											unoptimized
 											width={640}
 										/>
 									) : (
-										<div className="grid h-44 place-items-center border border-dashed border-[#cfd5ce] text-center text-xs bg-[#f4f5f1] rounded">
+										<div className="report-doc__video">
 											Video: {media.originalName}
 										</div>
 									)}
-									<figcaption className="mt-2.5 leading-normal text-[10px] space-y-1">
-										<p>
-											<b>Relación:</b>{" "}
-											<span className="text-black">
-												{mediaActivityLabel(report, media)}
-											</span>
-										</p>
-										<p>
-											<b>Archivo:</b>{" "}
-											<span className="text-[var(--muted)]">
-												{media.originalName}
-											</span>
-										</p>
-										{media.description && (
-											<p className="bg-white p-1.5 border rounded mt-1 whitespace-normal break-words italic">
-												"{media.description}"
-											</p>
-										)}
+									<figcaption>
+										<strong>
+											{media.title ||
+												`Foto ${String(index + 1).padStart(2, "0")}`}
+										</strong>
+										<span>
+											{mediaTypeLabels[media.mediaType]} ·{" "}
+											{mediaActivityLabel(report, media)}
+										</span>
+										{media.description ? <p>{media.description}</p> : null}
 									</figcaption>
 								</figure>
 							))}
 						</div>
-					) : (
-						<p className="border border-black px-2 py-6 text-center text-[var(--muted)]">
-							Sin evidencias fotográficas registradas.
-						</p>
-					)}
+					</section>
+				) : null}
+
+				<section className="report-doc__section">
+					<SectionTitle>Observaciones</SectionTitle>
+					<p className="report-doc__observations">
+						{report.generalObservations || "Sin observaciones."}
+					</p>
 				</section>
 
-				{/* Observaciones */}
-				<section className="text-[10px] break-inside-avoid">
-					<h3 className="border border-black bg-[#d9d9d9] py-1 text-center font-bold uppercase">
-						Observaciones Generales
-					</h3>
-					<p className="min-h-16 border-l border-r border-b border-black px-3 py-2.5 whitespace-normal break-words bg-white">
-						{report.generalObservations ||
-							"Ninguna observación registrada para esta jornada."}
-					</p>
+				<section className="report-doc__signatures">
+					<div>
+						<span />
+						<strong>{report.siteManager}</strong>
+						<small>Elaborado por · Encargado de obra</small>
+					</div>
+					<div>
+						<span />
+						<strong>{report.approvedBy?.name ?? " "}</strong>
+						<small>
+							Aprobado por
+							{report.approvedAt
+								? ` · ${report.approvedAt.toLocaleDateString("es-GT")}`
+								: ""}
+						</small>
+					</div>
 				</section>
 			</main>
 		</div>

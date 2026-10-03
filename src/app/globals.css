@@ -24621,3 +24621,196 @@ input[id^="tab-seguridad-"]:checked
 		bottom: 6px;
 	}
 }
+
+/* Informe diario imprimible: misma línea que presupuesto y estado de cuenta. */
+.report-doc {
+	color: #1b2325;
+	font-size: 11px;
+	line-height: 1.45;
+}
+.report-doc * {
+	-webkit-print-color-adjust: exact;
+	print-color-adjust: exact;
+}
+.report-doc__notice {
+	margin: -0.5rem 0 1rem;
+	border: 1px solid #ead9a8;
+	border-radius: 6px;
+	background: #fff8e6;
+	padding: 0.4rem 0.65rem;
+	color: #6b4f0e;
+	font-size: 10px;
+}
+.report-doc__summary {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	margin-bottom: 1.1rem;
+	border: 1px solid #c9d1cd;
+	border-radius: 6px;
+}
+.report-doc__summary > div {
+	padding: 0.5rem 0.65rem;
+}
+.report-doc__summary > div + div {
+	border-left: 1px solid #c9d1cd;
+}
+.report-doc__summary span {
+	display: block;
+	color: #5d6a66;
+	font-size: 8.5px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+.report-doc__summary strong {
+	display: block;
+	margin-top: 0.15rem;
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+.report-doc__section {
+	margin-bottom: 1.1rem;
+	break-inside: avoid;
+}
+.report-doc__section-title {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: 0.4rem;
+	border-bottom: 1.5px solid #1b2325;
+	padding-bottom: 0.2rem;
+}
+.report-doc__section-title h2 {
+	font-size: 10.5px;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+.report-doc__section-title span {
+	font-size: 10px;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+.report-doc__table {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: collapse;
+}
+.report-doc__table th,
+.report-doc__table td {
+	border: 1px solid #b9c2be;
+	padding: 4px 6px;
+	vertical-align: middle;
+}
+.report-doc__table th {
+	background: #eef2ef;
+	font-size: 8.5px;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+}
+.report-doc__table tbody tr {
+	break-inside: avoid;
+}
+.report-doc__table td small {
+	display: block;
+	color: #5d6a66;
+	font-size: 9.5px;
+}
+.report-doc__progress {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+.report-doc__progress > span {
+	position: relative;
+	height: 6px;
+	flex: 1;
+	overflow: hidden;
+	border-radius: 999px;
+	background: #e3e8e5;
+}
+.report-doc__progress i {
+	position: absolute;
+	inset: 0 auto 0 0;
+	background: #1f7a5b;
+}
+.report-doc__progress b {
+	min-width: 2.6rem;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.report-doc__empty {
+	border: 1px dashed #c9d1cd;
+	border-radius: 6px;
+	padding: 0.45rem 0.65rem;
+	color: #6b7773;
+	font-size: 10px;
+}
+.report-doc__footnote {
+	margin-top: 0.35rem;
+	color: #5d6a66;
+	font-size: 9.5px;
+}
+.report-doc__photos {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+.report-doc__photos figure {
+	break-inside: avoid;
+}
+.report-doc__photos img,
+.report-doc__video {
+	width: 100%;
+	height: 11rem;
+	border: 1px solid #d7ddd9;
+	border-radius: 4px;
+	object-fit: cover;
+}
+.report-doc__video {
+	display: grid;
+	place-items: center;
+	background: #f3f5f4;
+}
+.report-doc__photos figcaption {
+	margin-top: 0.3rem;
+	font-size: 9.5px;
+}
+.report-doc__photos figcaption strong,
+.report-doc__photos figcaption span {
+	display: block;
+}
+.report-doc__photos figcaption span {
+	color: #5d6a66;
+}
+.report-doc__photos figcaption p {
+	margin-top: 0.15rem;
+}
+.report-doc__observations {
+	min-height: 2.5rem;
+	white-space: pre-line;
+}
+.report-doc__signatures {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 3rem;
+	margin-top: 2.75rem;
+	break-inside: avoid;
+}
+.report-doc__signatures > div {
+	display: grid;
+	justify-items: center;
+	gap: 0.15rem;
+	text-align: center;
+}
+.report-doc__signatures > div > span {
+	width: 100%;
+	margin-bottom: 0.3rem;
+	border-top: 1px solid #1b2325;
+}
+.report-doc__signatures small {
+	color: #5d6a66;
+	font-size: 9px;
+}
