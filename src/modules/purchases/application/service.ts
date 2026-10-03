@@ -9,6 +9,7 @@ import {
 	type SupplierInput,
 	supplierInputSchema,
 } from "../domain/validation";
+import { purchaseOrderCancelBlocker } from "../domain/order-rules";
 
 type PurchaseContext = { userId: string };
 
@@ -25,6 +26,9 @@ export async function receivePurchaseOrder(
 		rawInput,
 	) as PurchaseReceiptInput;
 	return prisma.$transaction(async (tx) => {
+		// Bloquea la orden: dos recepciones simultáneas (doble clic, dos
+		// usuarios) leerían el mismo saldo pendiente y recibirían de más.
+		await tx.$executeRaw`SELECT id FROM PurchaseOrder WHERE id = ${parsed.purchaseOrderId} FOR UPDATE`;
 		const order = await tx.purchaseOrder.findUnique({
 			where: { id: parsed.purchaseOrderId },
 			include: { items: true, requisition: true },
@@ -438,9 +442,14 @@ export async function issuePurchaseOrder(
 	context: PurchaseContext,
 ) {
 	return prisma.$transaction(async (tx) => {
+		await tx.$executeRaw`SELECT id FROM PurchaseOrder WHERE id = ${orderId} FOR UPDATE`;
 		const order = await tx.purchaseOrder.findUnique({ where: { id: orderId } });
 		if (order?.status !== "DRAFT") {
-			throw new Error("Solo se pueden emitir órdenes en borrador.");
+			throw new Error(
+				order?.status === "ISSUED"
+					? "La orden ya fue emitida."
+					: "Solo se pueden emitir órdenes en borrador.",
+			);
 		}
 		const issued = await tx.purchaseOrder.update({
 			where: { id: orderId },
@@ -474,10 +483,25 @@ export async function cancelPurchaseOrder(
 	context: PurchaseContext,
 ) {
 	return prisma.$transaction(async (tx) => {
-		const order = await tx.purchaseOrder.findUnique({ where: { id: orderId } });
-		if (!order || !["DRAFT", "ISSUED"].includes(order.status)) {
-			throw new Error("Esta orden ya no se puede anular.");
-		}
+		// Mismo bloqueo que usa Finanzas al registrar una factura: así una
+		// anulación y una factura simultáneas no pueden pasar ambas.
+		await tx.$executeRaw`SELECT id FROM PurchaseOrder WHERE id = ${orderId} FOR UPDATE`;
+		const order = await tx.purchaseOrder.findUnique({
+			where: { id: orderId },
+			include: {
+				items: { select: { receivedQuantity: true } },
+				_count: {
+					select: { financialExpenses: { where: { status: "VALID" } } },
+				},
+			},
+		});
+		if (!order) throw new Error("La orden ya no existe.");
+		const blocker = purchaseOrderCancelBlocker({
+			status: order.status,
+			validInvoiceCount: order._count.financialExpenses,
+			hasReceipts: order.items.some((item) => item.receivedQuantity.gt(0)),
+		});
+		if (blocker) throw new Error(blocker);
 		const canceled = await tx.purchaseOrder.update({
 			where: { id: orderId },
 			data: { status: "CANCELED" },

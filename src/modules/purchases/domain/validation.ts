@@ -186,7 +186,7 @@ export const purchaseOrderInputSchema = z
 const receiptLineSchema = z.object({
 	purchaseOrderItemId: z.string().trim().min(1),
 	quantity: z.coerce
-		.number({ message: "Ingrese una cantidad valida." })
+		.number({ message: "Ingrese una cantidad válida." })
 		.finite()
 		.positive("La cantidad recibida debe ser mayor que cero."),
 });
@@ -196,7 +196,7 @@ export const purchaseReceiptInputSchema = z.object({
 	receivedDate: z
 		.string()
 		.trim()
-		.regex(/^\d{4}-\d{2}-\d{2}$/, "Ingrese una fecha valida."),
+		.regex(/^\d{4}-\d{2}-\d{2}$/, "Ingrese una fecha válida."),
 	reference: z
 		.string()
 		.trim()
@@ -204,7 +204,7 @@ export const purchaseReceiptInputSchema = z.object({
 	notes: z.string().trim().optional(),
 	items: z
 		.array(receiptLineSchema)
-		.min(1, "Registre al menos un renglon recibido."),
+		.min(1, "Registre al menos un renglón recibido."),
 });
 
 export type SupplierInput = z.infer<typeof supplierInputSchema>;

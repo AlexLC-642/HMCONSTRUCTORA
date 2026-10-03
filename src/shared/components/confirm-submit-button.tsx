@@ -16,6 +16,7 @@ export function ConfirmSubmitButton({
 	description,
 	confirmLabel = "Eliminar",
 	cancelLabel = "Cancelar",
+	pendingLabel = "Eliminando...",
 	children,
 	className,
 }: {
@@ -23,6 +24,7 @@ export function ConfirmSubmitButton({
 	description: string;
 	confirmLabel?: string;
 	cancelLabel?: string;
+	pendingLabel?: string;
 	children: ReactNode;
 	className?: string;
 }) {
@@ -104,7 +106,7 @@ export function ConfirmSubmitButton({
 								}}
 								type="button"
 							>
-								{pending ? "Eliminando..." : confirmLabel}
+								{pending ? pendingLabel : confirmLabel}
 							</button>
 						</div>
 					</section>

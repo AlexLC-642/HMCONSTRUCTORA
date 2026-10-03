@@ -6,8 +6,10 @@ import { redirect } from "next/navigation";
 import { requireProjectScopePortfolioPermission } from "@/modules/auth/application/authorization";
 import {
 	purchaseOrderInputSchema,
+	purchaseReceiptInputSchema,
 	supplierInputSchema,
 } from "../domain/validation";
+import { createInventoryMaterial } from "@/modules/inventory/application/service";
 import {
 	cancelPurchaseOrder,
 	createPurchaseOrder,
@@ -28,6 +30,22 @@ export type PurchaseOrderFormState = {
 	message: string;
 	errors?: Record<string, string[] | undefined>;
 };
+
+export type PurchaseOrderStepState = {
+	status: "idle" | "error";
+	message: string;
+};
+
+/**
+ * Los servicios de compras lanzan `Error` con mensajes pensados para el
+ * usuario. Cualquier otra excepción (Prisma, red) se reemplaza por un mensaje
+ * genérico para no filtrar detalles internos.
+ */
+function userMessage(error: unknown, fallback: string) {
+	return error instanceof Error && error.constructor === Error
+		? error.message
+		: fallback;
+}
 
 function value(formData: FormData, key: string) {
 	const raw = formData.get(key);
@@ -143,38 +161,61 @@ export async function createPurchaseOrderAction(
 	} catch (error) {
 		return {
 			status: "error",
-			message:
-				error instanceof Error
-					? error.message
-					: "No se pudo guardar la compra. Inténtalo de nuevo.",
+			message: userMessage(
+				error,
+				"No se pudo guardar la compra. Inténtalo de nuevo.",
+			),
 		};
 	}
 	purchaseRefresh();
 }
 
-export async function issuePurchaseOrderAction(formData: FormData) {
+export async function issuePurchaseOrderAction(
+	_previousState: PurchaseOrderStepState,
+	formData: FormData,
+): Promise<PurchaseOrderStepState> {
 	const user = await requireProjectScopePortfolioPermission(
 		"compras.gestionar",
 		"purchases",
 	);
-	await issuePurchaseOrder(value(formData, "purchaseOrderId"), {
-		userId: user.id,
-	});
+	try {
+		await issuePurchaseOrder(value(formData, "purchaseOrderId"), {
+			userId: user.id,
+		});
+	} catch (error) {
+		return {
+			status: "error",
+			message: userMessage(error, "No se pudo emitir la orden."),
+		};
+	}
 	purchaseRefresh();
 }
 
-export async function cancelPurchaseOrderAction(formData: FormData) {
+export async function cancelPurchaseOrderAction(
+	_previousState: PurchaseOrderStepState,
+	formData: FormData,
+): Promise<PurchaseOrderStepState> {
 	const user = await requireProjectScopePortfolioPermission(
 		"compras.gestionar",
 		"purchases",
 	);
-	await cancelPurchaseOrder(value(formData, "purchaseOrderId"), {
-		userId: user.id,
-	});
+	try {
+		await cancelPurchaseOrder(value(formData, "purchaseOrderId"), {
+			userId: user.id,
+		});
+	} catch (error) {
+		return {
+			status: "error",
+			message: userMessage(error, "No se pudo anular la orden."),
+		};
+	}
 	purchaseRefresh();
 }
 
-export async function receivePurchaseOrderAction(formData: FormData) {
+export async function receivePurchaseOrderAction(
+	_previousState: PurchaseOrderStepState,
+	formData: FormData,
+): Promise<PurchaseOrderStepState> {
 	const user = await requireProjectScopePortfolioPermission(
 		"compras.gestionar",
 		"purchases",
@@ -183,17 +224,102 @@ export async function receivePurchaseOrderAction(formData: FormData) {
 	try {
 		items = JSON.parse(value(formData, "items"));
 	} catch {
-		throw new Error("No se pudieron leer las cantidades recibidas.");
+		return {
+			status: "error",
+			message: "No se pudieron leer las cantidades recibidas.",
+		};
 	}
-	await receivePurchaseOrder(
-		{
-			purchaseOrderId: value(formData, "purchaseOrderId"),
-			receivedDate: value(formData, "receivedDate"),
-			reference: value(formData, "reference"),
-			notes: value(formData, "notes"),
-			items,
-		},
-		{ userId: user.id },
-	);
+	const parsed = purchaseReceiptInputSchema.safeParse({
+		purchaseOrderId: value(formData, "purchaseOrderId"),
+		receivedDate: value(formData, "receivedDate"),
+		reference: value(formData, "reference"),
+		notes: value(formData, "notes"),
+		items,
+	});
+	if (!parsed.success) {
+		return {
+			status: "error",
+			message:
+				parsed.error.issues[0]?.message ??
+				"Revisa la fecha, la referencia y las cantidades recibidas.",
+		};
+	}
+	try {
+		await receivePurchaseOrder(parsed.data, { userId: user.id });
+	} catch (error) {
+		return {
+			status: "error",
+			message: userMessage(error, "No se pudo registrar la recepción."),
+		};
+	}
 	purchaseRefresh();
+}
+
+export type QuickMaterialState =
+	| { status: "error"; message: string }
+	| {
+			status: "success";
+			material: {
+				id: string;
+				code: string;
+				name: string;
+				unit: string;
+				unitCost: number;
+			};
+	  };
+
+/**
+ * Alta rápida de un artículo desde el formulario de compra, para no obligar a
+ * salir a Inventario. Reutiliza el servicio de Inventario, que reconoce un
+ * artículo existente por nombre o código y lo reactiva en vez de duplicarlo.
+ */
+export async function quickCreatePurchaseMaterialAction(input: {
+	name: string;
+	unit: string;
+	unitCost: number;
+}): Promise<QuickMaterialState> {
+	const user = await requireProjectScopePortfolioPermission(
+		"compras.gestionar",
+		"purchases",
+	);
+	const name = typeof input?.name === "string" ? input.name.trim() : "";
+	const unit = typeof input?.unit === "string" ? input.unit.trim() : "";
+	const unitCost = Number(input?.unitCost);
+	if (name.length < 2) {
+		return { status: "error", message: "Escribe el nombre del artículo." };
+	}
+	if (name.length > 191) {
+		return { status: "error", message: "El nombre es demasiado largo." };
+	}
+	if (!unit || unit.length > 40) {
+		return {
+			status: "error",
+			message: "Indica la unidad de compra (saco, m³, unidad...).",
+		};
+	}
+	if (!Number.isFinite(unitCost) || unitCost < 0) {
+		return { status: "error", message: "El costo debe ser cero o mayor." };
+	}
+	try {
+		const material = await createInventoryMaterial(
+			{ name, unit, unitCost, resourceType: "MATERIAL" },
+			{ userId: user.id },
+		);
+		revalidatePath("/inventory");
+		return {
+			status: "success",
+			material: {
+				id: material.id,
+				code: material.code,
+				name: material.name,
+				unit: material.unit,
+				unitCost: material.unitCost.toNumber(),
+			},
+		};
+	} catch (error) {
+		return {
+			status: "error",
+			message: userMessage(error, "No se pudo crear el artículo."),
+		};
+	}
 }

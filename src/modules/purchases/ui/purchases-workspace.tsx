@@ -25,27 +25,45 @@ import {
 	Warehouse,
 	X,
 } from "lucide-react";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import {
+	useActionState,
+	useEffect,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+	useTransition,
+} from "react";
 import { useFormStatus } from "react-dom";
 import {
 	cancelPurchaseOrderAction,
 	createPurchaseOrderAction,
 	issuePurchaseOrderAction,
 	type PurchaseOrderFormState,
+	quickCreatePurchaseMaterialAction,
+	type PurchaseOrderStepState,
 	receivePurchaseOrderAction,
 	type SupplierFormState,
 	saveSupplierAction,
 	setSupplierActiveAction,
 } from "../application/actions";
 import type { getPurchaseWorkspace } from "../application/queries";
+import { ConfirmSubmitButton } from "@/shared/components/confirm-submit-button";
+import { SelectMenu, type SelectMenuOption } from "@/shared/ui/select-menu";
+import {
+	purchaseOrderCancelBlocker,
+	purchaseOrderTracksFinance,
+} from "../domain/order-rules";
 import { purchaseOrderStatusLabels } from "../domain/validation";
+
+const idleStepState: PurchaseOrderStepState = { status: "idle", message: "" };
 
 type WorkspaceData = Awaited<ReturnType<typeof getPurchaseWorkspace>>;
 type Supplier = WorkspaceData["suppliers"][number];
 type Order = WorkspaceData["orders"][number];
 type Requisition = WorkspaceData["readyRequisitions"][number];
 type View = "orders" | "suppliers" | "requisitions";
-type FlowState = "done" | "active" | "pending" | "stopped";
+type FlowState = "done" | "active" | "pending" | "stopped" | "skipped";
 
 function FlowStep({
 	icon: Icon,
@@ -81,7 +99,9 @@ function FlowStep({
 				? (activeLabels[label] ?? "En curso")
 				: state === "stopped"
 					? "Anulado"
-					: "Pendiente";
+					: state === "skipped"
+						? "No aplica"
+						: "Pendiente";
 	return (
 		<div data-state={state} title={`${label}: ${stateLabel}`}>
 			<span>
@@ -202,57 +222,86 @@ function creditStatusLabel(order: Order) {
 		: "Sin seguimiento";
 }
 
+const paymentChoices: Array<{
+	value: PaymentType;
+	label: string;
+	detail: string;
+}> = [
+	{
+		value: "IMMEDIATE",
+		label: "Al contado",
+		detail: "Se paga al emitir la orden.",
+	},
+	{
+		value: "ON_DELIVERY",
+		label: "Contra entrega",
+		detail: "Se paga cuando llega el material.",
+	},
+	{
+		value: "CREDIT",
+		label: "A crédito",
+		detail: "Con plazo; Finanzas controla factura, abonos y vencimiento.",
+	},
+];
+
+function FieldError({ id, message }: { id?: string; message?: string }) {
+	return message ? (
+		<small className="purchases-field-error" id={id}>
+			{message}
+		</small>
+	) : null;
+}
+
 function PaymentConditionFields({
 	today,
 	errorFor,
 	creditAvailable = true,
+	creditUnavailableReason = "Disponible solo para compras de un proyecto.",
 }: {
 	today: string;
 	errorFor: (field: string) => string | undefined;
 	creditAvailable?: boolean;
+	creditUnavailableReason?: string;
 }) {
 	const [paymentType, setPaymentType] = useState<PaymentType>("IMMEDIATE");
-	useEffect(() => {
-		if (!creditAvailable && paymentType === "CREDIT") {
-			setPaymentType("IMMEDIATE");
-		}
-	}, [creditAvailable, paymentType]);
-	const descriptions: Record<PaymentType, string> = {
-		IMMEDIATE: "La compra no utiliza crédito.",
-		ON_DELIVERY: "El pago queda acordado para la recepción.",
-		CREDIT: "Indica la fecha límite acordada.",
-	};
+	const effectiveType =
+		!creditAvailable && paymentType === "CREDIT" ? "IMMEDIATE" : paymentType;
 
 	return (
 		<>
-			<label>
-				<span>Condición de pago</span>
-				<select
-					aria-invalid={Boolean(errorFor("paymentType"))}
-					name="paymentType"
-					onChange={(event) =>
-						setPaymentType(event.target.value as PaymentType)
-					}
-					value={paymentType}
-				>
-					<option value="IMMEDIATE">Pago al contado</option>
-					<option value="ON_DELIVERY">Pago contra entrega</option>
-					<option disabled={!creditAvailable} value="CREDIT">
-						{creditAvailable
-							? "Compra a crédito"
-							: "Compra a crédito · requiere proyecto"}
-					</option>
-				</select>
-				<small className="purchases-field-hint">
-					{descriptions[paymentType]}
-				</small>
-				{errorFor("paymentType") ? (
-					<small className="purchases-field-error">
-						{errorFor("paymentType")}
-					</small>
-				) : null}
-			</label>
-			{paymentType === "CREDIT" ? (
+			<fieldset
+				aria-invalid={Boolean(errorFor("paymentType")) || undefined}
+				className="purchases-choice purchases-choice--three"
+			>
+				<legend>Condición de pago</legend>
+				{paymentChoices.map((choice) => {
+					const unavailable = choice.value === "CREDIT" && !creditAvailable;
+					return (
+						<label
+							className="purchases-choice__option"
+							data-disabled={unavailable || undefined}
+							key={choice.value}
+						>
+							<input
+								checked={effectiveType === choice.value}
+								disabled={unavailable}
+								name="paymentType"
+								onChange={() => setPaymentType(choice.value)}
+								type="radio"
+								value={choice.value}
+							/>
+							<span>
+								<strong>{choice.label}</strong>
+								<small>
+									{unavailable ? creditUnavailableReason : choice.detail}
+								</small>
+							</span>
+						</label>
+					);
+				})}
+				<FieldError message={errorFor("paymentType")} />
+			</fieldset>
+			{effectiveType === "CREDIT" ? (
 				<label className="purchases-payment-due">
 					<span>Vencimiento del pago</span>
 					<input
@@ -262,14 +311,96 @@ function PaymentConditionFields({
 						required
 						type="date"
 					/>
-					{errorFor("paymentDueDate") ? (
-						<small className="purchases-field-error">
-							{errorFor("paymentDueDate")}
-						</small>
-					) : null}
+					<small className="purchases-field-hint">
+						Fecha límite acordada con el proveedor.
+					</small>
+					<FieldError message={errorFor("paymentDueDate")} />
 				</label>
 			) : null}
 		</>
+	);
+}
+
+/** IVA editable dentro del resumen de totales, junto al monto que produce. */
+function OrderTotals({
+	subtotal,
+	tax,
+	onTaxChange,
+	error,
+	totalLabel = "Total",
+}: {
+	subtotal: number;
+	tax: number;
+	onTaxChange: (value: number) => void;
+	error?: string;
+	totalLabel?: string;
+}) {
+	const total = subtotal * (1 + tax / 100);
+	return (
+		<div className="purchases-order-total">
+			<div>
+				<span>Subtotal</span>
+				<strong>{formatCurrency(subtotal)}</strong>
+			</div>
+			<div className="purchases-order-total__tax">
+				<label>
+					<span>IVA</span>
+					<span className="purchases-input-suffix">
+						<input
+							aria-invalid={Boolean(error)}
+							max={100}
+							min={0}
+							name="taxPercentage"
+							onChange={(event) => onTaxChange(Number(event.target.value) || 0)}
+							step="0.01"
+							type="number"
+							value={tax}
+						/>
+						<span>%</span>
+					</span>
+				</label>
+				<strong>{formatCurrency(total - subtotal)}</strong>
+				<small className="purchases-field-hint">
+					Déjalo en 0 si los precios ya incluyen IVA.
+				</small>
+				<FieldError message={error} />
+			</div>
+			<div className="purchases-order-total__grand">
+				<span>{totalLabel}</span>
+				<strong>{formatCurrency(total)}</strong>
+			</div>
+		</div>
+	);
+}
+
+/** Explica qué registrará Finanzas antes de guardar, según el destino. */
+function FinanceImpactNote({
+	tracked,
+	projectLabel,
+}: {
+	tracked: boolean;
+	projectLabel?: string;
+}) {
+	return (
+		<p className="purchases-finance-note" data-tracked={tracked}>
+			<ReceiptText aria-hidden="true" size={16} />
+			{tracked ? (
+				<span>
+					Después de emitirla, la factura y los pagos se registran en{" "}
+					<strong>
+						{projectLabel
+							? `Finanzas · ${projectLabel}`
+							: "Finanzas del proyecto"}
+					</strong>
+					.
+				</span>
+			) : (
+				<span>
+					Compra para bodega: se controla en Inventario y{" "}
+					<strong>no genera gasto de proyecto en Finanzas</strong>.
+				</span>
+			)}
+		</p>
 	);
 }
 
@@ -340,7 +471,10 @@ function ModalShell({
 	useEffect(() => {
 		const previous = document.body.style.overflow;
 		document.body.style.overflow = "hidden";
-		const close = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+		// Un Escape ya atendido por un control interno (selector, buscador)
+		// no debe cerrar todo el formulario.
+		const close = (event: KeyboardEvent) =>
+			event.key === "Escape" && !event.defaultPrevented && onClose();
 		window.addEventListener("keydown", close);
 		return () => {
 			document.body.style.overflow = previous;
@@ -648,6 +782,17 @@ function SupplierForm({
 	);
 }
 
+function supplierOptions(suppliers: Supplier[]): SelectMenuOption[] {
+	return suppliers
+		.filter((supplier) => supplier.status === "ACTIVE")
+		.map((supplier) => ({
+			value: supplier.id,
+			label: supplier.businessName,
+			description: `${supplier.code}${supplier.taxId ? ` · NIT ${supplier.taxId}` : ""}`,
+			keywords: supplier.tradeName ?? "",
+		}));
+}
+
 function OrderForm({
 	requisition,
 	suppliers,
@@ -666,6 +811,13 @@ function OrderForm({
 	);
 	const errorFor = (field: string) => state.errors?.[field]?.[0];
 	const [tax, setTax] = useState(0);
+	const [supplierId, setSupplierId] = useState("");
+	const [expectedDate, setExpectedDate] = useState(
+		requisition.neededDate && requisition.neededDate >= today
+			? requisition.neededDate.slice(0, 10)
+			: "",
+	);
+	const [showMissing, setShowMissing] = useState(false);
 	const [costs, setCosts] = useState<Record<string, number>>(() =>
 		Object.fromEntries(
 			requisition.items.map((item) => [item.id, item.estimatedCost]),
@@ -675,21 +827,41 @@ function OrderForm({
 		(total, item) => total + item.quantity * (costs[item.id] ?? 0),
 		0,
 	);
-	const total = subtotal * (1 + tax / 100);
 	const serializedItems = JSON.stringify(
 		requisition.items.map((item) => ({
 			requisitionItemId: item.id,
 			unitCost: costs[item.id] ?? 0,
 		})),
 	);
+	const supplierChoices = supplierOptions(suppliers);
+	const missing = [
+		!supplierId ? "el proveedor" : null,
+		!expectedDate ? "la entrega prevista" : null,
+		requisition.items.some((item) => !((costs[item.id] ?? 0) > 0))
+			? "el costo de cada renglón"
+			: null,
+	].filter((item): item is string => Boolean(item));
+	const projectLabel = requisition.project
+		? `${requisition.project.code} · ${requisition.project.name}`
+		: null;
 
 	return (
 		<ModalShell
-			description="Define proveedor, precios y entrega para generar la orden."
+			description="Asigna proveedor, precios y entrega a la solicitud autorizada."
 			onClose={onClose}
-			title="Nueva compra"
+			title="Comprar solicitud"
 		>
-			<form action={formAction} className="purchases-order-form">
+			<form
+				action={formAction}
+				className="purchases-order-form"
+				noValidate
+				onSubmit={(event) => {
+					if (missing.length > 0) {
+						event.preventDefault();
+						setShowMissing(true);
+					}
+				}}
+			>
 				<input name="requisitionId" type="hidden" value={requisition.id} />
 				<input name="items" type="hidden" value={serializedItems} />
 				<section className="purchases-order-origin">
@@ -730,38 +902,30 @@ function OrderForm({
 					<header>
 						<Store aria-hidden="true" size={18} />
 						<div>
-							<h3>Condiciones de compra</h3>
-							<p>Proveedor, fechas e impuesto aplicables a esta orden.</p>
+							<h3>Proveedor y entrega</h3>
+							<p>Quién vende y cuándo debe llegar el material.</p>
 						</div>
 					</header>
 					<div className="purchases-order-form__meta">
-						<label>
-							<span>Proveedor</span>
-							<select
-								aria-invalid={Boolean(errorFor("supplierId"))}
+						<div className="purchases-field">
+							<span id="requisition-order-supplier-label">Proveedor</span>
+							<SelectMenu
+								aria-labelledby="requisition-order-supplier-label"
+								emptyMessage="No hay proveedores activos con ese nombre."
+								invalid={
+									Boolean(errorFor("supplierId")) ||
+									(showMissing && !supplierId)
+								}
 								name="supplierId"
-								required
-							>
-								<option value="">Seleccionar proveedor</option>
-								{suppliers
-									.filter((supplier) => supplier.status === "ACTIVE")
-									.map((supplier) => (
-										<option key={supplier.id} value={supplier.id}>
-											{supplier.code} · {supplier.businessName}
-										</option>
-									))}
-							</select>
-							{errorFor("supplierId") ? (
-								<small className="purchases-field-error">
-									{errorFor("supplierId")}
-								</small>
-							) : null}
-						</label>
-						<PaymentConditionFields
-							creditAvailable={Boolean(requisition.project)}
-							errorFor={errorFor}
-							today={today}
-						/>
+								onChange={setSupplierId}
+								options={supplierChoices}
+								placeholder="Elegir proveedor"
+								searchPlaceholder="Buscar por nombre, código o NIT"
+								searchable
+								value={supplierId}
+							/>
+							<FieldError message={errorFor("supplierId")} />
+						</div>
 						<label>
 							<span>Fecha de emisión</span>
 							<input
@@ -771,65 +935,61 @@ function OrderForm({
 								required
 								type="date"
 							/>
-							{errorFor("issueDate") ? (
-								<small className="purchases-field-error">
-									{errorFor("issueDate")}
-								</small>
-							) : null}
+							<FieldError message={errorFor("issueDate")} />
 						</label>
 						<label>
 							<span>Entrega prevista</span>
 							<input
-								aria-invalid={Boolean(errorFor("expectedDate"))}
+								aria-invalid={
+									Boolean(errorFor("expectedDate")) ||
+									(showMissing && !expectedDate)
+								}
 								min={today}
 								name="expectedDate"
+								onChange={(event) => setExpectedDate(event.target.value)}
 								required
 								type="date"
+								value={expectedDate}
 							/>
-							{errorFor("expectedDate") ? (
-								<small className="purchases-field-error">
-									{errorFor("expectedDate")}
-								</small>
-							) : null}
+							<FieldError message={errorFor("expectedDate")} />
 						</label>
-						<label>
-							<span>IVA</span>
-							<div className="purchases-input-suffix">
-								<input
-									aria-invalid={Boolean(errorFor("taxPercentage"))}
-									max={100}
-									min={0}
-									name="taxPercentage"
-									onChange={(event) => setTax(Number(event.target.value) || 0)}
-									step="0.01"
-									type="number"
-									value={tax}
-								/>
-								<span>%</span>
-							</div>
-							{errorFor("taxPercentage") ? (
-								<small className="purchases-field-error">
-									{errorFor("taxPercentage")}
-								</small>
-							) : null}
-						</label>
+					</div>
+				</div>
+				<div className="purchases-order-form__section">
+					<header>
+						<CircleDollarSign aria-hidden="true" size={18} />
+						<div>
+							<h3>Pago</h3>
+							<p>Cómo se le pagará al proveedor.</p>
+						</div>
+					</header>
+					<div className="purchases-order-form__stack">
+						<PaymentConditionFields
+							creditAvailable={Boolean(requisition.project)}
+							creditUnavailableReason="La solicitud es para bodega; el crédito requiere proyecto."
+							errorFor={errorFor}
+							today={today}
+						/>
+						<FinanceImpactNote
+							projectLabel={projectLabel ?? undefined}
+							tracked={Boolean(projectLabel)}
+						/>
 					</div>
 				</div>
 				<div className="purchases-order-lines">
 					<div className="purchases-order-lines__heading">
 						<div>
-							<h3>Detalle de compra</h3>
+							<h3>Precios acordados</h3>
 							<p>
-								Las cantidades vienen de la solicitud; aquí se registran los
-								precios acordados.
+								Las cantidades vienen de la solicitud; escribe el costo unitario
+								de cada renglón.
 							</p>
-							{errorFor("items") ? (
-								<small className="purchases-field-error">
-									{errorFor("items")}
-								</small>
-							) : null}
+							<FieldError message={errorFor("items")} />
 						</div>
-						<span>{requisition.items.length} renglones</span>
+						<span>
+							{requisition.items.length}{" "}
+							{requisition.items.length === 1 ? "renglón" : "renglones"}
+						</span>
 					</div>
 					<div className="purchases-order-lines__table">
 						<div className="purchases-order-lines__row purchases-order-lines__row--head">
@@ -853,6 +1013,9 @@ function OrderForm({
 										Costo unitario de {item.description}
 									</span>
 									<input
+										aria-invalid={
+											(showMissing && !((costs[item.id] ?? 0) > 0)) || undefined
+										}
 										min="0.01"
 										onChange={(event) =>
 											setCosts((current) => ({
@@ -875,7 +1038,7 @@ function OrderForm({
 				</div>
 				<div className="purchases-order-form__bottom">
 					<label>
-						<span>Condiciones u observaciones</span>
+						<span>Condiciones u observaciones (opcional)</span>
 						<textarea
 							maxLength={2000}
 							name="notes"
@@ -883,33 +1046,176 @@ function OrderForm({
 							rows={4}
 						/>
 					</label>
-					<div className="purchases-order-total">
-						<div>
-							<span>Subtotal</span>
-							<strong>{formatCurrency(subtotal)}</strong>
-						</div>
-						<div>
-							<span>IVA</span>
-							<strong>{formatCurrency(total - subtotal)}</strong>
-						</div>
-						<div className="purchases-order-total__grand">
-							<span>Total de la orden</span>
-							<strong>{formatCurrency(total)}</strong>
-						</div>
-					</div>
+					<OrderTotals
+						error={errorFor("taxPercentage")}
+						onTaxChange={setTax}
+						subtotal={subtotal}
+						tax={tax}
+						totalLabel="Total de la orden"
+					/>
 				</div>
-				<footer className="purchases-form__footer">
-					<button
-						className="purchases-button purchases-button--ghost focus-ring"
-						onClick={onClose}
-						type="button"
-					>
-						Cancelar
-					</button>
-					<SubmitButton>Guardar compra en borrador</SubmitButton>
-				</footer>
+				<OrderFormFooter
+					missing={showMissing ? missing : []}
+					onClose={onClose}
+				/>
 			</form>
 		</ModalShell>
+	);
+}
+
+function OrderFormFooter({
+	missing,
+	onClose,
+	disabled = false,
+}: {
+	missing: string[];
+	onClose: () => void;
+	disabled?: boolean;
+}) {
+	return (
+		<footer className="purchases-form__footer purchases-form__footer--order">
+			<p aria-live="polite" className="purchases-form__footer-note">
+				{missing.length > 0 ? (
+					<strong className="purchases-field-error">
+						Falta completar {joinSpanish(missing)}.
+					</strong>
+				) : (
+					"Se guarda como borrador; podrás revisarla antes de emitirla."
+				)}
+			</p>
+			<button
+				className="purchases-button purchases-button--ghost focus-ring"
+				onClick={onClose}
+				type="button"
+			>
+				Cancelar
+			</button>
+			<SubmitButton disabled={disabled}>Guardar borrador</SubmitButton>
+		</footer>
+	);
+}
+
+function joinSpanish(items: string[]) {
+	if (items.length <= 1) return items.join("");
+	return `${items.slice(0, -1).join(", ")} y ${items.at(-1)}`;
+}
+
+type CatalogMaterial = WorkspaceData["materials"][number];
+
+/**
+ * Alta rápida de artículo sin salir de la compra. No usa <form> porque vive
+ * dentro del formulario de la orden; llama a la acción del servidor directo.
+ */
+function QuickMaterialForm({
+	initialName,
+	units,
+	onCreated,
+	onCancel,
+}: {
+	initialName: string;
+	units: string[];
+	onCreated: (material: CatalogMaterial) => void;
+	onCancel: () => void;
+}) {
+	const [name, setName] = useState(initialName);
+	const [unit, setUnit] = useState("");
+	const [unitCost, setUnitCost] = useState("");
+	const [error, setError] = useState("");
+	const [pending, startTransition] = useTransition();
+	const unitListId = useId();
+
+	const submit = () => {
+		setError("");
+		startTransition(async () => {
+			const result = await quickCreatePurchaseMaterialAction({
+				name,
+				unit,
+				unitCost: Number(unitCost) || 0,
+			});
+			if (result.status === "error") {
+				setError(result.message);
+				return;
+			}
+			onCreated(result.material as CatalogMaterial);
+		});
+	};
+
+	return (
+		<div className="purchases-quick-material">
+			<div className="purchases-quick-material__head">
+				<strong>Nuevo artículo del catálogo</strong>
+				<small>Se guarda en Inventario y se agrega a esta compra.</small>
+			</div>
+			<label>
+				<span>Nombre</span>
+				<input
+					// biome-ignore lint/a11y/noAutofocus: el usuario acaba de pedir crear el artículo.
+					autoFocus
+					maxLength={191}
+					onChange={(event) => setName(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key === "Enter") {
+							event.preventDefault();
+							submit();
+						}
+					}}
+					placeholder="Ej. Cemento gris 42.5 kg"
+					value={name}
+				/>
+			</label>
+			<div className="purchases-quick-material__pair">
+				<label>
+					<span>Unidad</span>
+					<input
+						list={unitListId}
+						maxLength={40}
+						onChange={(event) => setUnit(event.target.value)}
+						placeholder="saco, m³, unidad"
+						value={unit}
+					/>
+					<datalist id={unitListId}>
+						{units.map((item) => (
+							<option key={item} value={item} />
+						))}
+					</datalist>
+				</label>
+				<label>
+					<span>Costo de referencia</span>
+					<input
+						inputMode="decimal"
+						min="0"
+						onChange={(event) => setUnitCost(event.target.value)}
+						placeholder="0.00"
+						step="0.01"
+						type="number"
+						value={unitCost}
+					/>
+				</label>
+			</div>
+			{error ? (
+				<p className="purchases-field-error" role="alert">
+					{error}
+				</p>
+			) : null}
+			<div className="purchases-quick-material__actions">
+				<button
+					className="purchases-button purchases-button--ghost focus-ring"
+					disabled={pending}
+					onClick={onCancel}
+					type="button"
+				>
+					Volver
+				</button>
+				<button
+					className="purchases-order-lines__add focus-ring"
+					disabled={pending || name.trim().length < 2 || !unit.trim()}
+					onClick={submit}
+					type="button"
+				>
+					{pending ? "Creando..." : "Crear y agregar"}
+				</button>
+			</div>
+		</div>
 	);
 }
 
@@ -919,6 +1225,8 @@ type DirectLine = {
 	quantity: number;
 	unitCost: number;
 };
+
+type PurchaseDestination = "WAREHOUSE" | "PROJECT";
 
 function DirectPurchaseForm({
 	data,
@@ -937,23 +1245,50 @@ function DirectPurchaseForm({
 		initialState,
 	);
 	const errorFor = (field: string) => state.errors?.[field]?.[0];
-	const nextKey = useRef(2);
+	const nextKey = useRef(1);
 	const pendingLineFocusKey = useRef<number | null>(null);
 	const [tax, setTax] = useState(0);
+	const [supplierId, setSupplierId] = useState("");
+	const [warehouseId, setWarehouseId] = useState(
+		data.warehouses.length === 1 ? (data.warehouses[0]?.id ?? "") : "",
+	);
+	const [destination, setDestination] =
+		useState<PurchaseDestination>("WAREHOUSE");
 	const [projectId, setProjectId] = useState("");
-	const [lines, setLines] = useState<DirectLine[]>([
-		{ key: 1, materialId: "", quantity: 1, unitCost: 0 },
-	]);
+	const [justification, setJustification] = useState("");
+	const [expectedDate, setExpectedDate] = useState("");
+	const [showMissing, setShowMissing] = useState(false);
+	const [lines, setLines] = useState<DirectLine[]>([]);
+	// Artículos creados aquí mismo con el alta rápida; se suman al catálogo
+	// recibido del servidor hasta que la página se vuelva a cargar.
+	const [createdMaterials, setCreatedMaterials] = useState<CatalogMaterial[]>(
+		[],
+	);
+	const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+	const materials = useMemo(() => {
+		const known = new Set(data.materials.map((material) => material.id));
+		return [
+			...data.materials,
+			...createdMaterials.filter((material) => !known.has(material.id)),
+		];
+	}, [data.materials, createdMaterials]);
 	const materialById = useMemo(
-		() => new Map(data.materials.map((material) => [material.id, material])),
-		[data.materials],
+		() => new Map(materials.map((material) => [material.id, material])),
+		[materials],
+	);
+	const units = useMemo(
+		() =>
+			Array.from(
+				new Set(materials.map((material) => material.unit).filter(Boolean)),
+			).sort((left, right) => left.localeCompare(right, "es")),
+		[materials],
 	);
 	const updateLine = (key: number, change: Partial<DirectLine>) =>
 		setLines((current) =>
 			current.map((line) => (line.key === key ? { ...line, ...change } : line)),
 		);
 	// Selector masivo: marcar varios artículos a la vez en vez de agregarlos
-	// uno por uno con "+ Agregar artículo" y elegirlos fila por fila.
+	// uno por uno y elegirlos fila por fila.
 	const [pickerOpen, setPickerOpen] = useState(false);
 	const [pickerQuery, setPickerQuery] = useState("");
 	const [pickerSelected, setPickerSelected] = useState<Set<string>>(new Set());
@@ -964,30 +1299,67 @@ function DirectPurchaseForm({
 	);
 	const materialsForPicker = useMemo(() => {
 		const query = pickerQuery.trim().toLowerCase();
-		return data.materials.filter((material) => {
+		return materials.filter((material) => {
 			if (selectedMaterialIds.has(material.id)) return false;
 			if (!query) return true;
 			return `${material.code} ${material.name}`.toLowerCase().includes(query);
 		});
-	}, [data.materials, selectedMaterialIds, pickerQuery]);
+	}, [materials, selectedMaterialIds, pickerQuery]);
 
 	useEffect(() => {
 		if (!pickerOpen) return;
 		function onPointerDown(event: MouseEvent) {
 			if (!pickerRef.current?.contains(event.target as Node)) {
 				setPickerOpen(false);
+				setQuickCreateOpen(false);
 			}
 		}
 		function onKeyDown(event: KeyboardEvent) {
-			if (event.key === "Escape") setPickerOpen(false);
+			if (event.key === "Escape") {
+				event.stopPropagation();
+				setPickerOpen(false);
+				setQuickCreateOpen(false);
+			}
 		}
 		document.addEventListener("mousedown", onPointerDown);
-		document.addEventListener("keydown", onKeyDown);
+		document.addEventListener("keydown", onKeyDown, true);
 		return () => {
 			document.removeEventListener("mousedown", onPointerDown);
-			document.removeEventListener("keydown", onKeyDown);
+			document.removeEventListener("keydown", onKeyDown, true);
 		};
 	}, [pickerOpen]);
+
+	const closePicker = () => {
+		setPickerOpen(false);
+		setQuickCreateOpen(false);
+	};
+
+	const addCreatedMaterial = (material: CatalogMaterial) => {
+		setCreatedMaterials((current) =>
+			current.some((item) => item.id === material.id)
+				? current
+				: [...current, material],
+		);
+		setLines((current) => {
+			if (current.some((line) => line.materialId === material.id)) {
+				return current;
+			}
+			const key = nextKey.current;
+			nextKey.current += 1;
+			pendingLineFocusKey.current = key;
+			return [
+				...current,
+				{
+					key,
+					materialId: material.id,
+					quantity: 1,
+					unitCost: material.unitCost,
+				},
+			];
+		});
+		setPickerQuery("");
+		closePicker();
+	};
 
 	const togglePicked = (materialId: string) => {
 		setPickerSelected((current) => {
@@ -1022,57 +1394,86 @@ function DirectPurchaseForm({
 	};
 
 	const serializedItems = JSON.stringify(
-		lines.map((line) => {
-			return {
-				materialId: line.materialId,
-				quantity: line.quantity,
-				unitCost: line.unitCost,
-			};
-		}),
+		lines.map((line) => ({
+			materialId: line.materialId,
+			quantity: line.quantity,
+			unitCost: line.unitCost,
+		})),
 	);
 	const subtotal = lines.reduce(
 		(total, line) => total + line.quantity * line.unitCost,
 		0,
 	);
-	const total = subtotal * (1 + tax / 100);
-	const missingSupplier = !data.suppliers.some(
-		(supplier) => supplier.status === "ACTIVE",
+	const supplierChoices = supplierOptions(data.suppliers);
+	const warehouseChoices: SelectMenuOption[] = data.warehouses.map(
+		(warehouse) => ({
+			value: warehouse.id,
+			label: warehouse.name,
+			description: warehouse.code,
+		}),
 	);
+	const projectChoices: SelectMenuOption[] = data.projects.map((project) => ({
+		value: project.id,
+		label: project.name,
+		description: project.code ?? undefined,
+	}));
+	const missingSupplier = supplierChoices.length === 0;
 	const missingWarehouse = data.warehouses.length === 0;
-	const missingMaterials = data.materials.length === 0;
-	const cannotSave = missingSupplier || missingWarehouse || missingMaterials;
+	const missingMaterials = materials.length === 0;
+	const cannotSave = missingSupplier || missingWarehouse;
+	const forProject = destination === "PROJECT";
+	const selectedProject = data.projects.find(
+		(project) => project.id === projectId,
+	);
+	const missing = [
+		!supplierId ? "el proveedor" : null,
+		!expectedDate ? "la entrega prevista" : null,
+		!warehouseId ? "la bodega" : null,
+		forProject && !projectId ? "el proyecto" : null,
+		forProject && justification.trim().length < 10
+			? "el motivo de la compra"
+			: null,
+		lines.length === 0 ? "al menos un artículo" : null,
+		lines.some((line) => !(line.quantity > 0) || !(line.unitCost > 0))
+			? "cantidad y costo de cada artículo"
+			: null,
+	].filter((item): item is string => Boolean(item));
 
 	return (
 		<ModalShell
-			description="Registra una compra sin vincularla a una solicitud."
+			description="Compra sin solicitud previa. Se guarda como borrador hasta que la emitas."
 			onClose={onClose}
 			title="Nueva compra"
 		>
-			<form action={formAction} className="purchases-order-form">
+			<form
+				action={formAction}
+				className="purchases-order-form"
+				noValidate
+				onSubmit={(event) => {
+					if (missing.length > 0) {
+						event.preventDefault();
+						setShowMissing(true);
+					}
+				}}
+			>
 				<input name="requisitionId" type="hidden" value="" />
 				<input name="items" type="hidden" value={serializedItems} />
-				<section className="purchases-order-origin purchases-order-origin--direct">
-					<div className="purchases-order-origin__mark">
-						<ShoppingCart aria-hidden="true" size={20} />
-					</div>
-					<div className="purchases-order-origin__identity">
-						<span>Origen</span>
-						<strong>Sin solicitud asociada</strong>
-						<p>La recepción se registrará en la bodega seleccionada.</p>
-					</div>
-				</section>
+				<input
+					name="projectId"
+					type="hidden"
+					value={forProject ? projectId : ""}
+				/>
 				{cannotSave ? (
 					<section className="purchases-readiness" role="status">
 						<div>
-							<strong>Completa la configuración para guardar</strong>
+							<strong>Antes de comprar, falta configurar</strong>
 							<p>
-								{[
-									missingSupplier ? "un proveedor activo" : null,
-									missingWarehouse ? "una bodega activa" : null,
-									missingMaterials ? "artículos en Inventario" : null,
-								]
-									.filter(Boolean)
-									.join(", ")}
+								{joinSpanish(
+									[
+										missingSupplier ? "un proveedor activo" : null,
+										missingWarehouse ? "una bodega activa" : null,
+									].filter((item): item is string => Boolean(item)),
+								)}
 								.
 							</p>
 						</div>
@@ -1082,7 +1483,7 @@ function DirectPurchaseForm({
 									<Plus aria-hidden="true" size={15} /> Agregar proveedor
 								</button>
 							) : null}
-							{missingWarehouse || missingMaterials ? (
+							{missingWarehouse ? (
 								<a href="/inventory">
 									Abrir Inventario <ArrowRight aria-hidden="true" size={15} />
 								</a>
@@ -1102,92 +1503,37 @@ function DirectPurchaseForm({
 				) : null}
 				<div className="purchases-order-form__section">
 					<header>
-						<Warehouse aria-hidden="true" size={18} />
+						<Store aria-hidden="true" size={18} />
 						<div>
-							<h3>Proveedor y destino</h3>
-							<p>Datos necesarios para emitir y recibir la orden.</p>
+							<h3>Proveedor y entrega</h3>
+							<p>Quién vende y cuándo debe llegar el material.</p>
 						</div>
 					</header>
-					<div className="purchases-order-form__meta purchases-order-form__meta--direct">
-						<label>
-							<span>Proveedor</span>
-							<select
-								aria-invalid={Boolean(errorFor("supplierId"))}
+					<div className="purchases-order-form__meta">
+						<div className="purchases-field">
+							<span id="direct-order-supplier-label">Proveedor</span>
+							<SelectMenu
+								aria-labelledby="direct-order-supplier-label"
+								disabled={missingSupplier}
+								emptyMessage="No hay proveedores activos con ese nombre."
+								invalid={
+									Boolean(errorFor("supplierId")) ||
+									(showMissing && !supplierId)
+								}
 								name="supplierId"
-								required
-							>
-								<option value="">Seleccionar proveedor</option>
-								{data.suppliers
-									.filter((supplier) => supplier.status === "ACTIVE")
-									.map((supplier) => (
-										<option key={supplier.id} value={supplier.id}>
-											{supplier.code} · {supplier.businessName}
-										</option>
-									))}
-							</select>
-							{errorFor("supplierId") ? (
-								<small className="purchases-field-error">
-									{errorFor("supplierId")}
-								</small>
-							) : null}
-						</label>
-						<label>
-							<span>Bodega de recepción</span>
-							<select
-								aria-invalid={Boolean(errorFor("warehouseId"))}
-								name="warehouseId"
-								required
-							>
-								<option value="">Seleccionar bodega</option>
-								{data.warehouses.map((warehouse) => (
-									<option key={warehouse.id} value={warehouse.id}>
-										{warehouse.code} · {warehouse.name}
-									</option>
-								))}
-							</select>
-							{errorFor("warehouseId") ? (
-								<small className="purchases-field-error">
-									{errorFor("warehouseId")}
-								</small>
-							) : null}
-						</label>
-						<label>
-							<span>Proyecto (opcional excepto crédito)</span>
-							<select
-								name="projectId"
-								onChange={(event) => setProjectId(event.target.value)}
-								value={projectId}
-							>
-								<option value="">Compra general</option>
-								{data.projects.map((project) => (
-									<option key={project.id} value={project.id}>
-										{project.code} · {project.name}
-									</option>
-								))}
-							</select>
-						</label>
-						{projectId ? (
-							<label className="md:col-span-2">
-								<span>Justificación fuera de presupuesto</span>
-								<textarea
-									aria-invalid={Boolean(errorFor("budgetExceptionReason"))}
-									minLength={10}
-									name="budgetExceptionReason"
-									placeholder="Motivo de la compra directa y necesidad para el proyecto"
-									required
-								/>
-								{errorFor("budgetExceptionReason") ? (
-									<small className="purchases-field-error">
-										{errorFor("budgetExceptionReason")}
-									</small>
-								) : null}
-							</label>
-						) : null}
-						<PaymentConditionFields
-							creditAvailable={Boolean(projectId)}
-							errorFor={errorFor}
-							today={today}
-						/>
+								onChange={setSupplierId}
+								options={supplierChoices}
+								placeholder={
+									missingSupplier
+										? "Sin proveedores activos"
+										: "Elegir proveedor"
+								}
+								searchPlaceholder="Buscar por nombre, código o NIT"
+								searchable
+								value={supplierId}
+							/>
+							<FieldError message={errorFor("supplierId")} />
+						</div>
 						<label>
 							<span>Fecha de emisión</span>
 							<input
@@ -1197,55 +1543,167 @@ function DirectPurchaseForm({
 								required
 								type="date"
 							/>
-							{errorFor("issueDate") ? (
-								<small className="purchases-field-error">
-									{errorFor("issueDate")}
-								</small>
-							) : null}
+							<FieldError message={errorFor("issueDate")} />
 						</label>
 						<label>
 							<span>Entrega prevista</span>
 							<input
-								aria-invalid={Boolean(errorFor("expectedDate"))}
+								aria-invalid={
+									Boolean(errorFor("expectedDate")) ||
+									(showMissing && !expectedDate)
+								}
 								min={today}
 								name="expectedDate"
+								onChange={(event) => setExpectedDate(event.target.value)}
 								required
 								type="date"
+								value={expectedDate}
 							/>
-							{errorFor("expectedDate") ? (
-								<small className="purchases-field-error">
-									{errorFor("expectedDate")}
-								</small>
-							) : null}
-						</label>
-						<label>
-							<span>IVA</span>
-							<div className="purchases-input-suffix">
-								<input
-									aria-invalid={Boolean(errorFor("taxPercentage"))}
-									max={100}
-									min={0}
-									name="taxPercentage"
-									onChange={(event) => setTax(Number(event.target.value) || 0)}
-									step="0.01"
-									type="number"
-									value={tax}
-								/>
-								<span>%</span>
-							</div>
-							{errorFor("taxPercentage") ? (
-								<small className="purchases-field-error">
-									{errorFor("taxPercentage")}
-								</small>
-							) : null}
+							<FieldError message={errorFor("expectedDate")} />
 						</label>
 					</div>
 				</div>
+
+				<div className="purchases-order-form__section">
+					<header>
+						<Warehouse aria-hidden="true" size={18} />
+						<div>
+							<h3>Destino y pago</h3>
+							<p>Dónde se recibe, a quién se carga y cómo se paga.</p>
+						</div>
+					</header>
+					<div className="purchases-order-form__stack">
+						<fieldset className="purchases-choice">
+							<legend>¿Para qué es esta compra?</legend>
+							<label className="purchases-choice__option">
+								<input
+									checked={!forProject}
+									name="purchaseDestination"
+									onChange={() => setDestination("WAREHOUSE")}
+									type="radio"
+									value="WAREHOUSE"
+								/>
+								<span>
+									<strong>Existencia de bodega</strong>
+									<small>
+										Material de uso general. Se controla en Inventario.
+									</small>
+								</span>
+							</label>
+							<label
+								className="purchases-choice__option"
+								data-disabled={data.projects.length === 0 || undefined}
+							>
+								<input
+									checked={forProject}
+									disabled={data.projects.length === 0}
+									name="purchaseDestination"
+									onChange={() => setDestination("PROJECT")}
+									type="radio"
+									value="PROJECT"
+								/>
+								<span>
+									<strong>Para un proyecto</strong>
+									<small>
+										{data.projects.length === 0
+											? "No tienes proyectos disponibles."
+											: "Se carga al proyecto y su factura se registra en Finanzas."}
+									</small>
+								</span>
+							</label>
+						</fieldset>
+						<div className="purchases-order-form__pair">
+							<div className="purchases-field">
+								<span id="direct-order-warehouse-label">Bodega que recibe</span>
+								<SelectMenu
+									aria-labelledby="direct-order-warehouse-label"
+									disabled={missingWarehouse}
+									invalid={
+										Boolean(errorFor("warehouseId")) ||
+										(showMissing && !warehouseId)
+									}
+									name="warehouseId"
+									onChange={setWarehouseId}
+									options={warehouseChoices}
+									placeholder={
+										missingWarehouse ? "Sin bodegas activas" : "Elegir bodega"
+									}
+									value={warehouseId}
+								/>
+								<FieldError message={errorFor("warehouseId")} />
+							</div>
+							{forProject ? (
+								<div className="purchases-field purchases-reveal">
+									<span id="direct-order-project-label">Proyecto</span>
+									<SelectMenu
+										aria-labelledby="direct-order-project-label"
+										emptyMessage="Ningún proyecto coincide."
+										invalid={
+											Boolean(errorFor("projectId")) ||
+											(showMissing && !projectId)
+										}
+										onChange={setProjectId}
+										options={projectChoices}
+										placeholder="Elegir proyecto"
+										searchPlaceholder="Buscar por nombre o código"
+										searchable
+										value={projectId}
+									/>
+									<FieldError message={errorFor("projectId")} />
+								</div>
+							) : null}
+						</div>
+						{forProject ? (
+							<label className="purchases-reveal">
+								<span>¿Por qué se compra sin solicitud?</span>
+								<textarea
+									aria-describedby="direct-order-justification-hint"
+									aria-invalid={
+										Boolean(errorFor("budgetExceptionReason")) ||
+										(showMissing && justification.trim().length < 10)
+									}
+									maxLength={1000}
+									name="budgetExceptionReason"
+									onChange={(event) => setJustification(event.target.value)}
+									placeholder="Ej. Material urgente para terminar la losa; no estaba en la solicitud."
+									rows={2}
+									value={justification}
+								/>
+								<small
+									className="purchases-field-hint"
+									id="direct-order-justification-hint"
+								>
+									Las compras de proyecto normalmente salen de una solicitud
+									autorizada. Mínimo 10 caracteres.
+								</small>
+								<FieldError message={errorFor("budgetExceptionReason")} />
+							</label>
+						) : null}
+						<PaymentConditionFields
+							creditAvailable={forProject}
+							creditUnavailableReason="Elige “Para un proyecto” para comprar a crédito."
+							errorFor={errorFor}
+							today={today}
+						/>
+						<FinanceImpactNote
+							projectLabel={
+								selectedProject
+									? `${selectedProject.code} · ${selectedProject.name}`
+									: undefined
+							}
+							tracked={forProject}
+						/>
+					</div>
+				</div>
+
 				<div className="purchases-order-lines">
 					<div className="purchases-order-lines__heading">
 						<div>
-							<h3>Artículos de la compra</h3>
-							<p>Selecciona artículos existentes del catálogo de Inventario.</p>
+							<h3>Artículos</h3>
+							<p>
+								Elige del catálogo de Inventario o crea uno nuevo; el costo se
+								puede ajustar.
+							</p>
 						</div>
 						<div className="purchases-order-lines__actions">
 							<span aria-live="polite" className="purchases-order-lines__count">
@@ -1254,138 +1712,252 @@ function DirectPurchaseForm({
 							<div className="purchases-material-picker" ref={pickerRef}>
 								<button
 									aria-expanded={pickerOpen}
-									aria-label="Agregar varios artículos a la compra"
 									className="purchases-order-lines__add focus-ring"
-									disabled={materialsForPicker.length === 0 && !pickerOpen}
-									onClick={() => setPickerOpen((current) => !current)}
+									onClick={() => {
+										if (pickerOpen) closePicker();
+										else setPickerOpen(true);
+									}}
 									type="button"
 								>
 									<Plus aria-hidden="true" size={17} /> Agregar artículos
 								</button>
 								{pickerOpen ? (
 									<div
+										aria-label="Elegir artículos del catálogo"
 										className="purchases-material-picker__panel"
 										role="dialog"
 									>
-										<div className="purchases-material-picker__search">
-											<Search aria-hidden="true" size={15} />
-											<input
-												aria-label="Buscar artículo"
-												onChange={(event) => setPickerQuery(event.target.value)}
-												placeholder="Buscar por código o nombre"
-												type="text"
-												value={pickerQuery}
+										{quickCreateOpen ? (
+											<QuickMaterialForm
+												initialName={pickerQuery}
+												onCancel={() => setQuickCreateOpen(false)}
+												onCreated={addCreatedMaterial}
+												units={units}
 											/>
-										</div>
-										<div className="purchases-material-picker__list">
-											{materialsForPicker.length === 0 ? (
-												<p className="purchases-material-picker__empty">
-													{data.materials.length === selectedMaterialIds.size
-														? "Todos los artículos disponibles ya fueron agregados."
-														: "Sin resultados para esa búsqueda."}
-												</p>
-											) : (
-												materialsForPicker.map((material) => {
-													const checked = pickerSelected.has(material.id);
-													return (
-														<label
-															className="purchases-material-picker__item"
-															key={material.id}
-														>
-															<input
-																checked={checked}
-																onChange={() => togglePicked(material.id)}
-																type="checkbox"
-															/>
-															<span>
-																<strong>{material.code}</strong>
-																<small>{material.name}</small>
-															</span>
-															{checked ? (
-																<Check aria-hidden="true" size={15} />
-															) : null}
-														</label>
-													);
-												})
-											)}
-										</div>
-										<div className="purchases-material-picker__footer">
-											<span>
-												{pickerSelected.size === 0
-													? "Ninguno seleccionado"
-													: `${pickerSelected.size} seleccionado${pickerSelected.size === 1 ? "" : "s"}`}
-											</span>
-											<button
-												className="purchases-button purchases-button--ghost focus-ring"
-												onClick={() => setPickerOpen(false)}
-												type="button"
-											>
-												Cancelar
-											</button>
-											<button
-												className="purchases-order-lines__add focus-ring"
-												disabled={pickerSelected.size === 0}
-												onClick={confirmPicker}
-												type="button"
-											>
-												Agregar
-											</button>
-										</div>
+										) : (
+											<>
+												<div className="purchases-material-picker__search">
+													<Search aria-hidden="true" size={15} />
+													<input
+														aria-label="Buscar artículo"
+														// biome-ignore lint/a11y/noAutofocus: el panel se abre a pedido del usuario para buscar.
+														autoFocus
+														onChange={(event) =>
+															setPickerQuery(event.target.value)
+														}
+														placeholder="Buscar por código o nombre"
+														type="text"
+														value={pickerQuery}
+													/>
+												</div>
+												<div className="purchases-material-picker__list">
+													{materialsForPicker.length === 0 ? (
+														<p className="purchases-material-picker__empty">
+															{materials.length === 0
+																? "El catálogo de Inventario está vacío."
+																: materials.length === selectedMaterialIds.size
+																	? "Ya agregaste todos los artículos del catálogo."
+																	: "Ningún artículo coincide con la búsqueda."}
+														</p>
+													) : (
+														materialsForPicker.map((material) => {
+															const checked = pickerSelected.has(material.id);
+															return (
+																<label
+																	className="purchases-material-picker__item"
+																	key={material.id}
+																>
+																	<input
+																		checked={checked}
+																		onChange={() => togglePicked(material.id)}
+																		type="checkbox"
+																	/>
+																	<span>
+																		<strong>{material.name}</strong>
+																		<small>
+																			{material.code} · {material.unit}
+																		</small>
+																	</span>
+																	{checked ? (
+																		<Check aria-hidden="true" size={15} />
+																	) : null}
+																</label>
+															);
+														})
+													)}
+												</div>
+												<button
+													className="purchases-material-picker__create focus-ring"
+													onClick={() => setQuickCreateOpen(true)}
+													type="button"
+												>
+													<Plus aria-hidden="true" size={15} />
+													{pickerQuery.trim()
+														? `Crear “${pickerQuery.trim()}” en el catálogo`
+														: "¿No está? Crear artículo nuevo"}
+												</button>
+												<div className="purchases-material-picker__footer">
+													<span>
+														{pickerSelected.size === 0
+															? "Marca uno o varios"
+															: `${pickerSelected.size} marcado${pickerSelected.size === 1 ? "" : "s"}`}
+													</span>
+													<button
+														className="purchases-button purchases-button--ghost focus-ring"
+														onClick={closePicker}
+														type="button"
+													>
+														Cancelar
+													</button>
+													<button
+														className="purchases-order-lines__add focus-ring"
+														disabled={pickerSelected.size === 0}
+														onClick={confirmPicker}
+														type="button"
+													>
+														Agregar
+													</button>
+												</div>
+											</>
+										)}
 									</div>
 								) : null}
 							</div>
 						</div>
 					</div>
 					{errorFor("items") ? (
-						<p className="purchases-field-error" role="alert">
+						<p
+							className="purchases-field-error purchases-order-lines__error"
+							role="alert"
+						>
 							{errorFor("items")}
 						</p>
 					) : null}
-					<div className="purchases-order-lines__table">
-						<div className="purchases-order-lines__row purchases-order-lines__row--head">
-							<span>Artículo</span>
-							<span>Cantidad</span>
-							<span>Costo unitario</span>
-							<span>Subtotal</span>
+					{lines.length === 0 ? (
+						<div
+							className="purchases-order-lines__empty"
+							data-invalid={showMissing || undefined}
+						>
+							<PackageCheck aria-hidden="true" size={26} />
+							<strong>
+								{missingMaterials
+									? "El catálogo de Inventario está vacío"
+									: "Aún no agregas artículos"}
+							</strong>
+							<p>
+								{missingMaterials
+									? "Crea el primer artículo aquí mismo; quedará guardado en el catálogo de Inventario."
+									: "Marca varios del catálogo a la vez, o crea uno nuevo si no existe."}
+							</p>
+							<button
+								className="purchases-order-lines__add focus-ring"
+								onClick={() => {
+									setPickerOpen(true);
+									setQuickCreateOpen(missingMaterials);
+									pickerRef.current?.scrollIntoView({ block: "nearest" });
+								}}
+								type="button"
+							>
+								<Plus aria-hidden="true" size={16} />
+								{missingMaterials ? "Crear artículo" : "Agregar artículos"}
+							</button>
 						</div>
-						{lines.map((line) => {
-							const material = materialById.get(line.materialId);
-							const selectedByAnotherLine = new Set(
-								lines
-									.filter((item) => item.key !== line.key)
-									.map((item) => item.materialId),
-							);
-							return (
-								<div className="purchases-order-lines__row" key={line.key}>
-									<div className="purchases-direct-material">
-										<select
-											aria-label="Artículo de inventario"
-											onChange={(event) => {
-												const selected = materialById.get(event.target.value);
+					) : (
+						<div className="purchases-order-lines__table">
+							<div className="purchases-order-lines__row purchases-order-lines__row--head purchases-order-lines__row--direct">
+								<span>Artículo</span>
+								<span>Cantidad</span>
+								<span>Costo unitario</span>
+								<span>Subtotal</span>
+								<span className="sr-only">Quitar</span>
+							</div>
+							{lines.map((line) => {
+								const material = materialById.get(line.materialId);
+								const takenByOtherLine = new Set(
+									lines
+										.filter((item) => item.key !== line.key)
+										.map((item) => item.materialId),
+								);
+								const materialName = material?.name ?? "artículo";
+								return (
+									<div
+										className="purchases-order-lines__row purchases-order-lines__row--direct"
+										key={line.key}
+									>
+										<div className="purchases-direct-material">
+											<SelectMenu
+												aria-label="Artículo"
+												emptyMessage="Ningún artículo coincide."
+												onChange={(materialId) =>
+													updateLine(line.key, {
+														materialId,
+														unitCost:
+															materialById.get(materialId)?.unitCost ?? 0,
+													})
+												}
+												options={materials.map((item) => ({
+													value: item.id,
+													label: item.name,
+													description: takenByOtherLine.has(item.id)
+														? `${item.code} · ya está en la compra`
+														: `${item.code} · ${item.unit}`,
+													disabled: takenByOtherLine.has(item.id),
+												}))}
+												placeholder="Elegir artículo"
+												searchPlaceholder="Buscar por código o nombre"
+												searchable
+												value={line.materialId}
+											/>
+											<small>{material?.unit ?? "Sin unidad"}</small>
+										</div>
+										<input
+											aria-invalid={
+												(showMissing && !(line.quantity > 0)) || undefined
+											}
+											aria-label={`Cantidad de ${materialName}`}
+											min="0.01"
+											onChange={(event) =>
 												updateLine(line.key, {
-													materialId: event.target.value,
-													unitCost: selected?.unitCost ?? 0,
+													quantity: Number(event.target.value) || 0,
+												})
+											}
+											ref={(node) => {
+												if (!node || pendingLineFocusKey.current !== line.key)
+													return;
+												pendingLineFocusKey.current = null;
+												node.focus({ preventScroll: true });
+												node.scrollIntoView({
+													behavior: "smooth",
+													block: "nearest",
 												});
 											}}
 											required
-											value={line.materialId}
-										>
-											<option value="">Seleccionar artículo</option>
-											{data.materials.map((item) => (
-												<option
-													disabled={selectedByAnotherLine.has(item.id)}
-													key={item.id}
-													value={item.id}
-												>
-													{item.code} · {item.name}
-												</option>
-											))}
-										</select>
-										<small>{material?.unit ?? "Unidad pendiente"}</small>
+											step="0.01"
+											type="number"
+											value={line.quantity}
+										/>
+										<input
+											aria-invalid={
+												(showMissing && !(line.unitCost > 0)) || undefined
+											}
+											aria-label={`Costo unitario de ${materialName}`}
+											min="0.01"
+											onChange={(event) =>
+												updateLine(line.key, {
+													unitCost: Number(event.target.value) || 0,
+												})
+											}
+											required
+											step="0.01"
+											type="number"
+											value={line.unitCost}
+										/>
+										<strong>
+											{formatCurrency(line.quantity * line.unitCost)}
+										</strong>
 										<button
-											aria-label="Eliminar renglón"
+											aria-label={`Quitar ${materialName}`}
 											className="purchases-line-remove focus-ring"
-											disabled={lines.length === 1}
 											onClick={() =>
 												setLines((current) =>
 													current.filter((item) => item.key !== line.key),
@@ -1393,85 +1965,36 @@ function DirectPurchaseForm({
 											}
 											type="button"
 										>
-											<X size={15} />
+											<X aria-hidden="true" size={15} />
 										</button>
 									</div>
-									<input
-										aria-label={`Cantidad de ${material?.name ?? "artículo"}`}
-										min="0.01"
-										onChange={(event) =>
-											updateLine(line.key, {
-												quantity: Number(event.target.value) || 0,
-											})
-										}
-										ref={(node) => {
-											if (!node || pendingLineFocusKey.current !== line.key)
-												return;
-											pendingLineFocusKey.current = null;
-											node.focus({ preventScroll: true });
-											node.scrollIntoView({
-												behavior: "smooth",
-												block: "nearest",
-											});
-										}}
-										required
-										step="0.01"
-										type="number"
-										value={line.quantity}
-									/>
-									<input
-										aria-label={`Costo unitario de ${material?.name ?? "artículo"}`}
-										min="0.01"
-										onChange={(event) =>
-											updateLine(line.key, {
-												unitCost: Number(event.target.value) || 0,
-											})
-										}
-										required
-										step="0.01"
-										type="number"
-										value={line.unitCost}
-									/>
-									<strong>
-										{formatCurrency(line.quantity * line.unitCost)}
-									</strong>
-								</div>
-							);
-						})}
-					</div>
+								);
+							})}
+						</div>
+					)}
 				</div>
 				<div className="purchases-order-form__bottom">
 					<label>
-						<span>Condiciones u observaciones</span>
-						<textarea maxLength={2000} name="notes" rows={4} />
+						<span>Condiciones u observaciones (opcional)</span>
+						<textarea
+							maxLength={2000}
+							name="notes"
+							placeholder="Entrega, garantía o condiciones acordadas"
+							rows={4}
+						/>
 					</label>
-					<div className="purchases-order-total">
-						<div>
-							<span>Subtotal</span>
-							<strong>{formatCurrency(subtotal)}</strong>
-						</div>
-						<div>
-							<span>IVA</span>
-							<strong>{formatCurrency(total - subtotal)}</strong>
-						</div>
-						<div className="purchases-order-total__grand">
-							<span>Total</span>
-							<strong>{formatCurrency(total)}</strong>
-						</div>
-					</div>
+					<OrderTotals
+						error={errorFor("taxPercentage")}
+						onTaxChange={setTax}
+						subtotal={subtotal}
+						tax={tax}
+					/>
 				</div>
-				<footer className="purchases-form__footer">
-					<button
-						className="purchases-button purchases-button--ghost focus-ring"
-						onClick={onClose}
-						type="button"
-					>
-						Cancelar
-					</button>
-					<SubmitButton disabled={cannotSave}>
-						Guardar compra en borrador
-					</SubmitButton>
-				</footer>
+				<OrderFormFooter
+					disabled={cannotSave}
+					missing={showMissing ? missing : []}
+					onClose={onClose}
+				/>
 			</form>
 		</ModalShell>
 	);
@@ -1505,6 +2028,10 @@ function ReceiptForm({
 			}))
 			.filter((item) => item.quantity > 0),
 	);
+	const [state, formAction] = useActionState(
+		receivePurchaseOrderAction,
+		idleStepState,
+	);
 
 	return (
 		<ModalShell
@@ -1512,12 +2039,19 @@ function ReceiptForm({
 			onClose={onClose}
 			title="Registrar recepción"
 		>
-			<form
-				action={receivePurchaseOrderAction}
-				className="purchases-receipt-form"
-			>
+			<form action={formAction} className="purchases-receipt-form">
 				<input name="purchaseOrderId" type="hidden" value={order.id} />
 				<input name="items" type="hidden" value={serializedItems} />
+				{state.status === "error" ? (
+					<div
+						aria-live="polite"
+						className="purchases-form__error"
+						role="alert"
+					>
+						<strong>No se registró la recepción</strong>
+						<span>{state.message}</span>
+					</div>
+				) : null}
 				<div className="purchases-receipt-form__meta">
 					<label>
 						<span>Fecha recibida</span>
@@ -1590,6 +2124,123 @@ function ReceiptForm({
 				</footer>
 			</form>
 		</ModalShell>
+	);
+}
+
+/**
+ * Emitir y anular devuelven su error al panel en vez de romper la página.
+ * `attempt` cambia en cada envío para volver a montar la confirmación y
+ * cerrarla cuando el servidor rechaza la anulación.
+ */
+type StepState = PurchaseOrderStepState & { attempt: number };
+
+function withAttempt(
+	action: (
+		state: PurchaseOrderStepState,
+		formData: FormData,
+	) => Promise<PurchaseOrderStepState>,
+) {
+	return async (
+		previous: StepState,
+		formData: FormData,
+	): Promise<StepState> => ({
+		...(await action(previous, formData)),
+		attempt: previous.attempt + 1,
+	});
+}
+
+const issueWithAttempt = withAttempt(issuePurchaseOrderAction);
+const cancelWithAttempt = withAttempt(cancelPurchaseOrderAction);
+
+function OrderStepActions({
+	order,
+	canManage,
+	canRegisterFinance,
+	onReceive,
+}: {
+	order: Order;
+	canManage: boolean;
+	canRegisterFinance: boolean;
+	onReceive: () => void;
+}) {
+	const idle: StepState = { ...idleStepState, attempt: 0 };
+	const [issueState, issueAction] = useActionState(issueWithAttempt, idle);
+	const [cancelState, cancelAction] = useActionState(cancelWithAttempt, idle);
+	const cancelBlocker = purchaseOrderCancelBlocker({
+		status: order.status,
+		validInvoiceCount: order.invoiceCount,
+		hasReceipts: order.items.some((item) => item.receivedQuantity > 0),
+	});
+	const error =
+		cancelState.status === "error"
+			? cancelState.message
+			: issueState.status === "error"
+				? issueState.message
+				: null;
+	const showFinance =
+		canRegisterFinance && order.project && order.status !== "DRAFT";
+	const showReceive = canManage && ["ISSUED", "PARTIAL"].includes(order.status);
+	const showIssue = canManage && order.status === "DRAFT";
+	const showCancel =
+		canManage && ["DRAFT", "ISSUED"].includes(order.status) && !cancelBlocker;
+
+	if (!showFinance && !showReceive && !showIssue && !showCancel && !error) {
+		return null;
+	}
+
+	return (
+		<footer>
+			{error ? (
+				<p className="purchases-order-detail__error" role="alert">
+					{error}
+				</p>
+			) : null}
+			{showFinance && order.project ? (
+				<a
+					className="purchases-button purchases-button--ghost focus-ring"
+					href={`/finances?projectId=${order.project.id}`}
+				>
+					<ReceiptText size={17} /> Registrar factura en Finanzas
+				</a>
+			) : null}
+			{showReceive ? (
+				<button
+					className="purchases-button purchases-button--red focus-ring"
+					onClick={onReceive}
+					type="button"
+				>
+					<PackageCheck size={17} /> Registrar recepción
+				</button>
+			) : null}
+			{showIssue ? (
+				<form action={issueAction}>
+					<input name="purchaseOrderId" type="hidden" value={order.id} />
+					<SubmitButton>
+						<Check size={17} />
+						Emitir orden
+					</SubmitButton>
+				</form>
+			) : null}
+			{showCancel ? (
+				<form action={cancelAction}>
+					<input name="purchaseOrderId" type="hidden" value={order.id} />
+					<ConfirmSubmitButton
+						className="purchases-submit focus-ring"
+						confirmLabel="Anular orden"
+						description={
+							order.status === "ISSUED"
+								? `${order.number} quedará anulada y no podrá recibirse ni facturarse.${order.requisition ? ` La solicitud ${order.requisition.number} volverá a quedar pendiente de compra.` : ""}`
+								: `${order.number} quedará anulada y no podrá emitirse.`
+						}
+						key={cancelState.attempt}
+						pendingLabel="Anulando..."
+						title="¿Anular esta orden de compra?"
+					>
+						Anular orden
+					</ConfirmSubmitButton>
+				</form>
+			) : null}
+		</footer>
 	);
 }
 
@@ -1683,11 +2334,13 @@ export function PurchasesWorkspace({
 							: "pending",
 				orderStopped
 					? "stopped"
-					: invoiceComplete
-						? "done"
-						: selectedOrder.invoiceCount > 0
-							? "active"
-							: "pending",
+					: !selectedOrder.project
+						? "skipped"
+						: invoiceComplete
+							? "done"
+							: selectedOrder.invoiceCount > 0
+								? "active"
+								: "pending",
 			]
 		: ["pending", "pending", "pending", "pending", "pending"];
 	const flowStates: FlowState[] =
@@ -2119,56 +2772,26 @@ export function PurchasesWorkspace({
 											<strong>{formatCurrency(selectedOrder.total)}</strong>
 										</div>
 									</div>
-									{(canManage || canRegisterFinance) &&
-									selectedOrder.status !== "CANCELED" ? (
-										<footer>
-											{canRegisterFinance &&
-											selectedOrder.project &&
-											selectedOrder.status !== "DRAFT" ? (
-												<a
-													className="purchases-button purchases-button--ghost focus-ring"
-													href={`/finances?projectId=${selectedOrder.project.id}`}
-												>
-													<ReceiptText size={17} /> Factura en Finanzas
-												</a>
-											) : null}
-											{canManage &&
-											["ISSUED", "PARTIAL"].includes(selectedOrder.status) ? (
-												<button
-													className="purchases-button purchases-button--red focus-ring"
-													onClick={() => setReceiptOrder(selectedOrder)}
-													type="button"
-												>
-													<PackageCheck size={17} /> Registrar recepción
-												</button>
-											) : null}
-											{canManage && selectedOrder.status === "DRAFT" ? (
-												<form action={issuePurchaseOrderAction}>
-													<input
-														name="purchaseOrderId"
-														type="hidden"
-														value={selectedOrder.id}
-													/>
-													<SubmitButton>
-														<Check size={17} />
-														Emitir orden
-													</SubmitButton>
-												</form>
-											) : null}
-											{canManage &&
-											["DRAFT", "ISSUED"].includes(selectedOrder.status) ? (
-												<form action={cancelPurchaseOrderAction}>
-													<input
-														name="purchaseOrderId"
-														type="hidden"
-														value={selectedOrder.id}
-													/>
-													<SubmitButton tone="danger">
-														Anular orden
-													</SubmitButton>
-												</form>
-											) : null}
-										</footer>
+									{!purchaseOrderTracksFinance({
+										projectId: selectedOrder.project?.id ?? null,
+									}) && selectedOrder.status !== "CANCELED" ? (
+										<p className="purchases-finance-note" data-tracked="false">
+											<ReceiptText aria-hidden="true" size={16} />
+											<span>
+												Compra para bodega: se controla en Inventario y{" "}
+												<strong>no genera gasto de proyecto en Finanzas</strong>
+												.
+											</span>
+										</p>
+									) : null}
+									{selectedOrder.status !== "CANCELED" ? (
+										<OrderStepActions
+											canManage={canManage}
+											canRegisterFinance={canRegisterFinance}
+											key={selectedOrder.id}
+											onReceive={() => setReceiptOrder(selectedOrder)}
+											order={selectedOrder}
+										/>
 									) : null}
 								</>
 							) : (
