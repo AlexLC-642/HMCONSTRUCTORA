@@ -1,8 +1,9 @@
 "use client";
 
-import { Link2, Plus, Save, Trash2 } from "lucide-react";
+import { CalendarRange, Link2, Plus, Save, Trash2, Undo2, Wand2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
+import { distributePlannedDates, isValidPlanningRange } from "../domain/date-distribution";
 import { scheduleActivityStatusLabels, type ScheduleInput } from "../domain/validation";
 
 type Activity = ScheduleInput["activities"][number];
@@ -11,6 +12,8 @@ type ScheduleStatus = Activity["status"];
 type ScheduleFormProps = {
   initialValue: ScheduleInput;
   readOnly: boolean;
+  /** Fechas del proyecto (inicio y finalización prevista) en formato YYYY-MM-DD. */
+  projectRange?: { start: string; end: string };
   action: (formData: FormData) => void | Promise<void>;
 };
 
@@ -50,6 +53,7 @@ const inputClass = "focus-ring h-11 w-full rounded-md border border-[#cfd5ce] bg
 const labelClass = "text-[11px] font-bold uppercase tracking-[0.08em] text-[#58635f]";
 const surfaceClass = "rounded-2xl border border-[#cfd5ce] bg-white shadow-[0_18px_48px_rgba(37,48,51,0.10),0_1px_0_rgba(255,255,255,0.9)]";
 const dayFormatter = new Intl.DateTimeFormat("es-GT", { day: "2-digit", month: "short", timeZone: "UTC" });
+const fullDateFormatter = new Intl.DateTimeFormat("es-GT", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 const weekdayFormatter = new Intl.DateTimeFormat("es-GT", { weekday: "short", timeZone: "UTC" });
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -101,8 +105,14 @@ function groupDaysByWeek(days: Date[]) {
   }, []);
 }
 
-function emptyActivity(position: number): Activity {
-  const start = addDays(new Date(), position - 1);
+function emptyActivity(position: number, previous?: Activity, range?: { start: string; end: string }): Activity {
+  let start = addDays(new Date(), position - 1);
+  if (range) {
+    // Ubica la nueva actividad justo después de la anterior, sin salir del rango del proyecto.
+    const candidate = previous ? addDays(toDate(previous.plannedEnd), 1) : toDate(range.start);
+    const rangeEnd = toDate(range.end);
+    start = candidate > rangeEnd ? rangeEnd : candidate;
+  }
   return {
     id: crypto.randomUUID(),
     code: String(position),
@@ -130,22 +140,33 @@ function progressTone(progress: number) {
   return "text-[#66706b]";
 }
 
-export function ScheduleForm({ initialValue, readOnly, action }: ScheduleFormProps) {
+export function ScheduleForm({ initialValue, readOnly, projectRange, action }: ScheduleFormProps) {
   const [value, setValue] = useState<ScheduleInput>(initialValue);
+  const [undoActivities, setUndoActivities] = useState<Activity[] | null>(null);
+  const range = projectRange && isValidPlanningRange(projectRange.start, projectRange.end) ? projectRange : undefined;
+  const outOfRangeCount = range
+    ? value.activities.filter((activity) => activity.plannedStart < range.start || activity.plannedEnd > range.end).length
+    : 0;
   const canSave = value.title.trim().length > 0 && value.activities.length > 0 && value.activities.every((activity) =>
     activity.code.trim().length > 0 && activity.description.trim().length > 0 && activity.plannedStart.length > 0 && activity.plannedEnd.length > 0
   );
+  const rangeStart = range?.start;
+  const rangeEnd = range?.end;
 
   const timeline = useMemo(() => {
     if (value.activities.length === 0) return null;
     const starts = value.activities.map((activity) => toDate(activity.plannedStart).getTime());
     const ends = value.activities.map((activity) => toDate(activity.plannedEnd).getTime());
+    if (rangeStart && rangeEnd) {
+      starts.push(toDate(rangeStart).getTime());
+      ends.push(toDate(rangeEnd).getTime());
+    }
     const start = new Date(Math.min(...starts));
     const end = new Date(Math.max(...ends));
     const totalDays = daysBetween(start, end);
     const days = Array.from({ length: totalDays }, (_, index) => addDays(start, index));
     return { start, end, totalDays, days, weeks: groupDaysByWeek(days) };
-  }, [value.activities]);
+  }, [value.activities, rangeStart, rangeEnd]);
 
   const summary = useMemo(() => {
     const total = value.activities.length;
@@ -159,6 +180,7 @@ export function ScheduleForm({ initialValue, readOnly, action }: ScheduleFormPro
   }, [value.activities]);
 
   function updateActivity(index: number, patch: Partial<Activity>) {
+    setUndoActivities(null);
     setValue((current) => ({
       ...current,
       activities: current.activities.map((activity, activityIndex) =>
@@ -175,7 +197,24 @@ export function ScheduleForm({ initialValue, readOnly, action }: ScheduleFormPro
     updateActivity(index, patch);
   }
 
+  function distributeInRange() {
+    if (!range || value.activities.length === 0) return;
+    const ranges = distributePlannedDates(range.start, range.end, value.activities.length);
+    setUndoActivities(value.activities);
+    setValue((current) => ({
+      ...current,
+      activities: current.activities.map((activity, index) => ({ ...activity, ...ranges[index] }))
+    }));
+  }
+
+  function undoDistribution() {
+    if (!undoActivities) return;
+    setValue((current) => ({ ...current, activities: undoActivities }));
+    setUndoActivities(null);
+  }
+
   function removeActivity(index: number) {
+    setUndoActivities(null);
     setValue((current) => ({
       ...current,
       activities: current.activities.filter((_, activityIndex) => activityIndex !== index)
@@ -231,6 +270,36 @@ export function ScheduleForm({ initialValue, readOnly, action }: ScheduleFormPro
             ))}
           </div>
         </div>
+
+        {range && !readOnly ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#d9ded8] bg-[#fbfaf6] px-5 py-3">
+            <div className="flex items-start gap-3">
+              <CalendarRange aria-hidden="true" className="mt-0.5 shrink-0 text-[#58635f]" size={18} />
+              <div className="text-sm">
+                <p className="font-semibold text-[#253033]">
+                  Rango del proyecto: {fullDateFormatter.format(toDate(range.start))} - {fullDateFormatter.format(toDate(range.end))}
+                  <span className="font-normal text-[#66706b]"> ({daysBetween(toDate(range.start), toDate(range.end))} días)</span>
+                </p>
+                <p className="mt-0.5 text-xs text-[#66706b]">
+                  Reparte el rango entre las actividades en orden como punto de partida; luego ajusta cada fecha. No se guarda hasta pulsar &quot;Guardar cronograma&quot;.
+                  {outOfRangeCount > 0 ? <span className="ml-1 font-semibold text-[#b76e00]">{outOfRangeCount} {outOfRangeCount === 1 ? "actividad queda" : "actividades quedan"} fuera del rango.</span> : null}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {undoActivities ? (
+                <button className="focus-ring inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd5ce] bg-white px-3 text-sm font-semibold text-[#46504c] transition hover:bg-[#fbfaf6]" type="button" onClick={undoDistribution}>
+                  <Undo2 aria-hidden="true" size={16} />
+                  Deshacer
+                </button>
+              ) : null}
+              <button className="focus-ring inline-flex h-10 items-center gap-2 rounded-md border border-[#cfd5ce] bg-white px-3 text-sm font-semibold text-[#253033] transition hover:bg-[#fbfaf6] disabled:cursor-not-allowed disabled:opacity-45" disabled={value.activities.length === 0} type="button" onClick={distributeInRange}>
+                <Wand2 aria-hidden="true" size={16} />
+                Repartir fechas en el rango
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <div className="divide-y divide-[#dde2dc]">
           {value.activities.length === 0 ? <div className="px-5 py-10 text-center"><p className="font-semibold">Aún no hay actividades</p><p className="mt-1 text-sm text-[#66706b]">Agrega la primera actividad para comenzar.</p></div> : null}
@@ -322,7 +391,7 @@ export function ScheduleForm({ initialValue, readOnly, action }: ScheduleFormPro
 
       {!readOnly ? (
         <div className="flex flex-wrap gap-2">
-          <button className="focus-ring inline-flex h-12 items-center gap-2 rounded-md border border-[#cfd5ce] bg-white px-5 text-sm font-semibold text-[#253033] shadow-[0_10px_24px_rgba(37,48,51,0.08)] transition hover:-translate-y-0.5 hover:bg-[#fbfaf6]" type="button" onClick={() => setValue({ ...value, activities: [...value.activities, emptyActivity(value.activities.length + 1)] })}>
+          <button className="focus-ring inline-flex h-12 items-center gap-2 rounded-md border border-[#cfd5ce] bg-white px-5 text-sm font-semibold text-[#253033] shadow-[0_10px_24px_rgba(37,48,51,0.08)] transition hover:-translate-y-0.5 hover:bg-[#fbfaf6]" type="button" onClick={() => { setUndoActivities(null); setValue({ ...value, activities: [...value.activities, emptyActivity(value.activities.length + 1, value.activities.at(-1), range)] }); }}>
             <Plus aria-hidden="true" size={18} />
             Agregar actividad
           </button>

@@ -66,6 +66,13 @@ export default async function ProjectSchedulePage({
 
 	const canEdit = user.permissions.includes("cronograma.editar");
 	const createAction = createInitialScheduleAction.bind(null, id);
+	const projectRange =
+		project.startDate && project.expectedEndDate
+			? {
+					start: formatDateInput(project.startDate),
+					end: formatDateInput(project.expectedEndDate),
+				}
+			: undefined;
 	const completed =
 		schedule?.activities.filter((activity) => activity.status === "COMPLETED")
 			.length ?? 0;
@@ -138,6 +145,7 @@ export default async function ProjectSchedulePage({
 								notes: "",
 								activities: [],
 							}}
+							projectRange={projectRange}
 							readOnly={false}
 						/>
 					) : null}
@@ -208,6 +216,7 @@ export default async function ProjectSchedulePage({
 					<ScheduleForm
 						initialValue={toScheduleInput(schedule)}
 						readOnly={!canEdit}
+						projectRange={projectRange}
 						action={saveScheduleAction.bind(null, id, schedule.id)}
 					/>
 				</>

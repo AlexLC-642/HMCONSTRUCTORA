@@ -2,13 +2,19 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/shared/lib/prisma";
 import { calculateBudget } from "./calculations";
 import { budgetVersionInputSchema } from "../domain/validation";
+import { distributePlannedDates } from "@/modules/schedules/domain/date-distribution";
 
 type BudgetMutationContext = {
 	userId: string;
 };
 
 function buildScheduleActivitiesFromApprovedBudget(
-	project: { code: string | null; name: string; startDate: Date | null },
+	project: {
+		code: string | null;
+		name: string;
+		startDate: Date | null;
+		expectedEndDate?: Date | null;
+	},
 	version: {
 		sourceReference?: string | null;
 		sections: Array<{
@@ -41,15 +47,31 @@ function buildScheduleActivitiesFromApprovedBudget(
 		notes: string | null;
 	}> = [];
 
-	for (const section of version.sections) {
+	const sections = version.sections.filter((section) => section.name.trim());
+	// Con fecha de finalización prevista, el rango del proyecto se reparte entre
+	// las actividades; sin ella se conserva el escalonado fijo de 4 días.
+	const distributed =
+		project.startDate && project.expectedEndDate
+			? distributePlannedDates(
+					baseDate.toISOString().slice(0, 10),
+					project.expectedEndDate.toISOString().slice(0, 10),
+					sections.length,
+				)
+			: [];
+
+	for (const section of sections) {
 		const description = section.name.trim();
-		if (!description) continue;
+		const range = distributed[activities.length];
 
-		const start = new Date(baseDate);
-		start.setUTCDate(start.getUTCDate() + activities.length * 2);
+		const start = range
+			? new Date(`${range.plannedStart}T00:00:00.000Z`)
+			: new Date(baseDate);
+		if (!range) start.setUTCDate(start.getUTCDate() + activities.length * 2);
 
-		const end = new Date(start);
-		end.setUTCDate(end.getUTCDate() + 3);
+		const end = range
+			? new Date(`${range.plannedEnd}T00:00:00.000Z`)
+			: new Date(start);
+		if (!range) end.setUTCDate(end.getUTCDate() + 3);
 
 		activities.push({
 			code: section.code,
@@ -296,6 +318,7 @@ export async function approveBudgetVersion(
 				code: true,
 				name: true,
 				startDate: true,
+				expectedEndDate: true,
 			},
 		});
 
