@@ -24481,3 +24481,143 @@ input[id^="tab-seguridad-"]:checked
 	align-items: center;
 	gap: 0.3rem;
 }
+
+/* Gantt compartido: PDF del cronograma y portal del cliente. Siempre sobre
+   superficie blanca, como un documento. */
+.schedule-timeline {
+	background: #fff;
+	color: #111;
+}
+.schedule-timeline * {
+	-webkit-print-color-adjust: exact;
+	print-color-adjust: exact;
+}
+.schedule-timeline__scroll {
+	overflow-x: auto;
+}
+.schedule-timeline__table {
+	width: 100%;
+	min-width: 760px;
+	table-layout: fixed;
+	border-collapse: collapse;
+	font-size: 10px;
+}
+.schedule-timeline__table th,
+.schedule-timeline__table td {
+	border: 1px solid #9aa3a0;
+	padding: 4px 5px;
+	vertical-align: middle;
+}
+.schedule-timeline__table thead th {
+	background: #eef2ef;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+.schedule-timeline__table thead tr:first-child th {
+	background: #dfe6e1;
+}
+.schedule-timeline__table .period {
+	overflow: hidden;
+	padding: 3px 0;
+	font-size: 9px;
+	text-align: center;
+	text-transform: none;
+	white-space: nowrap;
+}
+.schedule-timeline__table .period small {
+	display: block;
+	color: #555;
+	font-weight: 500;
+}
+.schedule-timeline__table tbody tr {
+	break-inside: avoid;
+	page-break-inside: avoid;
+}
+.schedule-timeline__table tbody tr:nth-child(even) td {
+	background: #fafbfa;
+}
+.schedule-timeline__table .bar-cell {
+	position: relative;
+	height: 26px;
+	padding: 0;
+}
+.schedule-timeline__table .grid-line {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	border-left: 1px solid #e1e6e2;
+}
+.schedule-timeline__table .bar {
+	position: absolute;
+	top: 7px;
+	bottom: 7px;
+	overflow: hidden;
+	border: 1.5px solid;
+	border-radius: 3px;
+}
+.schedule-timeline__table .bar > span {
+	position: absolute;
+	inset: 0 auto 0 0;
+}
+.schedule-timeline__table thead {
+	display: table-header-group;
+}
+.schedule-timeline__pct {
+	display: block;
+	color: #555;
+	font-size: 8px;
+}
+.schedule-timeline__legend {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem 1rem;
+	margin-top: 0.85rem;
+	color: #333;
+	font-size: 10px;
+}
+.schedule-timeline__legend > div {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 1rem;
+}
+.schedule-timeline__legend span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+.schedule-timeline__legend p {
+	text-transform: uppercase;
+}
+.schedule-timeline__swatch {
+	display: inline-block;
+	width: 1.5rem;
+	height: 0.6rem;
+	border-radius: 2px;
+}
+.schedule-timeline__swatch--planned {
+	border: 1.5px solid #8a949a;
+	background: #8a949a22;
+}
+.schedule-timeline__swatch--actual {
+	background: #1f7a5b;
+}
+@media print {
+	.schedule-timeline__scroll {
+		overflow: visible;
+	}
+	.schedule-timeline__table {
+		min-width: 0;
+		font-size: 9px;
+	}
+	.schedule-timeline__table .bar-cell {
+		height: 22px;
+	}
+	.schedule-timeline__table .bar {
+		top: 6px;
+		bottom: 6px;
+	}
+}

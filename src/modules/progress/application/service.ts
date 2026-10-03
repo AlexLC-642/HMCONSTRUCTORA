@@ -353,6 +353,9 @@ export async function approveDailyReport(
 	context: ProgressMutationContext,
 ) {
 	return prisma.$transaction(async (tx) => {
+		// Bloquea el informe: dos aprobaciones simultáneas (doble clic, dos
+		// usuarios) leerían ambas "SUBMITTED" y sumarían el avance dos veces.
+		await tx.$executeRaw`SELECT id FROM DailyReport WHERE id = ${reportId} FOR UPDATE`;
 		const report = await tx.dailyReport.findFirstOrThrow({
 			where: { id: reportId, projectId },
 			include: { activities: true, materialEntries: true },
@@ -365,9 +368,12 @@ export async function approveDailyReport(
 		for (const activity of report.activities) {
 			if (!activity.scheduleActivityId) continue;
 
+			// Otro informe de la misma actividad puede aprobarse a la vez: se
+			// bloquea la fila para no perder ninguno de los dos avances.
+			await tx.$executeRaw`SELECT id FROM ScheduleActivity WHERE id = ${activity.scheduleActivityId} FOR UPDATE`;
 			const scheduleActivity = await tx.scheduleActivity.findFirst({
 				where: { id: activity.scheduleActivityId, schedule: { projectId } },
-				select: { id: true, progress: true },
+				select: { id: true, progress: true, actualStart: true },
 			});
 
 			if (!scheduleActivity) {
@@ -397,9 +403,14 @@ export async function approveDailyReport(
 								: totals.newProgress.gt(0)
 									? "IN_PROGRESS"
 									: "PENDING",
-					actualStart: activity.todayQuantity.gt(0)
-						? report.reportDate
-						: undefined,
+					// El inicio real es el día más temprano con trabajo reportado,
+					// aunque los informes se aprueben en desorden.
+					actualStart:
+						activity.todayQuantity.gt(0) &&
+						(!scheduleActivity.actualStart ||
+							report.reportDate < scheduleActivity.actualStart)
+							? report.reportDate
+							: undefined,
 					actualEnd: totals.newProgress.equals(new Prisma.Decimal(100))
 						? report.reportDate
 						: undefined,

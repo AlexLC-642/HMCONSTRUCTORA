@@ -36,7 +36,7 @@ import {
 	type PortalTabKey,
 	PortalTabs,
 } from "@/modules/client-portal/ui/portal-tabs";
-import { daysBetweenInclusive } from "@/modules/schedules/application/dates";
+import { ScheduleTimelineTable } from "@/modules/schedules/ui/schedule-timeline-table";
 import {
 	type scheduleActivityStatuses,
 	scheduleActivityStatusLabels,
@@ -51,11 +51,6 @@ const currencyFormatter = new Intl.NumberFormat("es-GT", {
 	currency: "GTQ",
 });
 const dateFormatter = new Intl.DateTimeFormat("es-GT", { dateStyle: "medium" });
-const dayFormatter = new Intl.DateTimeFormat("es-GT", {
-	day: "2-digit",
-	month: "short",
-	timeZone: "UTC",
-});
 const portalTabKeys: PortalTabKey[] = [
 	"summary",
 	"budget",
@@ -79,50 +74,6 @@ function formatDate(value?: Date | null) {
 
 function money(value: Prisma.Decimal | number | null | undefined) {
 	return currencyFormatter.format(toNumber(value));
-}
-
-function addDays(value: Date, days: number) {
-	const next = new Date(value);
-	next.setUTCDate(next.getUTCDate() + days);
-	return next;
-}
-
-function offset(start: Date, value: Date) {
-	return Math.max(
-		0,
-		Math.round((value.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)),
-	);
-}
-
-function weekKey(startOfTimeline: Date, value: Date) {
-	const diffDays = Math.floor(
-		(value.getTime() - startOfTimeline.getTime()) / (24 * 60 * 60 * 1000),
-	);
-	return `${startOfTimeline.toISOString().slice(0, 10)}-${Math.floor(diffDays / 7)}`;
-}
-
-function weekLabel(days: Date[]) {
-	return `${dayFormatter.format(days[0])} - ${dayFormatter.format(days[days.length - 1])}`;
-}
-
-function groupDaysByWeek(days: Date[]) {
-	if (days.length === 0) return [];
-
-	return days.reduce<Array<{ key: string; label: string; days: Date[] }>>(
-		(groups, day) => {
-			const startOfTimeline = days[0];
-			const key = weekKey(startOfTimeline, day);
-			const current = groups.at(-1);
-			if (!current || current.key !== key) {
-				groups.push({ key, label: weekLabel([day]), days: [day] });
-				return groups;
-			}
-			current.days.push(day);
-			current.label = weekLabel(current.days);
-			return groups;
-		},
-		[],
-	);
 }
 
 function lineSubtotal(line: {
@@ -166,13 +117,6 @@ function activityStatus(status: string) {
 			status as (typeof scheduleActivityStatuses)[number]
 		] ?? status
 	);
-}
-
-function statusTone(status: string) {
-	if (status === "COMPLETED") return "bg-[var(--info)]";
-	if (status === "IN_PROGRESS") return "bg-[var(--success)]";
-	if (status === "BLOCKED") return "bg-[var(--danger)]";
-	return "bg-[var(--warning)]";
 }
 
 function statusColor(status: string) {
@@ -287,17 +231,7 @@ export default async function ClientPortalPage({
 			0,
 		) ?? 0;
 	const mediaCount = latestReport?.mediaEntries.length ?? 0;
-	const totalDays =
-		schedule?.startDate && schedule.endDate
-			? daysBetweenInclusive(schedule.startDate, schedule.endDate)
-			: 0;
 	const scheduleStart = schedule?.startDate ?? null;
-	const days = scheduleStart
-		? Array.from({ length: totalDays }, (_, index) =>
-				addDays(scheduleStart, index),
-			)
-		: [];
-	const weeks = groupDaysByWeek(days);
 	const progressChartActivities =
 		reportActivities.length > 0
 			? reportActivities.map((activity) => ({
@@ -640,10 +574,9 @@ export default async function ClientPortalPage({
 						{scheduleStart && schedule?.endDate ? (
 							<SchedulePreview
 								activities={activities}
-								days={days}
-								scheduleStart={scheduleStart}
-								weeks={weeks}
+								end={schedule.endDate}
 								notes={schedule.notes}
+								scheduleStart={scheduleStart}
 							/>
 						) : (
 							<EmptyState text="No hay cronograma visible para este portal." />
@@ -981,7 +914,9 @@ function BudgetSummary({
 						</td>
 					</tr>
 					<tr>
-						<td className="border border-[#8f9994] px-2 py-1">Encargado de obra</td>
+						<td className="border border-[#8f9994] px-2 py-1">
+							Encargado de obra
+						</td>
 						<td className="border border-[#8f9994] px-2 py-1 text-right">
 							{money(budget.siteManagerCost)}
 						</td>
@@ -1216,121 +1151,34 @@ function BudgetPreview({
 
 function SchedulePreview({
 	activities,
-	days,
+	end,
 	notes,
 	scheduleStart,
-	weeks,
 }: {
 	activities: NonNullable<
 		NonNullable<Awaited<ReturnType<typeof getClientPortalByToken>>>["schedule"]
 	>["activities"];
-	days: Date[];
+	end: Date;
 	notes: string | null;
 	scheduleStart: Date;
-	weeks: Array<{ key: string; label: string; days: Date[] }>;
 }) {
-	// table-fixed divides leftover width evenly across day columns - with no
-	// explicit width per day, a long schedule (many days) compresses them to
-	// unreadable slivers. Giving each day a real min-width and growing the
-	// table's own min-width with it keeps every day column legible; it just
-	// scrolls further on long schedules instead of squeezing.
-	const dayColumnWidth = 26;
-	const fixedColumnsWidth = 56 + 360 + 150 + 110;
-	const tableMinWidth = fixedColumnsWidth + days.length * dayColumnWidth;
-
 	return (
-		<div className="mt-5 overflow-x-auto bg-white p-1 text-black">
-			<table
-				className="w-full table-fixed border-collapse text-[11px]"
-				style={{ minWidth: `${tableMinWidth}px` }}
-			>
-				<colgroup>
-					<col className="w-[56px]" />
-					<col className="w-[360px]" />
-					<col className="w-[150px]" />
-					<col className="w-[110px]" />
-					{days.map((day) => (
-						<col
-							key={`col-${day.toISOString()}`}
-							style={{ width: dayColumnWidth }}
-						/>
-					))}
-				</colgroup>
-				<thead>
-					<tr className="bg-[#e7ece8]">
-						<th className="border border-[#777] px-2 py-1" colSpan={4}></th>
-						{weeks.map((week) => (
-							<th
-								className="border border-[#777] px-1 py-1 text-center uppercase"
-								colSpan={week.days.length}
-								key={week.key}
-							>
-								Semana {week.label}
-							</th>
-						))}
-					</tr>
-					<tr className="bg-[#f4f7f4]">
-						<th className="border border-[#777] px-2 py-1">No.</th>
-						<th className="border border-[#777] px-2 py-1 text-left">
-							Descripcion
-						</th>
-						<th className="border border-[#777] px-2 py-1">Mano de obra</th>
-						<th className="border border-[#777] px-2 py-1">Estado</th>
-						{days.map((day) => (
-							<th
-								className="border border-[#777] px-1 py-1"
-								key={day.toISOString()}
-							>
-								{day.getUTCDate()}
-							</th>
-						))}
-					</tr>
-				</thead>
-				<tbody>
-					{activities.map((activity) => {
-						const startOffset = offset(scheduleStart, activity.plannedStart);
-						const duration = daysBetweenInclusive(
-							activity.plannedStart,
-							activity.plannedEnd,
-						);
-						const progressDays = Math.ceil(
-							(duration *
-								Math.min(100, Math.max(0, toNumber(activity.progress)))) /
-								100,
-						);
-						return (
-							<tr key={activity.id}>
-								<td className="border border-[#777] px-2 py-1 text-center">
-									{activity.code}
-								</td>
-								<td className="border border-[#777] px-2 py-1">
-									{activity.description}
-								</td>
-								<td className="border border-[#777] px-2 py-1 text-center">
-									{activity.labor ?? ""}
-								</td>
-								<td className="border border-[#777] px-2 py-1 text-center">
-									{activityStatus(activity.status)}
-								</td>
-								{days.map((day, index) => {
-									const active =
-										index >= startOffset && index < startOffset + duration;
-									const advanced = active && index < startOffset + progressDays;
-									return (
-										<td
-											className={`border border-[#777] px-1 py-1 ${advanced ? statusTone(activity.status) : ""}`}
-											key={`${activity.id}-${day.toISOString()}`}
-										>
-											&nbsp;
-										</td>
-									);
-								})}
-							</tr>
-						);
-					})}
-				</tbody>
-			</table>
-			<p className="mt-4 text-xs uppercase text-[#596765]">Nota: {notes}</p>
+		<div className="mt-5 rounded-xl bg-white p-3">
+			<ScheduleTimelineTable
+				activities={activities.map((activity) => ({
+					id: activity.id,
+					code: activity.code,
+					description: activity.description,
+					labor: activity.labor,
+					status: activity.status,
+					plannedStart: activity.plannedStart,
+					plannedEnd: activity.plannedEnd,
+					progress: toNumber(activity.progress),
+				}))}
+				end={end}
+				notes={notes}
+				start={scheduleStart}
+			/>
 		</div>
 	);
 }
