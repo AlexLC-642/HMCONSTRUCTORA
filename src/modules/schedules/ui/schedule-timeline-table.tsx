@@ -1,8 +1,8 @@
 import { daysBetweenInclusive } from "../application/dates";
 import {
-	buildPrintTimeline,
+	buildDailyTimeline,
 	dayOffset,
-	type TimelineUnit,
+	type TimelineSegment,
 } from "../domain/print-timeline";
 import {
 	type scheduleActivityStatuses,
@@ -36,73 +36,76 @@ const statusColor: Record<Status, string> = {
 	COMPLETED: "#2563eb",
 };
 
-const unitLabel: Record<TimelineUnit, string> = {
-	day: "días",
-	week: "semanas (fecha de inicio de cada semana)",
-	month: "meses",
+type PreparedActivity = ScheduleTimelineActivity & {
+	statusKey: Status;
+	startDay: number;
+	duration: number;
+	progressValue: number;
 };
 
-/**
- * Tabla Gantt compartida por la vista PDF del cronograma y el portal del
- * cliente. La escala (días, semanas o meses) se elige según la duración para
- * que siempre sea legible, y cada barra muestra lo planificado con el avance
- * real encima.
- */
-export function ScheduleTimelineTable({
+function SegmentTable({
+	segment,
 	activities,
-	start,
-	end,
-	notes,
+	hasLabor,
 }: {
-	activities: ScheduleTimelineActivity[];
-	start: Date;
-	end: Date;
-	notes?: string | null;
+	segment: TimelineSegment;
+	activities: PreparedActivity[];
+	hasLabor: boolean;
 }) {
-	const timeline = buildPrintTimeline(start, end);
-	const hasLabor = activities.some((activity) => activity.labor?.trim());
-	// Columnas fijas en % del ancho; el resto es la línea de tiempo.
-	const fixed = {
-		no: 3,
-		description: hasLabor ? 18 : 23,
-		labor: hasLabor ? 9 : 0,
-		start: 6,
-		end: 6,
-		days: 4,
-		status: 7,
-	};
-	const timelineWidth =
-		100 - Object.values(fixed).reduce((sum, value) => sum + value, 0);
-	const fixedColumns = hasLabor ? 7 : 6;
-	const pct = (days: number) => (days / timeline.totalDays) * 100;
+	const segmentStart = segment.startDay;
+	const segmentDays = segment.days.length;
+	const segmentEnd = segmentStart + segmentDays;
+	// Columnas fijas en % del ancho total de la hoja; los días reparten el resto
+	// con el ancho de un mes completo, para que todas las hojas tengan la misma
+	// escala aunque el primer o el último mes estén incompletos.
+	const fixed: Array<[string, number]> = hasLabor
+		? [
+				["no", 3],
+				["activity", 15],
+				["labor", 8],
+				["start", 5.5],
+				["end", 5.5],
+				["days", 3.5],
+				["status", 7],
+			]
+		: [
+				["no", 3],
+				["activity", 21],
+				["start", 5.5],
+				["end", 5.5],
+				["days", 3.5],
+				["status", 7],
+			];
+	const fixedTotal = fixed.reduce((sum, [, value]) => sum + value, 0);
+	const dayWidth = (100 - fixedTotal) / 31;
+	const tableWidth = fixedTotal + dayWidth * segmentDays;
+	const pctOfTable = (value: number) => `${(value / tableWidth) * 100}%`;
+	const pctOfSegment = (days: number) => `${(days / segmentDays) * 100}%`;
+	const fixedColumns = fixed.length;
 
 	return (
-		<div className="schedule-timeline">
+		<section className="schedule-timeline__segment">
 			<div className="schedule-timeline__scroll">
-				<table className="schedule-timeline__table">
+				<table
+					className="schedule-timeline__table"
+					style={{ width: `${tableWidth}%` }}
+				>
 					<colgroup>
-						<col style={{ width: `${fixed.no}%` }} />
-						<col style={{ width: `${fixed.description}%` }} />
-						{hasLabor ? <col style={{ width: `${fixed.labor}%` }} /> : null}
-						<col style={{ width: `${fixed.start}%` }} />
-						<col style={{ width: `${fixed.end}%` }} />
-						<col style={{ width: `${fixed.days}%` }} />
-						<col style={{ width: `${fixed.status}%` }} />
-						{timeline.periods.map((period) => (
-							<col
-								key={period.key}
-								style={{
-									width: `${(period.days / timeline.totalDays) * timelineWidth}%`,
-								}}
-							/>
+						{fixed.map(([key, width]) => (
+							<col key={key} style={{ width: pctOfTable(width) }} />
+						))}
+						{segment.days.map((day) => (
+							<col key={day.offset} style={{ width: pctOfTable(dayWidth) }} />
 						))}
 					</colgroup>
 					<thead>
 						<tr>
-							<th colSpan={fixedColumns} />
-							{timeline.groups.map((group) => (
-								<th className="period" colSpan={group.span} key={group.key}>
-									{group.label}
+							<th className="schedule-timeline__corner" colSpan={fixedColumns}>
+								{segment.label}
+							</th>
+							{segment.weeks.map((week) => (
+								<th className="period" colSpan={week.span} key={week.key}>
+									{week.label}
 								</th>
 							))}
 						</tr>
@@ -114,29 +117,38 @@ export function ScheduleTimelineTable({
 							<th>Fin</th>
 							<th>Días</th>
 							<th>Estado</th>
-							{timeline.periods.map((period) => (
-								<th className="period" key={period.key}>
-									{period.label}
-									{period.sublabel ? <small>{period.sublabel}</small> : null}
+							{segment.days.map((day) => (
+								<th
+									className="period"
+									data-sunday={day.isSunday || undefined}
+									key={day.offset}
+								>
+									{day.dayOfMonth}
+									<small>{day.weekday}</small>
 								</th>
 							))}
 						</tr>
 					</thead>
 					<tbody>
 						{activities.map((activity) => {
-							const status = (
-								activity.status in statusColor ? activity.status : "PENDING"
-							) as Status;
-							const color = statusColor[status];
-							const offset = Math.max(
-								0,
-								dayOffset(start, activity.plannedStart),
-							);
-							const duration = daysBetweenInclusive(
-								activity.plannedStart,
-								activity.plannedEnd,
-							);
-							const progress = Math.min(100, Math.max(0, activity.progress));
+							const color = statusColor[activity.statusKey];
+							const end = activity.startDay + activity.duration;
+							const visibleStart = Math.max(activity.startDay, segmentStart);
+							const visibleEnd = Math.min(end, segmentEnd);
+							const visible = visibleEnd > visibleStart;
+							const progressEnd =
+								activity.startDay +
+								(activity.duration * activity.progressValue) / 100;
+							const fill = visible
+								? Math.min(
+										1,
+										Math.max(
+											0,
+											(progressEnd - visibleStart) /
+												(visibleEnd - visibleStart),
+										),
+									)
+								: 0;
 							return (
 								<tr key={activity.id}>
 									<td className="text-center">{activity.code}</td>
@@ -150,36 +162,60 @@ export function ScheduleTimelineTable({
 									<td className="text-center tabular-nums">
 										{shortDate.format(activity.plannedEnd)}
 									</td>
-									<td className="text-center tabular-nums">{duration}</td>
+									<td className="text-center tabular-nums">
+										{activity.duration}
+									</td>
 									<td className="text-center">
-										{scheduleActivityStatusLabels[status]}
-										{progress > 0 && progress < 100 ? (
+										{scheduleActivityStatusLabels[activity.statusKey]}
+										{activity.progressValue > 0 &&
+										activity.progressValue < 100 ? (
 											<span className="schedule-timeline__pct">
-												{progress.toFixed(0)}%
+												{activity.progressValue.toFixed(0)}%
 											</span>
 										) : null}
 									</td>
-									<td className="bar-cell" colSpan={timeline.periods.length}>
-										{timeline.periods.slice(1).map((period) => (
+									<td className="bar-cell" colSpan={segmentDays}>
+										{segment.days.map((day, index) =>
+											day.isSunday ? (
+												<span
+													className="sunday"
+													key={day.offset}
+													style={{
+														left: pctOfSegment(index),
+														width: pctOfSegment(1),
+													}}
+												/>
+											) : null,
+										)}
+										{segment.days.slice(1).map((day, index) => (
 											<span
 												className="grid-line"
-												key={period.key}
-												style={{ left: `${pct(period.startDay)}%` }}
+												key={day.offset}
+												style={{ left: pctOfSegment(index + 1) }}
 											/>
 										))}
-										<span
-											className="bar"
-											style={{
-												left: `${pct(offset)}%`,
-												width: `max(3px, ${pct(duration)}%)`,
-												borderColor: color,
-												background: `${color}22`,
-											}}
-										>
+										{visible ? (
 											<span
-												style={{ width: `${progress}%`, background: color }}
-											/>
-										</span>
+												className="bar"
+												data-continues-left={
+													activity.startDay < segmentStart || undefined
+												}
+												data-continues-right={end > segmentEnd || undefined}
+												style={{
+													left: pctOfSegment(visibleStart - segmentStart),
+													width: pctOfSegment(visibleEnd - visibleStart),
+													borderColor: color,
+													background: `${color}22`,
+												}}
+											>
+												<span
+													style={{
+														width: `${fill * 100}%`,
+														background: color,
+													}}
+												/>
+											</span>
+										) : null}
 									</td>
 								</tr>
 							);
@@ -187,6 +223,48 @@ export function ScheduleTimelineTable({
 					</tbody>
 				</table>
 			</div>
+		</section>
+	);
+}
+
+/**
+ * Gantt diario compartido por la vista PDF del cronograma y el portal del
+ * cliente. Se divide por mes calendario: cada mes muestra sus días completos
+ * y, al imprimir, ocupa su propia hoja con las columnas de la actividad.
+ */
+export function ScheduleTimelineTable({
+	activities,
+	start,
+	end,
+	notes,
+}: {
+	activities: ScheduleTimelineActivity[];
+	start: Date;
+	end: Date;
+	notes?: string | null;
+}) {
+	const timeline = buildDailyTimeline(start, end);
+	const hasLabor = activities.some((activity) => activity.labor?.trim());
+	const prepared: PreparedActivity[] = activities.map((activity) => ({
+		...activity,
+		statusKey: (activity.status in statusColor
+			? activity.status
+			: "PENDING") as Status,
+		startDay: Math.max(0, dayOffset(start, activity.plannedStart)),
+		duration: daysBetweenInclusive(activity.plannedStart, activity.plannedEnd),
+		progressValue: Math.min(100, Math.max(0, activity.progress)),
+	}));
+
+	return (
+		<div className="schedule-timeline">
+			{timeline.segments.map((segment) => (
+				<SegmentTable
+					activities={prepared}
+					hasLabor={hasLabor}
+					key={segment.key}
+					segment={segment}
+				/>
+			))}
 			<div className="schedule-timeline__legend">
 				<div>
 					<span>
@@ -197,7 +275,10 @@ export function ScheduleTimelineTable({
 						<i className="schedule-timeline__swatch schedule-timeline__swatch--actual" />
 						Avance real
 					</span>
-					<span>Escala: {unitLabel[timeline.unit]}</span>
+					<span>
+						<i className="schedule-timeline__swatch schedule-timeline__swatch--sunday" />
+						Domingo
+					</span>
 				</div>
 				{notes ? <p>Nota: {notes}</p> : null}
 			</div>

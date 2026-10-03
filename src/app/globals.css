@@ -24809,3 +24809,45 @@ input[id^="tab-seguridad-"]:checked
 	color: #1b2325;
 	font-weight: 600;
 }
+
+/* Gantt diario por mes. */
+.schedule-timeline__segment + .schedule-timeline__segment {
+	margin-top: 1.25rem;
+}
+.schedule-timeline__table thead tr:first-child .schedule-timeline__corner {
+	background: #1b2528;
+	color: #fff;
+	font-size: 10px;
+	letter-spacing: 0.08em;
+	text-align: left;
+}
+.schedule-timeline__table thead .period[data-sunday] {
+	background: #e3e7e4;
+}
+.schedule-timeline__table .bar-cell .sunday {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	background: #f0f2f0;
+}
+.schedule-timeline__table .bar[data-continues-left] {
+	border-left-style: dashed;
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
+}
+.schedule-timeline__table .bar[data-continues-right] {
+	border-right-style: dashed;
+	border-top-right-radius: 0;
+	border-bottom-right-radius: 0;
+}
+.schedule-timeline__swatch--sunday {
+	border: 1px solid #d5dbd7;
+	background: #f0f2f0;
+}
+@media print {
+	.schedule-timeline__segment + .schedule-timeline__segment {
+		margin-top: 0;
+		break-before: page;
+		page-break-before: always;
+	}
+}
