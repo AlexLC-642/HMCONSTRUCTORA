@@ -79,22 +79,10 @@ export function DailyReportPrintDocument({
 	const idle = report.activities.filter(
 		(activity) => num(activity.todayQuantity) <= 0,
 	);
-	const people = report.laborEntries.reduce(
-		(sum, entry) => sum + num(entry.people),
-		0,
-	);
-	const hours = report.laborEntries.reduce(
-		(sum, entry) => sum + num(entry.hours) * Math.max(1, num(entry.people)),
-		0,
-	);
 	const laborTotal = report.laborEntries.reduce(
 		(sum, entry) => sum + num(entry.amount),
 		0,
 	);
-	const preliminary =
-		report.status === "DRAFT" ||
-		report.status === "SUBMITTED" ||
-		report.status === "REVIEWED";
 	const schedule =
 		report.startTime || report.endTime
 			? `${report.startTime ?? "—"} a ${report.endTime ?? "—"}`
@@ -150,40 +138,9 @@ export function DailyReportPrintDocument({
 						longDate.format(report.reportDate),
 					]}
 					documentTitle="Informe diario"
+					layout="table"
 					projectName={report.project.name}
 				/>
-
-				{preliminary ? (
-					<p className="report-doc__notice">
-						Documento preliminar: el avance se aplica al cronograma cuando el
-						informe es aprobado.
-					</p>
-				) : null}
-
-				<section className="report-doc__summary">
-					<div>
-						<span>Actividades con avance</span>
-						<strong>
-							{worked.length} de {report.activities.length}
-						</strong>
-					</div>
-					<div>
-						<span>Personal</span>
-						<strong>
-							{number.format(people)} · {number.format(hours)} h
-						</strong>
-					</div>
-					<div>
-						<span>Mano de obra</span>
-						<strong>{currency.format(laborTotal)}</strong>
-					</div>
-					<div>
-						<span>Materiales · fotos</span>
-						<strong>
-							{report.materialEntries.length} · {report.mediaEntries.length}
-						</strong>
-					</div>
-				</section>
 
 				<section className="report-doc__section">
 					<SectionTitle>Avance del día</SectionTitle>

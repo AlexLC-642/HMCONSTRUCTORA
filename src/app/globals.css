@@ -24632,42 +24632,6 @@ input[id^="tab-seguridad-"]:checked
 	-webkit-print-color-adjust: exact;
 	print-color-adjust: exact;
 }
-.report-doc__notice {
-	margin: -0.5rem 0 1rem;
-	border: 1px solid #ead9a8;
-	border-radius: 6px;
-	background: #fff8e6;
-	padding: 0.4rem 0.65rem;
-	color: #6b4f0e;
-	font-size: 10px;
-}
-.report-doc__summary {
-	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
-	margin-bottom: 1.1rem;
-	border: 1px solid #c9d1cd;
-	border-radius: 6px;
-}
-.report-doc__summary > div {
-	padding: 0.5rem 0.65rem;
-}
-.report-doc__summary > div + div {
-	border-left: 1px solid #c9d1cd;
-}
-.report-doc__summary span {
-	display: block;
-	color: #5d6a66;
-	font-size: 8.5px;
-	font-weight: 700;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
-}
-.report-doc__summary strong {
-	display: block;
-	margin-top: 0.15rem;
-	font-size: 13px;
-	font-variant-numeric: tabular-nums;
-}
 .report-doc__section {
 	margin-bottom: 1.1rem;
 	break-inside: avoid;
@@ -24813,4 +24777,35 @@ input[id^="tab-seguridad-"]:checked
 .report-doc__signatures small {
 	color: #5d6a66;
 	font-size: 9px;
+}
+
+/* Ficha formal del encabezado de documentos (layout="table"). */
+.print-doc-facts {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: collapse;
+	font-size: 10.5px;
+}
+.print-doc-facts th,
+.print-doc-facts td {
+	border: 1px solid #9aa3a0;
+	padding: 5px 8px;
+	vertical-align: middle;
+	text-align: left;
+}
+.print-doc-facts th {
+	width: 15%;
+	background: #eef2ef;
+	color: #3d4946;
+	font-size: 8.5px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	-webkit-print-color-adjust: exact;
+	print-color-adjust: exact;
+}
+.print-doc-facts td {
+	width: 35%;
+	color: #1b2325;
+	font-weight: 600;
 }
