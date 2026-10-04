@@ -27,7 +27,7 @@ import type { NextConfig } from "next";
 // see https://nextjs.org/docs/messages/csp-eval. React itself never calls
 // eval() in production, so the production CSP below stays eval-free.
 const isDev = process.env.NODE_ENV === "development";
-const cspDirectives = [
+const baseCspDirectives = [
 	"default-src 'self'",
 	`script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
 	"style-src 'self' 'unsafe-inline'",
@@ -38,9 +38,29 @@ const cspDirectives = [
 	"object-src 'none'",
 	"base-uri 'self'",
 	"form-action 'self'",
-	"frame-ancestors 'none'",
 	"upgrade-insecure-requests",
+];
+const cspDirectives = [...baseCspDirectives, "frame-ancestors 'none'"].join(
+	"; ",
+);
+
+// Stored files (PDF, images, video) are shown inside the in-app document
+// viewer, which embeds them in an <iframe>/<img>/<video> on the same origin.
+// "frame-ancestors 'none'" + "X-Frame-Options: DENY" made every PDF preview
+// render blank, so these routes allow same-origin framing only - still
+// nothing outside this site can frame them. Chrome's PDF viewer also needs
+// object-src to allow the document itself.
+const embeddableFileCsp = [
+	...baseCspDirectives.filter(
+		(directive) => !directive.startsWith("object-src"),
+	),
+	"object-src 'self'",
+	"frame-ancestors 'self'",
 ].join("; ");
+const embeddableFileHeaders = [
+	{ key: "Content-Security-Policy", value: embeddableFileCsp },
+	{ key: "X-Frame-Options", value: "SAMEORIGIN" },
+];
 
 const securityHeaders = [
 	{ key: "Content-Security-Policy", value: cspDirectives },
@@ -80,6 +100,16 @@ const nextConfig: NextConfig = {
 			{
 				source: "/(.*)",
 				headers: securityHeaders,
+			},
+			// Must stay after the catch-all: for the same header key, the last
+			// matching rule wins.
+			{
+				source: "/api/documents/versions/:versionId/file",
+				headers: embeddableFileHeaders,
+			},
+			{
+				source: "/uploads/:path*",
+				headers: embeddableFileHeaders,
 			},
 			{
 				source: "/sw.js",

@@ -23,7 +23,9 @@ import {
 	requireProjectPermission,
 } from "@/modules/auth/application/authorization";
 import { buildDocumentPreview } from "@/modules/documents/application/queries";
+import { documentFileUrl } from "@/modules/documents/domain/catalog";
 import { DocumentPreviewModal } from "@/modules/documents/ui/document-preview-modal";
+import { ReportUploadModal } from "@/modules/reports/ui/report-upload-modal";
 import {
 	ReportEmpty,
 	ReportMetric,
@@ -50,6 +52,7 @@ type ReportsSearch = {
 	dateTo?: string | string[];
 	preview?: string | string[];
 	newReport?: string | string[];
+	upload?: string | string[];
 };
 
 type DailyReportRow = Prisma.DailyReportGetPayload<{
@@ -88,6 +91,7 @@ function reportsHref(
 		dateTo: searchValue(params.dateTo),
 		preview: searchValue(params.preview),
 		newReport: searchValue(params.newReport),
+		upload: searchValue(params.upload),
 	};
 
 	for (const [key, value] of Object.entries({ ...current, ...next })) {
@@ -123,6 +127,7 @@ export default async function ReportsPage({
 	const dateToFilter = searchValue(params.dateTo);
 	const previewId = searchValue(params.preview);
 	const showNewReportModal = searchValue(params.newReport) === "true";
+	const showUploadModal = searchValue(params.upload) === "true";
 
 	const allProjects = await prisma.project.findMany({
 		where: projectAccessWhere(user),
@@ -232,12 +237,20 @@ export default async function ReportsPage({
 						</p>
 						<h1 className="sr-only">Informes de obra</h1>
 					</div>
-					<a
-						className="reports-primary-action focus-ring"
-						href={reportsHref(params, { newReport: "true" })}
-					>
-						<Plus aria-hidden="true" size={18} /> Nuevo informe
-					</a>
+					<div className="flex flex-wrap gap-2">
+						<a
+							className="reports-secondary-action focus-ring"
+							href={reportsHref(params, { tab: "reportes", upload: "true" })}
+						>
+							<Upload aria-hidden="true" size={17} /> Subir informe
+						</a>
+						<a
+							className="reports-primary-action focus-ring"
+							href={reportsHref(params, { newReport: "true" })}
+						>
+							<Plus aria-hidden="true" size={18} /> Nuevo informe
+						</a>
+					</div>
 				</div>
 			</section>
 
@@ -432,9 +445,12 @@ export default async function ReportsPage({
 							action={
 								<a
 									className="reports-secondary-action focus-ring"
-									href="/documents?upload=true"
+									href={reportsHref(params, {
+										tab: "reportes",
+										upload: "true",
+									})}
 								>
-									<Upload size={16} /> Subir archivo
+									<Upload size={16} /> Subir informe
 								</a>
 							}
 							detail={
@@ -457,6 +473,18 @@ export default async function ReportsPage({
 					allProjects={allProjects}
 					closeHref={reportsHref(params, { newReport: "" })}
 					inputClass={inputClass}
+					uploadHref={reportsHref(params, {
+						newReport: "",
+						tab: "reportes",
+						upload: "true",
+					})}
+				/>
+			) : null}
+			{showUploadModal ? (
+				<ReportUploadModal
+					closeHref={reportsHref(params, { upload: "" })}
+					defaultProjectId={projectFilter}
+					projects={allProjects}
 				/>
 			) : null}
 			{previewDocument ? (
@@ -680,7 +708,7 @@ function ManualReportsTable({
 												<a
 													className="reports-row-action reports-row-action--dark focus-ring"
 													download
-													href={latest.publicUrl}
+													href={documentFileUrl(latest.id)}
 												>
 													<Download size={14} /> Descargar
 												</a>
@@ -735,7 +763,7 @@ function ManualReportsTable({
 									<a
 										className="reports-row-action reports-row-action--dark focus-ring flex-1 justify-center"
 										download
-										href={latest.publicUrl}
+										href={documentFileUrl(latest.id)}
 									>
 										<Download size={14} /> Descargar
 									</a>
@@ -752,10 +780,12 @@ function ManualReportsTable({
 function NewReportModal({
 	allProjects,
 	closeHref,
+	uploadHref,
 	inputClass,
 }: {
 	allProjects: Array<{ id: string; code: string; name: string }>;
 	closeHref: string;
+	uploadHref: string;
 	inputClass: string;
 }) {
 	return (
@@ -809,16 +839,13 @@ function NewReportModal({
 							))}
 						</select>
 					</label>
-					<a
-						className="reports-upload-option focus-ring"
-						href="/documents?upload=true"
-					>
+					<a className="reports-upload-option focus-ring" href={uploadHref}>
 						<span className="grid size-10 place-items-center rounded-lg bg-[#eef1ed] text-[#34413d]">
 							<Upload size={18} />
 						</span>
 						<span className="min-w-0 flex-1">
 							<strong>Subir un informe existente</strong>
-							<small>Agrega un archivo al expediente del proyecto.</small>
+							<small>PDF, Word, Excel o foto de un informe ya hecho.</small>
 						</span>
 						<ArrowRight size={17} />
 					</a>

@@ -24,6 +24,26 @@ interface DocumentPreviewModalProps {
 	showProjectCard?: boolean;
 }
 
+const fileKinds: Record<string, { key: string; label: string; name: string }> =
+	{
+		docx: { key: "word", label: "DOCX", name: "Documento de Word" },
+		xlsx: { key: "excel", label: "XLSX", name: "Hoja de Excel" },
+		pptx: { key: "powerpoint", label: "PPTX", name: "Presentación" },
+		dwg: { key: "cad", label: "DWG", name: "Plano de AutoCAD" },
+		dxf: { key: "cad", label: "DXF", name: "Plano CAD" },
+	};
+
+function fileKind(fileName: string) {
+	const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
+	return (
+		fileKinds[extension] ?? {
+			key: "other",
+			label: extension.toUpperCase() || "ARCHIVO",
+			name: "Archivo",
+		}
+	);
+}
+
 function formatBytes(value: number) {
 	if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
 	if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
@@ -139,26 +159,28 @@ export function DocumentPreviewModal({
 						) : isPdf ? (
 							<iframe
 								className="h-full w-full rounded-xl border border-[#dfe3dc] bg-white"
-								src={documentFileUrl(safeVersion.id)}
+								src={`${documentFileUrl(safeVersion.id)}#navpanes=0&view=FitH`}
 								title={document.title}
 							/>
 						) : (
-							<div className="flex max-w-md flex-col items-center rounded-2xl border border-[#dfe3dc] bg-white p-8 text-center shadow-sm">
-								<div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#f4f0ed] text-[var(--muted)]">
-									<FileText size={32} />
-								</div>
-								<h3 className="text-base font-semibold text-[var(--foreground)]">
-									{safeVersion.originalName}
-								</h3>
-								<p className="mt-2 text-xs text-[var(--muted)]">
-									Vista previa no disponible para este tipo de archivo.
-								</p>
-								<p className="mt-1 text-xs text-[var(--muted)]">
-									{safeVersion.mimeType || "Formato desconocido"} ·{" "}
+							<div className="document-file-card">
+								<span
+									className="document-file-card__badge"
+									data-kind={fileKind(safeVersion.originalName).key}
+								>
+									{fileKind(safeVersion.originalName).label}
+								</span>
+								<h3>{safeVersion.originalName}</h3>
+								<p>
+									{fileKind(safeVersion.originalName).name} ·{" "}
 									{formatBytes(safeVersion.fileSize)}
 								</p>
+								<p className="document-file-card__hint">
+									Este formato se abre con su programa. Para verlo aquí, súbelo
+									en PDF.
+								</p>
 								<a
-									className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-[var(--brand-red)] px-5 text-sm font-semibold text-white hover:bg-[#b51d2a]"
+									className="documents-primary-action focus-ring"
 									download
 									href={documentFileUrl(safeVersion.id)}
 								>

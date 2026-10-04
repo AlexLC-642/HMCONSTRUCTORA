@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { recordAuditLog } from "@/modules/audit/application/audit";
 import { prisma } from "@/shared/lib/prisma";
@@ -118,37 +119,50 @@ export async function createProjectDocument(
 	// workflow - that extra step added no real value here (unlike Presupuesto,
 	// where approval gates a financial commitment). Every upload is approved
 	// on arrival; portal visibility stays a separate, deliberate action.
-	const document = await prisma.projectDocument.create({
-		data: {
-			projectId,
-			categoryId,
-			title: stringValue(formData, "title") || titleFromFileName(file.name),
-			description: stringValue(formData, "description") || null,
-			tags: normalizedTags(stringValue(formData, "tags")),
-			status: "APPROVED",
-			portalVisible: booleanValue(formData, "portalVisible"),
-			authorId: context.userId,
-			approvedById: context.userId,
-			approvedAt: new Date(),
-		},
-	});
-
+	//
+	// The file is validated and stored first, with a pre-generated id, and only
+	// then are the document and its version created together: a rejected file
+	// (type, size, duration) used to leave a document with no version behind.
+	const documentId = randomUUID();
 	const storedFile = await storeProjectDocumentFile(
 		projectId,
-		document.id,
+		documentId,
 		file,
 		category.key,
 		context.userId,
 	);
-	await prisma.documentVersion.create({
-		data: {
-			documentId: document.id,
-			versionNumber: 1,
-			...storedFile,
-			notes: stringValue(formData, "versionNotes") || null,
-			uploadedById: context.userId,
-		},
-	});
+	const document = await prisma
+		.$transaction(async (tx) => {
+			const created = await tx.projectDocument.create({
+				data: {
+					id: documentId,
+					projectId,
+					categoryId,
+					title: stringValue(formData, "title") || titleFromFileName(file.name),
+					description: stringValue(formData, "description") || null,
+					tags: normalizedTags(stringValue(formData, "tags")),
+					status: "APPROVED",
+					portalVisible: booleanValue(formData, "portalVisible"),
+					authorId: context.userId,
+					approvedById: context.userId,
+					approvedAt: new Date(),
+				},
+			});
+			await tx.documentVersion.create({
+				data: {
+					documentId: created.id,
+					versionNumber: 1,
+					...storedFile,
+					notes: stringValue(formData, "versionNotes") || null,
+					uploadedById: context.userId,
+				},
+			});
+			return created;
+		})
+		.catch(async (error: unknown) => {
+			await deleteStoredFile(storedFile.storageKey);
+			throw error;
+		});
 
 	await recordAuditLog({
 		userId: context.userId,

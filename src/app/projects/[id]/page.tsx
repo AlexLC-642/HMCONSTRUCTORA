@@ -5,7 +5,6 @@ import {
 	CalendarDays,
 	CheckCircle2,
 	ClipboardList,
-	FileText,
 	Gauge,
 	PackageSearch,
 	Plus,
@@ -36,6 +35,7 @@ import {
 	percent,
 	progressGap,
 } from "@/shared/ui/charts/format";
+import { MediaViewerGrid } from "@/shared/ui/media-viewer";
 
 const dateFormatter = new Intl.DateTimeFormat("es-GT", { dateStyle: "medium" });
 const shortDateFormatter = new Intl.DateTimeFormat("es-GT", {
@@ -828,27 +828,16 @@ export default async function ProjectDetailPage({
 						<a href={`/projects/${id}/documents`}>Documentos</a>
 					</div>
 					{dashboard.reports.recentMedia.length > 0 ? (
-						<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-							{dashboard.reports.recentMedia.map((media) => (
-								<a
-									className="rounded-xl border border-[var(--border)] bg-[#fbfaf6] p-3 text-sm shadow-sm hover:bg-white"
-									href={media.publicUrl}
-									key={media.id}
-									target="_blank"
-									rel="noreferrer"
-								>
-									<span className="mb-3 grid size-10 place-items-center rounded-lg bg-white text-[var(--brand-red)]">
-										<FileText aria-hidden="true" size={18} />
-									</span>
-									<strong className="line-clamp-2">
-										{media.title || media.originalName}
-									</strong>
-									<span className="mt-2 block text-xs text-[var(--muted)]">
-										{media.reportNumber} - {formatDate(media.reportDate)}
-									</span>
-								</a>
-							))}
-						</div>
+						<MediaViewerGrid
+							items={dashboard.reports.recentMedia.map((media) => ({
+								id: media.id,
+								src: media.publicUrl,
+								mimeType: media.mimeType,
+								title: media.title || media.originalName,
+								subtitle: `${media.reportNumber} · ${formatDate(media.reportDate)}`,
+								description: media.description,
+							}))}
+						/>
 					) : (
 						<div className="rounded-xl border border-dashed border-[var(--border)] bg-[#fbfaf6] p-6 text-center text-sm text-[var(--muted)]">
 							Sin evidencias cargadas.
