@@ -57,6 +57,7 @@ import { purchaseOrderStatusLabels } from "../domain/validation";
 import {
 	CancelOrderDialog,
 	CanceledOrdersTable,
+	CompanyInvoicesTable,
 	formatCompactMoney,
 	KpiStrip,
 	SuppliersTable,
@@ -68,7 +69,7 @@ type WorkspaceData = Awaited<ReturnType<typeof getPurchaseWorkspace>>;
 type Supplier = WorkspaceData["suppliers"][number];
 type Order = WorkspaceData["orders"][number];
 type Requisition = WorkspaceData["readyRequisitions"][number];
-type View = "orders" | "suppliers" | "requisitions" | "canceled";
+type View = "orders" | "suppliers" | "requisitions" | "canceled" | "invoices";
 type ProgressState = "done" | "active" | "pending" | "stopped" | "skipped";
 
 function BudgetTag({ scope }: { scope: PurchaseBudgetScope }) {
@@ -118,23 +119,21 @@ function OrderProgress({ order }: { order: Order }) {
 							: "Pendiente",
 			},
 			{
-				label: "Factura en Finanzas",
+				label: order.project
+					? "Factura del proyecto"
+					: "Factura de la compañía",
 				state: canceled
 					? "stopped"
-					: !order.project
-						? "skipped"
-						: invoiceComplete
-							? "done"
-							: order.status === "DRAFT"
-								? "pending"
-								: "active",
-				detail: !order.project
-					? "No aplica a bodega"
 					: invoiceComplete
-						? "Factura registrada"
-						: order.invoiceCount > 0
-							? "Factura parcial"
-							: "Por registrar",
+						? "done"
+						: order.status === "DRAFT"
+							? "pending"
+							: "active",
+				detail: invoiceComplete
+					? "Factura registrada"
+					: order.invoiceCount > 0
+						? "Factura parcial"
+						: "Por registrar",
 			},
 		];
 	return (
@@ -440,40 +439,38 @@ function BudgetNote({ order }: { order: Order }) {
 }
 
 /**
- * Qué pasa con la factura del proveedor. La orden de compra no emite factura:
- * el proveedor la emite a HM y Finanzas la registra como gasto del proyecto.
+ * Factura del proveedor. La orden no emite factura: el proveedor la emite a HM
+ * y se registra aquí, en la orden. Si la orden es de un proyecto queda como
+ * gasto de ese proyecto (Finanzas); si es de bodega, como gasto de la compañía
+ * (pestaña Facturas de Compras).
  */
 function FinancePanel({ order }: { order: Order }) {
 	if (order.status === "CANCELED") return null;
-	if (!order.project) {
-		return (
-			<section className="purchases-finance" data-tracked="false">
-				<ReceiptText aria-hidden="true" size={18} />
-				<div>
-					<strong>Factura y costo</strong>
-					<p>
-						Compra de la compañía para bodega: no es gasto de un proyecto. El
-						costo llega a cada obra cuando el material sale de bodega hacia
-						ella.
-					</p>
-				</div>
-			</section>
-		);
-	}
+	const company = !order.project;
 	const pending = Math.max(0, order.total - order.invoicedAmount);
+	const destination = company
+		? "gasto de la compañía (no suma a ninguna obra)"
+		: "gasto del proyecto en Finanzas";
 	return (
-		<section className="purchases-finance">
+		<section
+			className="purchases-finance"
+			data-tracked={company ? "false" : undefined}
+		>
 			<ReceiptText aria-hidden="true" size={18} />
 			<div>
-				<strong>Factura y pago · {order.project.name}</strong>
+				<strong>
+					Factura · {company ? "compra de la compañía" : order.project?.name}
+				</strong>
 				<p>
 					{order.status === "DRAFT"
-						? "Emite la orden. Cuando el proveedor entregue la factura a nombre de HM, regístrala aquí: queda como gasto del proyecto en Finanzas, sin capturarla dos veces."
+						? `Emite la orden. Cuando el proveedor entregue la factura a nombre de HM, regístrala aquí: queda como ${destination}.`
 						: order.invoiceCount === 0
-							? "El proveedor emite la factura a nombre de HM. Regístrala aquí con «Registrar factura»: queda como gasto del proyecto en Finanzas, donde se registran los pagos."
+							? `El proveedor emite la factura a nombre de HM. Regístrala aquí con «Registrar factura» (número y archivo): queda como ${destination}.`
 							: pending > 0
 								? `Hay ${order.invoiceCount === 1 ? "1 factura registrada" : `${order.invoiceCount} facturas registradas`}; faltan ${formatCurrency(pending)} por facturar.`
-								: "La factura cubre el total de la orden. Los pagos se registran en Finanzas."}
+								: company
+									? "La factura cubre el total de la orden. El costo llega a cada obra cuando el material sale de bodega."
+									: "La factura cubre el total de la orden. Los pagos se registran en Finanzas."}
 				</p>
 				{order.invoices.length > 0 ? (
 					<ul className="purchases-invoices">
@@ -505,10 +502,17 @@ function FinancePanel({ order }: { order: Order }) {
 							<dt>Facturado</dt>
 							<dd>{formatCurrency(order.invoicedAmount)}</dd>
 						</div>
-						<div>
-							<dt>Pagado</dt>
-							<dd>{formatCurrency(order.paidAmount)}</dd>
-						</div>
+						{company ? (
+							<div>
+								<dt>Por facturar</dt>
+								<dd>{formatCurrency(pending)}</dd>
+							</div>
+						) : (
+							<div>
+								<dt>Pagado</dt>
+								<dd>{formatCurrency(order.paidAmount)}</dd>
+							</div>
+						)}
 					</dl>
 				) : null}
 			</div>
@@ -1698,6 +1702,36 @@ function DirectPurchaseForm({
 														value={pickerQuery}
 													/>
 												</div>
+												{materialsForPicker.length > 1 ? (
+													<div className="purchases-material-picker__bulk">
+														<span>
+															{materialsForPicker.length}{" "}
+															{pickerQuery.trim() ? "resultados" : "artículos"}
+														</span>
+														<button
+															onClick={() =>
+																setPickerSelected((current) => {
+																	const allMarked = materialsForPicker.every(
+																		(material) => current.has(material.id),
+																	);
+																	const next = new Set(current);
+																	for (const material of materialsForPicker) {
+																		if (allMarked) next.delete(material.id);
+																		else next.add(material.id);
+																	}
+																	return next;
+																})
+															}
+															type="button"
+														>
+															{materialsForPicker.every((material) =>
+																pickerSelected.has(material.id),
+															)
+																? "Quitar marcas"
+																: "Marcar todos"}
+														</button>
+													</div>
+												) : null}
 												<div className="purchases-material-picker__list">
 													{materialsForPicker.length === 0 ? (
 														<p className="purchases-material-picker__empty">
@@ -1978,11 +2012,18 @@ function InvoiceForm({
 				) : null}
 				<p className="purchases-scope-note">
 					<ReceiptText aria-hidden="true" size={16} />
-					<span>
-						Se registra una sola vez: queda como gasto de{" "}
-						<strong>{order.project?.name}</strong> en Finanzas, donde se
-						registran los pagos al proveedor.
-					</span>
+					{order.project ? (
+						<span>
+							Se registra una sola vez: queda como gasto de{" "}
+							<strong>{order.project.name}</strong> en Finanzas, donde se
+							registran los pagos al proveedor.
+						</span>
+					) : (
+						<span>
+							Compra de la compañía: queda en <strong>Facturas</strong> de
+							Compras y en su reporte. No se suma a ningún proyecto.
+						</span>
+					)}
 				</p>
 				<div className="purchases-invoice-form__grid">
 					<label>
@@ -2229,8 +2270,7 @@ function OrderStepActions({
 	});
 	const error = issueState.status === "error" ? issueState.message : null;
 	const showFinance =
-		canRegisterFinance &&
-		Boolean(order.project) &&
+		(order.project ? canRegisterFinance : canManage) &&
 		order.status !== "DRAFT" &&
 		order.total - order.invoicedAmount > 0.004;
 	const showReceive = canManage && ["ISSUED", "PARTIAL"].includes(order.status);
@@ -2285,6 +2325,7 @@ export function PurchasesWorkspace({
 	data,
 	canManage,
 	canRegisterFinance,
+	companyInvoices,
 	initialView,
 	initialRequisitionId,
 	today,
@@ -2292,6 +2333,7 @@ export function PurchasesWorkspace({
 	data: WorkspaceData;
 	canManage: boolean;
 	canRegisterFinance: boolean;
+	companyInvoices: Parameters<typeof CompanyInvoicesTable>[0]["data"];
 	initialView: View;
 	initialRequisitionId: string;
 	today: string;
@@ -2508,6 +2550,17 @@ export function PurchasesWorkspace({
 					>
 						<ShoppingCart aria-hidden="true" size={17} />
 						Órdenes<span>{activeOrders.length}</span>
+					</button>
+					<button
+						aria-selected={view === "invoices"}
+						className="focus-ring"
+						data-view="invoices"
+						onClick={() => setView("invoices")}
+						role="tab"
+						type="button"
+					>
+						<ReceiptText aria-hidden="true" size={17} />
+						Facturas<span>{companyInvoices.invoices.length}</span>
 					</button>
 					<button
 						aria-selected={view === "canceled"}
@@ -2882,6 +2935,10 @@ export function PurchasesWorkspace({
 						}
 						totalCount={data.suppliers.length}
 					/>
+				) : null}
+
+				{view === "invoices" ? (
+					<CompanyInvoicesTable data={companyInvoices} />
 				) : null}
 
 				{view === "canceled" ? (

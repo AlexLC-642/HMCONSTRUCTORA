@@ -531,3 +531,12 @@ export async function cancelPurchaseOrder(
 		return canceled;
 	});
 }
+
+/** A quién pertenece la orden (proyecto o compañía) para autorizar su factura. */
+export function findOrderOwner(orderId: string) {
+	if (!orderId) return Promise.resolve(null);
+	return prisma.purchaseOrder.findUnique({
+		where: { id: orderId },
+		select: { id: true, projectId: true },
+	});
+}

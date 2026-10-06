@@ -1,6 +1,15 @@
 "use client";
 
-import { Ban, Mail, Pencil, Phone, Search, UserRound, X } from "lucide-react";
+import {
+	Ban,
+	FileText,
+	Mail,
+	Pencil,
+	Phone,
+	Search,
+	UserRound,
+	X,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { useActionState, useEffect, useId, useState } from "react";
 import { useFormStatus } from "react-dom";
@@ -9,6 +18,7 @@ import {
 	type PurchaseOrderStepState,
 	setSupplierActiveAction,
 } from "../application/actions";
+import type { getCompanyInvoices } from "../application/company-invoices";
 import type { getPurchaseWorkspace } from "../application/queries";
 
 type WorkspaceData = Awaited<ReturnType<typeof getPurchaseWorkspace>>;
@@ -482,5 +492,182 @@ export function CancelOrderDialog({ order }: { order: Order }) {
 				</div>
 			) : null}
 		</>
+	);
+}
+
+/* ------------------------------------- Facturas de la compañía */
+
+type CompanyInvoices = Awaited<ReturnType<typeof getCompanyInvoices>>;
+
+const paymentLabels: Record<string, string> = {
+	IMMEDIATE: "Al contado",
+	ON_DELIVERY: "Contra entrega",
+	CREDIT: "Crédito",
+};
+
+export function CompanyInvoicesTable({ data }: { data: CompanyInvoices }) {
+	const [from, setFrom] = useState("");
+	const [to, setTo] = useState("");
+	const [query, setQuery] = useState("");
+	const search = query.trim().toLowerCase();
+	const rows = data.invoices.filter((invoice) => {
+		const date = invoice.date.slice(0, 10);
+		if (from && date < from) return false;
+		if (to && date > to) return false;
+		if (!search) return true;
+		return `${invoice.number ?? ""} ${invoice.supplier} ${invoice.orderNumber ?? ""} ${invoice.warehouse ?? ""}`
+			.toLowerCase()
+			.includes(search);
+	});
+	const total = rows.reduce((sum, invoice) => sum + invoice.amount, 0);
+	const reportHref = `/purchases/report?${new URLSearchParams({
+		...(from ? { from } : {}),
+		...(to ? { to } : {}),
+	}).toString()}`;
+
+	return (
+		<div className="purchases-command__view purchases-table-view">
+			<header className="purchases-table-view__header">
+				<div>
+					<h2>Facturas de la compañía</h2>
+					<p>
+						Compras para bodega (herramientas, stock). No suman a ningún
+						proyecto: el costo llega a la obra cuando el material sale de
+						bodega.
+					</p>
+				</div>
+				<a
+					className="purchases-button purchases-button--ghost focus-ring"
+					href={reportHref}
+				>
+					<FileText aria-hidden="true" size={16} />
+					Reporte para imprimir
+				</a>
+			</header>
+			<div className="purchases-table-filters">
+				<label>
+					<span>Desde</span>
+					<input
+						onChange={(event) => setFrom(event.target.value)}
+						type="date"
+						value={from}
+					/>
+				</label>
+				<label>
+					<span>Hasta</span>
+					<input
+						min={from || undefined}
+						onChange={(event) => setTo(event.target.value)}
+						type="date"
+						value={to}
+					/>
+				</label>
+				<label className="purchases-search">
+					<Search aria-hidden="true" size={16} />
+					<input
+						aria-label="Buscar factura"
+						onChange={(event) => setQuery(event.target.value)}
+						placeholder="Factura, proveedor u orden"
+						value={query}
+					/>
+				</label>
+				<p className="purchases-table-filters__total">
+					<span>
+						{rows.length} {rows.length === 1 ? "factura" : "facturas"}
+					</span>
+					<strong>{money.format(total)}</strong>
+				</p>
+			</div>
+			{data.invoices.length === 0 ? (
+				<div className="purchases-table-empty">
+					<FileText aria-hidden="true" size={26} />
+					<strong>Aún no hay facturas de la compañía</strong>
+					<p>
+						Haz una compra directa para bodega, emítela y usa «Registrar
+						factura» en la orden para subir el número y el archivo.
+					</p>
+				</div>
+			) : (
+				<div className="purchases-table-wrap">
+					<table className="purchases-table">
+						<thead>
+							<tr>
+								<th scope="col">Fecha</th>
+								<th scope="col">Factura</th>
+								<th scope="col">Proveedor</th>
+								<th scope="col">Orden</th>
+								<th scope="col">Bodega</th>
+								<th scope="col">Pago</th>
+								<th className="purchases-table__num" scope="col">
+									Monto
+								</th>
+								<th className="purchases-table__actions" scope="col">
+									<span className="sr-only">Archivo</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							{rows.map((invoice) => (
+								<tr key={invoice.id}>
+									<td className="purchases-table__mono" data-label="Fecha">
+										{shortDate.format(new Date(invoice.date))}
+									</td>
+									<td data-label="Factura">
+										<strong className="purchases-table__id">
+											{invoice.number ?? "Sin número"}
+										</strong>
+										{invoice.registeredBy ? (
+											<small>Registró {invoice.registeredBy}</small>
+										) : null}
+									</td>
+									<td data-label="Proveedor">
+										{invoice.supplier}
+										{invoice.supplierTaxId ? (
+											<small>NIT {invoice.supplierTaxId}</small>
+										) : null}
+									</td>
+									<td className="purchases-table__mono" data-label="Orden">
+										{invoice.orderNumber ?? "—"}
+									</td>
+									<td data-label="Bodega">{invoice.warehouse ?? "—"}</td>
+									<td data-label="Pago">
+										{invoice.paymentType
+											? (paymentLabels[invoice.paymentType] ??
+												invoice.paymentType)
+											: "—"}
+									</td>
+									<td className="purchases-table__num" data-label="Monto">
+										{money.format(invoice.amount)}
+									</td>
+									<td className="purchases-table__actions">
+										{invoice.fileUrl ? (
+											<a
+												className="purchases-text-button focus-ring"
+												href={invoice.fileUrl}
+												rel="noopener"
+												target="_blank"
+											>
+												Ver archivo
+											</a>
+										) : (
+											<span className="purchases-table__muted">
+												Sin archivo
+											</span>
+										)}
+									</td>
+								</tr>
+							))}
+							{rows.length === 0 ? (
+								<tr>
+									<td className="purchases-table__none" colSpan={8}>
+										Ninguna factura coincide con el periodo o la búsqueda.
+									</td>
+								</tr>
+							) : null}
+						</tbody>
+					</table>
+				</div>
+			)}
+		</div>
 	);
 }

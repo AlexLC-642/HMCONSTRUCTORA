@@ -22,7 +22,10 @@ import {
 	requirePermission,
 	requireProjectPermission,
 } from "@/modules/auth/application/authorization";
-import { buildDocumentPreview } from "@/modules/documents/application/queries";
+import {
+	buildDocumentPreview,
+	hasProject,
+} from "@/modules/documents/application/queries";
 import { documentFileUrl } from "@/modules/documents/domain/catalog";
 import { DocumentPreviewModal } from "@/modules/documents/ui/document-preview-modal";
 import { ReportUploadModal } from "@/modules/reports/ui/report-upload-modal";
@@ -62,7 +65,7 @@ type DailyReportRow = Prisma.DailyReportGetPayload<{
 	};
 }>;
 
-type ManualReportRow = Prisma.ProjectDocumentGetPayload<{
+type ManualReportPayload = Prisma.ProjectDocumentGetPayload<{
 	include: {
 		project: { select: { id: true; code: true; name: true } };
 		category: { select: { name: true } };
@@ -72,6 +75,11 @@ type ManualReportRow = Prisma.ProjectDocumentGetPayload<{
 		};
 	};
 }>;
+// Los informes siempre pertenecen a un proyecto (se filtran con hasProject).
+type ManualReportRow = ManualReportPayload & {
+	projectId: string;
+	project: NonNullable<ManualReportPayload["project"]>;
+};
 
 function searchValue(value: string | string[] | undefined) {
 	return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -142,9 +150,10 @@ export default async function ReportsPage({
 		},
 		orderBy: { reportDate: "desc" },
 	});
-	const manualReportsRaw = await prisma.projectDocument.findMany({
+	const manualReportRows = await prisma.projectDocument.findMany({
 		where: {
 			category: { key: "informes" },
+			projectId: { not: null },
 			project: projectAccessWhere(user),
 		},
 		include: {
@@ -158,6 +167,7 @@ export default async function ReportsPage({
 		},
 		orderBy: { updatedAt: "desc" },
 	});
+	const manualReportsRaw = manualReportRows.filter(hasProject);
 
 	const filteredDailyReports = dailyReportsRaw.filter((report) => {
 		if (projectFilter && report.projectId !== projectFilter) return false;

@@ -175,4 +175,29 @@ describe("GET /api/documents/versions/[versionId]/file", () => {
 		expect(response.status).toBe(403);
 		expect(readFile).not.toHaveBeenCalled();
 	});
+
+	it("requires compras.ver for a company document (no project)", async () => {
+		getCurrentUser.mockResolvedValue({ id: "u1", permissions: [] });
+		// Puede ver proyectos, pero no Compras.
+		hasPermission.mockImplementation(
+			(_permissions: unknown, permission: string) =>
+				permission === "proyectos.ver",
+		);
+		findUnique.mockResolvedValue({
+			storageKey: "uploads/documents/compania/d1/f.pdf",
+			mimeType: "application/pdf",
+			originalName: "factura.pdf",
+			document: { projectId: null },
+		});
+
+		const { GET } = await import(
+			"@/app/api/documents/versions/[versionId]/file/route"
+		);
+		const response = await GET(new Request("http://localhost/x"), {
+			params: params("v1"),
+		});
+
+		expect(response.status).toBe(403);
+		expect(readFile).not.toHaveBeenCalled();
+	});
 });

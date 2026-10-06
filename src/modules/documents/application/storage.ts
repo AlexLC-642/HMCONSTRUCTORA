@@ -143,7 +143,8 @@ function assertUploadNotRateLimited(userId: string) {
 }
 
 export async function storeProjectDocumentFile(
-	projectId: string,
+	/** null = documento de la compañía (p. ej. factura de una compra de bodega). */
+	projectId: string | null,
 	documentId: string,
 	file: File,
 	categoryKey: string | undefined,
@@ -178,7 +179,7 @@ export async function storeProjectDocumentFile(
 	}
 
 	const { fileName, storageKey, publicUrl } = await writeStoredFile(
-		`uploads/documents/${projectId}/${documentId}`,
+		`uploads/documents/${projectId ?? "compania"}/${documentId}`,
 		buffer,
 		extension,
 	);

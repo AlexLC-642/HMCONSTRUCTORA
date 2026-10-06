@@ -28,7 +28,11 @@ export async function GET(
 	if (!user) {
 		return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 	}
-	if (!hasPermission(user.permissions, "proyectos.ver")) {
+	// Sin ningún permiso de lectura de documentos no hace falta ni buscarlo.
+	if (
+		!hasPermission(user.permissions, "proyectos.ver") &&
+		!hasPermission(user.permissions, "compras.ver")
+	) {
 		return NextResponse.json({ error: "Sin permiso." }, { status: 403 });
 	}
 
@@ -44,7 +48,21 @@ export async function GET(
 			{ status: 404 },
 		);
 	}
-	if (!(await canAccessProject(user, version.document.projectId))) {
+	// Sin proyecto = documento de la compañía (factura de una compra de
+	// bodega): lo ve quien puede ver Compras, no cualquiera con proyectos.
+	const companyDocument = version.document.projectId === null;
+	if (
+		!hasPermission(
+			user.permissions,
+			companyDocument ? "compras.ver" : "proyectos.ver",
+		)
+	) {
+		return NextResponse.json({ error: "Sin permiso." }, { status: 403 });
+	}
+	if (
+		version.document.projectId &&
+		!(await canAccessProject(user, version.document.projectId))
+	) {
 		return NextResponse.json(
 			{ error: "Sin acceso al proyecto." },
 			{ status: 403 },

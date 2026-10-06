@@ -23909,9 +23909,50 @@ input[id^="tab-seguridad-"]:checked
 	white-space: nowrap;
 }
 
-/* Pestañas: cuatro vistas */
+/* Pestañas: cinco vistas */
 .purchases-tabs {
-	grid-template-columns: repeat(4, minmax(0, 1fr));
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.purchases-table-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 0.75rem;
+	border-top: 1px solid var(--border);
+	background: var(--surface-raised);
+	padding: 0.75rem 1.25rem;
+}
+.purchases-table-filters > label:not(.purchases-search) {
+	display: grid;
+	gap: 0.25rem;
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+}
+.purchases-table-filters input[type="date"] {
+	min-height: 2.6rem;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	background: var(--surface);
+	padding: 0 0.65rem;
+	color: var(--foreground);
+	font-size: 0.8rem;
+}
+.purchases-table-filters .purchases-search {
+	flex: 1;
+}
+.purchases-table-filters__total {
+	display: grid;
+	margin-left: auto;
+	color: var(--muted);
+	font-size: 0.72rem;
+	text-align: right;
+}
+.purchases-table-filters__total strong {
+	color: var(--foreground);
+	font-size: 1.05rem;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
 }
 .purchases-tabs button {
 	font-weight: 600;
@@ -24344,6 +24385,84 @@ input[id^="tab-seguridad-"]:checked
 }
 .purchases-status {
 	font-weight: 600;
+}
+
+/* Selector de artículos: filas compactas; gana a las reglas generales de
+   .purchases-order-form label/input, que lo convertían en casillas gigantes. */
+.purchases-order-form .purchases-material-picker__panel {
+	width: min(26rem, 92vw);
+	border-color: var(--border);
+	background: var(--surface);
+}
+.purchases-order-form .purchases-material-picker__list {
+	max-height: min(20rem, 45vh);
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+}
+.purchases-order-form label.purchases-material-picker__item {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) 1rem;
+	align-items: center;
+	gap: 0.65rem;
+	border-radius: 8px;
+	padding: 0.45rem 0.6rem;
+	color: var(--foreground);
+	font-size: 0.8rem;
+	font-weight: 400;
+}
+.purchases-order-form label.purchases-material-picker__item:hover {
+	background: var(--surface-raised);
+}
+.purchases-order-form label.purchases-material-picker__item:has(input:checked) {
+	background: color-mix(in srgb, var(--success) 9%, var(--surface));
+}
+.purchases-order-form .purchases-material-picker__item input[type="checkbox"] {
+	width: 1rem;
+	height: 1rem;
+	min-height: 0;
+	margin: 0;
+	border-radius: 4px;
+	padding: 0;
+	accent-color: var(--success);
+	transform: none;
+	box-shadow: none;
+}
+.purchases-order-form .purchases-material-picker__item strong {
+	color: var(--foreground);
+	font-size: 0.8rem;
+	font-weight: 600;
+}
+.purchases-order-form .purchases-material-picker__item small {
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 400;
+}
+.purchases-order-form .purchases-material-picker__search input {
+	min-height: 2.4rem;
+	border: 0;
+	background: transparent;
+	padding: 0;
+	box-shadow: none;
+	transform: none;
+}
+.purchases-material-picker__bulk {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	border-bottom: 1px solid var(--border);
+	padding: 0.4rem 0.85rem;
+	color: var(--muted);
+	font-size: 0.72rem;
+}
+.purchases-material-picker__bulk button {
+	border-radius: 6px;
+	padding: 0.2rem 0.4rem;
+	color: var(--foreground);
+	font-weight: 600;
+}
+.purchases-material-picker__bulk button:hover {
+	background: var(--surface-inset);
 }
 
 .purchases-invoices {

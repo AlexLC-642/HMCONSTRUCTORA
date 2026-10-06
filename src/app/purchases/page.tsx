@@ -1,4 +1,5 @@
 import { requirePermission } from "@/modules/auth/application/authorization";
+import { getCompanyInvoices } from "@/modules/purchases/application/company-invoices";
 import { getPurchaseWorkspace } from "@/modules/purchases/application/queries";
 import { PurchasesWorkspace } from "@/modules/purchases/ui/purchases-workspace";
 
@@ -13,16 +14,20 @@ export default async function PurchasesPage({
 }) {
 	const user = await requirePermission("compras.ver");
 	const params = searchParams ? await searchParams : {};
-	const data = await getPurchaseWorkspace(user, {
-		query: first(params.q),
-		status: first(params.status),
-		supplierId: first(params.supplierId),
-	});
+	const [data, companyInvoices] = await Promise.all([
+		getPurchaseWorkspace(user, {
+			query: first(params.q),
+			status: first(params.status),
+			supplierId: first(params.supplierId),
+		}),
+		getCompanyInvoices(),
+	]);
 	const rawView = first(params.view);
 	const initialView =
 		rawView === "suppliers" ||
 		rawView === "requisitions" ||
-		rawView === "canceled"
+		rawView === "canceled" ||
+		rawView === "invoices"
 			? rawView
 			: data.orders.length === 0 && data.readyRequisitions.length > 0
 				? "requisitions"
@@ -33,6 +38,7 @@ export default async function PurchasesPage({
 			<PurchasesWorkspace
 				canManage={user.permissions.includes("compras.gestionar")}
 				canRegisterFinance={user.permissions.includes("finanzas.registrar")}
+				companyInvoices={companyInvoices}
 				data={data}
 				initialRequisitionId={first(params.requisitionId) ?? ""}
 				initialView={initialView}

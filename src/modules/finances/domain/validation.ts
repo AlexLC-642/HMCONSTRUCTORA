@@ -90,7 +90,8 @@ export const supplierPaymentInputSchema = z.object({
 });
 
 export const purchaseInvoiceInputSchema = z.object({
-	projectId: z.string().trim().min(1, "Seleccione un proyecto."),
+	// Vacío = orden de bodega (compra de la compañía).
+	projectId: z.string().trim().default(""),
 	purchaseOrderId: z.string().trim().min(1, "Seleccione una orden de compra."),
 	expenseDate: z
 		.string()

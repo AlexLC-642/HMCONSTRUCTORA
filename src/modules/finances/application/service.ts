@@ -76,13 +76,14 @@ export async function createPurchaseInvoice(
 	if (!order || !["ISSUED", "PARTIAL", "RECEIVED"].includes(order.status)) {
 		throw new Error("La factura debe corresponder a una orden emitida.");
 	}
-	if (!order.projectId) {
+	// Orden de proyecto: la factura es gasto de ese proyecto. Orden de bodega:
+	// es gasto de la compañía (projectId null) y no suma a ninguna obra.
+	if ((order.projectId ?? "") !== (parsed.projectId ?? "")) {
 		throw new Error(
-			"La orden debe estar vinculada a un proyecto para facturarla.",
+			order.projectId
+				? "La orden no pertenece al proyecto seleccionado."
+				: "Esta orden es de bodega: su factura es de la compañía, no de un proyecto.",
 		);
-	}
-	if (order.projectId !== parsed.projectId) {
-		throw new Error("La orden no pertenece al proyecto seleccionado.");
 	}
 	const invoiceTotal = decimal(parsed.subtotal);
 	const invoiced = order.financialExpenses.reduce(
@@ -150,7 +151,7 @@ export async function createPurchaseInvoice(
 		await tx.projectDocument.create({
 			data: {
 				id: documentId,
-				projectId: order.projectId as string,
+				projectId: order.projectId,
 				categoryId: category.id,
 				title: `Factura ${documentNumber}`,
 				description: `Factura de ${order.supplier.businessName} para ${order.number}`,
@@ -167,7 +168,7 @@ export async function createPurchaseInvoice(
 		});
 		const expense = await tx.financialExpense.create({
 			data: {
-				projectId: order.projectId as string,
+				projectId: order.projectId,
 				supplierId: order.supplierId,
 				purchaseOrderId: order.id,
 				expenseDate: date(parsed.expenseDate),

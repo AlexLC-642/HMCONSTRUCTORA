@@ -205,18 +205,32 @@ export async function getProjectDocumentsWorkspace(projectId: string) {
 	return { project, categories, documents };
 }
 
+/** Estrecha el tipo: el documento pertenece a un proyecto. */
+export function hasProject<
+	T extends { projectId: string | null; project: unknown },
+>(
+	document: T,
+): document is T & {
+	projectId: string;
+	project: NonNullable<T["project"]>;
+} {
+	return document.projectId !== null && document.project !== null;
+}
+
 export async function getDocumentLibrary(
 	user: Pick<AuthenticatedUser, "id" | "roles">,
 ) {
 	await ensureDocumentCategories();
-	const documents = await prisma.projectDocument.findMany({
-		where: { project: projectAccessWhere(user) },
+	const rows = await prisma.projectDocument.findMany({
+		where: { projectId: { not: null }, project: projectAccessWhere(user) },
 		include: {
 			...documentInclude,
 			project: { select: { id: true, code: true, name: true } },
 		},
 		orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
 	});
+	// Los documentos de la compañía (sin proyecto) viven en Compras.
+	const documents = rows.filter(hasProject);
 
 	const totals = {
 		documents: documents.length,

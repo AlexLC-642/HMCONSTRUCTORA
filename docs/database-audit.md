@@ -125,3 +125,13 @@ npm run test                → 99/99 tests, 20/20 suites
 ```
 
 No se corrió `npm run build` en esta pasada porque el servidor de desarrollo del usuario podía estar corriendo en paralelo sobre la misma carpeta `.next` (riesgo de corromperla, ya documentado en sesiones anteriores) — `typecheck` + `test` + `migrate status` ya confirman que el cambio de esquema no rompió nada en código ni en la base real.
+
+## 2026-10-06 — Facturas de compras de la compañía
+
+Migración `20261006180616_company_purchase_invoices`: `FinancialExpense.projectId` y `ProjectDocument.projectId` pasan a `NULL`able (solo `MODIFY ... NULL`, sin pérdida de datos; validada en la base local).
+
+- **Por qué no una tabla nueva:** la factura de una compra de bodega es el mismo concepto que la de una compra de proyecto (obligación con el proveedor, ligada a `PurchaseOrder`, con comprobante en `ProjectDocument`/`DocumentVersion`). Una tabla `CompanyInvoice` duplicaría `FinancialExpense` y el almacenamiento de documentos.
+- **Regla:** `projectId = null` ⇒ gasto/documento **de la compañía**. Nunca suma a una obra: el dashboard filtra `projectId: { not: null }` y Finanzas siempre consulta por proyecto. El costo llega al proyecto cuando el material sale de bodega (`StockMovement`).
+- **Acceso:** los documentos sin proyecto exigen `compras.ver` en la descarga; las bibliotecas de Documentos/Informes y el portal los excluyen.
+- **Índices:** el reporte filtra por `projectId IS NULL` + `status` + `expenseDate`; los índices existentes `projectId`, `status` y `expenseDate` alcanzan para el volumen actual. Revisar con `EXPLAIN` si el reporte crece.
+

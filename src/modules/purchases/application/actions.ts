@@ -22,6 +22,7 @@ import {
 	receivePurchaseOrder,
 	saveSupplier,
 	setSupplierActive,
+	findOrderOwner,
 } from "./service";
 
 export type SupplierFormState = {
@@ -281,12 +282,22 @@ export async function registerPurchaseInvoiceAction(
 	_previous: PurchaseOrderStepState,
 	formData: FormData,
 ): Promise<PurchaseOrderStepState> {
-	const projectId = String(formData.get("projectId") ?? "");
-	const user = await requireScopedProjectPermission(
-		projectId,
-		"finanzas.registrar",
-		"finances",
-	);
+	const purchaseOrderId = String(formData.get("purchaseOrderId") ?? "");
+	const order = await findOrderOwner(purchaseOrderId);
+	if (!order) return { status: "error", message: "La orden ya no existe." };
+	// Orden de proyecto: es gasto del proyecto (permiso de Finanzas sobre esa
+	// obra). Orden de bodega: es gasto de la compañía (permiso de Compras).
+	const projectId = order.projectId ?? "";
+	const user = order.projectId
+		? await requireScopedProjectPermission(
+				order.projectId,
+				"finanzas.registrar",
+				"finances",
+			)
+		: await requireProjectScopePortfolioPermission(
+				"compras.gestionar",
+				"purchases",
+			);
 	const file = formData.get("documentFile");
 	if (!(file instanceof File) || file.size <= 0) {
 		return { status: "error", message: "Adjunta el archivo de la factura." };
@@ -295,7 +306,7 @@ export async function registerPurchaseInvoiceAction(
 		await createPurchaseInvoice(
 			{
 				projectId,
-				purchaseOrderId: String(formData.get("purchaseOrderId") ?? ""),
+				purchaseOrderId,
 				expenseDate: String(formData.get("expenseDate") ?? ""),
 				documentNumber: String(formData.get("documentNumber") ?? ""),
 				subtotal: String(formData.get("subtotal") ?? ""),

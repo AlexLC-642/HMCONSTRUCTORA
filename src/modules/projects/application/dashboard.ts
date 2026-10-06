@@ -151,6 +151,7 @@ export async function getDashboardMetrics(
 		prisma.financialExpense.aggregate({
 			where: {
 				status: "VALID",
+				projectId: { not: null },
 				...(projectRelationWhere ? { project: projectRelationWhere } : {}),
 			},
 			_sum: { subtotal: true },
@@ -247,6 +248,7 @@ export async function getDashboardMetrics(
 		prisma.financialExpense.findMany({
 			where: {
 				status: "VALID",
+				projectId: { not: null },
 				expenseDate: { gte: twelveMonthsAgo },
 				...(projectRelationWhere ? { project: projectRelationWhere } : {}),
 			},
@@ -283,6 +285,7 @@ export async function getDashboardMetrics(
 			by: ["projectId"],
 			where: {
 				status: "VALID",
+				projectId: { not: null },
 				...(projectRelationWhere ? { project: projectRelationWhere } : {}),
 			},
 			_sum: { subtotal: true },
@@ -575,7 +578,7 @@ export async function getDashboardMetrics(
 		})),
 		...expensesForPeriod.slice(-5).map((expense) => ({
 			at: expense.expenseDate.toISOString(),
-			title: `Gasto ${expense.project.code}`,
+			title: `Gasto ${expense.project?.code ?? "de la compañía"}`,
 			detail: `${expense.description.slice(0, 80)} - ${toNumber(expense.subtotal).toFixed(2)}`,
 			href: "/finances",
 		})),
