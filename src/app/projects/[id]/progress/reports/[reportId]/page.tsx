@@ -1,13 +1,23 @@
 import { Printer, Undo2 } from "lucide-react";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { requirePermission } from "@/modules/auth/application/authorization";
-import { saveDailyReportAction } from "@/modules/progress/application/actions";
+import {
+	approveDailyReportAction,
+	returnDailyReportToDraftAction,
+	saveDailyReportAction,
+} from "@/modules/progress/application/actions";
 import {
 	getDailyReportById,
 	getProjectProgressWorkspace,
 } from "@/modules/progress/application/queries";
+import {
+	canReviewReports,
+	isInReview,
+} from "@/modules/progress/domain/report-editing";
 import { DailyReportEvidenceGallery } from "@/modules/progress/ui/daily-report-evidence-gallery";
 import { DailyReportForm } from "@/modules/progress/ui/daily-report-form";
+import { ReportReviewActions } from "@/modules/progress/ui/report-review-actions";
 import { scheduleActivityStatusLabels } from "@/modules/schedules/domain/validation";
 
 const statusLabels = {
@@ -49,11 +59,14 @@ function formatDate(value: Date) {
 
 export default async function DailyReportDetailPage({
 	params,
+	searchParams,
 }: {
 	params: Promise<{ id: string; reportId: string }>;
+	searchParams?: Promise<{ corregir?: string }>;
 }) {
-	await requirePermission("avance.crear");
+	const user = await requirePermission("avance.crear");
 	const { id, reportId } = await params;
+	const query = searchParams ? await searchParams : {};
 	const [report, workspace] = await Promise.all([
 		getDailyReportById(id, reportId),
 		getProjectProgressWorkspace(id),
@@ -63,8 +76,11 @@ export default async function DailyReportDetailPage({
 
 	const isDraft = report.status === "DRAFT";
 	const saveAction = saveDailyReportAction.bind(null, id);
+	const canReview = canReviewReports(user.permissions);
+	const reviewing = isInReview(report.status) && canReview;
+	const correcting = reviewing && query.corregir === "1";
 
-	if (isDraft) {
+	if (isDraft || correcting) {
 		return (
 			<main className="mx-auto max-w-[1480px] space-y-5">
 				<ReportHeader
@@ -72,12 +88,29 @@ export default async function DailyReportDetailPage({
 					reportId={reportId}
 					reportNumber={report.reportNumber}
 					status={report.status}
-					title="Editar informe"
+					title={correcting ? "Corregir informe en revisión" : "Editar informe"}
 				/>
+				{correcting ? (
+					<p className="rounded-xl border border-[#f2d58a] bg-[#fff8e8] px-4 py-3 text-sm text-[#5c3d00]">
+						Estás corrigiendo un informe enviado. Sigue en revisión al guardar y
+						la corrección queda registrada en la bitácora. Nada se aplica al
+						cronograma ni al inventario hasta aprobarlo.{" "}
+						<a
+							className="font-semibold underline underline-offset-2"
+							href={`/projects/${id}/progress/reports/${reportId}`}
+						>
+							Cancelar corrección
+						</a>
+					</p>
+				) : null}
 				<DailyReportEvidenceGallery editable projectId={id} report={report} />
 				<DailyReportForm
 					action={saveAction}
-					workspace={{ ...workspace, latestReport: report }}
+					workspace={{
+						...workspace,
+						latestReport: report,
+						editInReview: correcting,
+					}}
 				/>
 			</main>
 		);
@@ -99,7 +132,20 @@ export default async function DailyReportDetailPage({
 				reportNumber={report.reportNumber}
 				status={report.status}
 				title="Informe diario"
-			/>
+			>
+				{reviewing ? (
+					<ReportReviewActions
+						approveAction={approveDailyReportAction.bind(null, id, reportId)}
+						canApprove={user.permissions.includes("avance.aprobar")}
+						editHref={`/projects/${id}/progress/reports/${reportId}?corregir=1`}
+						returnAction={returnDailyReportToDraftAction.bind(
+							null,
+							id,
+							reportId,
+						)}
+					/>
+				) : null}
+			</ReportHeader>
 
 			<section className="kpi-grid grid gap-4 md:grid-cols-4">
 				<Metric label="Fecha" value={formatDate(report.reportDate)} />
@@ -243,12 +289,14 @@ function ReportHeader({
 	reportNumber,
 	status,
 	title,
+	children,
 }: {
 	id: string;
 	reportId: string;
 	reportNumber: string;
 	status: keyof typeof statusLabels;
 	title: string;
+	children?: ReactNode;
 }) {
 	return (
 		<section className="rounded-[18px] border border-[var(--border)] bg-white px-5 py-4 shadow-[0_18px_45px_rgba(20,25,27,0.08)]">
@@ -267,6 +315,7 @@ function ReportHeader({
 					</span>
 				</div>
 				<div className="flex flex-wrap gap-2">
+					{children}
 					<a
 						className="focus-ring inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
 						href={`/projects/${id}/progress?tab=historial`}

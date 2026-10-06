@@ -1,14 +1,22 @@
 import { Prisma } from "@prisma/client";
-import { prisma } from "@/shared/lib/prisma";
 import { consumeInventoryForDailyReport } from "@/modules/inventory/application/service";
-import { calculateDailyReportActivity } from "./calculations";
+import { prisma } from "@/shared/lib/prisma";
 import {
-	dailyReportInputSchema,
+	canEditReport,
+	isInReview,
+	reportEditBlockedMessage,
+	returnToDraftInputSchema,
+} from "../domain/report-editing";
+import {
 	type DailyReportInput,
+	dailyReportInputSchema,
 } from "../domain/validation";
+import { calculateDailyReportActivity } from "./calculations";
 
 type ProgressMutationContext = {
 	userId: string;
+	/** Puede corregir informes en revisión (avance.revisar o avance.aprobar). */
+	canReview?: boolean;
 };
 
 function nullable(value: string) {
@@ -252,8 +260,11 @@ export async function saveDailyReport(
 				})
 			: null;
 
-		if (existing && existing.status !== "DRAFT") {
-			throw new Error("Solo se pueden editar informes en borrador.");
+		if (
+			existing &&
+			!canEditReport(existing.status, Boolean(context.canReview))
+		) {
+			throw new Error(reportEditBlockedMessage(existing.status));
 		}
 
 		if (existing) {
@@ -281,7 +292,14 @@ export async function saveDailyReport(
 					action: "UPDATE",
 					entityType: "DailyReport",
 					entityId: report.id,
-					metadata: { projectId, reportNumber: report.reportNumber },
+					metadata: {
+						projectId,
+						reportNumber: report.reportNumber,
+						// Corrección hecha por quien revisa: queda constancia.
+						...(existing.status !== "DRAFT"
+							? { editedInReview: true, status: existing.status }
+							: {}),
+					},
 				},
 			});
 
@@ -311,6 +329,50 @@ export async function saveDailyReport(
 		});
 
 		return report;
+	});
+}
+
+/**
+ * Devuelve un informe en revisión al encargado para que lo corrija. Vuelve a
+ * borrador (aún no tenía efectos) y el motivo queda en la bitácora.
+ */
+export async function returnDailyReportToDraft(
+	projectId: string,
+	reportId: string,
+	rawReason: unknown,
+	context: ProgressMutationContext,
+) {
+	const { reason } = returnToDraftInputSchema.parse({ reason: rawReason });
+	return prisma.$transaction(async (tx) => {
+		await tx.$executeRaw`SELECT id FROM DailyReport WHERE id = ${reportId} FOR UPDATE`;
+		const report = await tx.dailyReport.findFirstOrThrow({
+			where: { id: reportId, projectId },
+		});
+		if (!isInReview(report.status)) {
+			throw new Error(
+				"Solo se puede devolver un informe que está en revisión.",
+			);
+		}
+		const updated = await tx.dailyReport.update({
+			where: { id: reportId },
+			data: { status: "DRAFT", submittedAt: null, updatedById: context.userId },
+		});
+		await tx.auditLog.create({
+			data: {
+				userId: context.userId,
+				action: "UPDATE",
+				entityType: "DailyReport",
+				entityId: reportId,
+				metadata: {
+					projectId,
+					status: "DRAFT",
+					previousStatus: report.status,
+					returnedForCorrection: true,
+					reason,
+				},
+			},
+		});
+		return updated;
 	});
 }
 

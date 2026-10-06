@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { canEditReport, reportEditBlockedMessage } from "../domain/report-editing";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/shared/lib/prisma";
@@ -31,14 +32,14 @@ function parseActivityRef(value: string) {
   return { type: "code" as const, value };
 }
 
-async function assertDraftReport(projectId: string, reportId: string) {
+async function assertDraftReport(projectId: string, reportId: string, canReview = false) {
   const report = await prisma.dailyReport.findFirst({
     where: { id: reportId, projectId },
     include: { activities: { select: { id: true, activityCode: true } } }
   });
 
   if (!report) throw new Error("No se encontro el informe diario.");
-  if (report.status !== "DRAFT") throw new Error("Solo se pueden modificar evidencias en informes en borrador.");
+  if (!canEditReport(report.status, canReview)) throw new Error(reportEditBlockedMessage(report.status));
   return report;
 }
 
@@ -61,7 +62,11 @@ function resolveActivityForReport(
   return { dailyReportActivityId: null, activityCode };
 }
 
-export async function saveDailyReportMediaFiles(reportId: string, formData: FormData, context: { userId: string }) {
+export async function saveDailyReportMediaFiles(
+  reportId: string,
+  formData: FormData,
+  context: { userId: string; canReview?: boolean }
+) {
   const count = Number(stringValue(formData, "mediaCount") || "0");
   const saved = [];
   const report = await prisma.dailyReport.findUnique({
@@ -73,7 +78,7 @@ export async function saveDailyReportMediaFiles(reportId: string, formData: Form
   });
 
   if (!report) throw new Error("No se encontro el informe diario.");
-  if (report.status !== "DRAFT") throw new Error("Solo se pueden agregar evidencias a informes en borrador.");
+  if (!canEditReport(report.status, Boolean(context.canReview))) throw new Error(reportEditBlockedMessage(report.status));
 
   let nextSortOrder = report.mediaEntries.reduce((max, media) => Math.max(max, media.sortOrder), 0);
 
@@ -156,9 +161,10 @@ export async function updateDailyReportMediaMetadata(
     title?: string | null;
     description?: string | null;
     sortOrder?: number;
-  }
+  },
+  canReview = false
 ) {
-  const report = await assertDraftReport(projectId, reportId);
+  const report = await assertDraftReport(projectId, reportId, canReview);
   const media = await prisma.dailyReportMedia.findFirst({ where: { id: mediaId, dailyReportId: reportId } });
   if (!media) throw new Error("No se encontro la evidencia.");
 
@@ -177,8 +183,13 @@ export async function updateDailyReportMediaMetadata(
   });
 }
 
-export async function reorderDailyReportMedia(projectId: string, reportId: string, orderedMediaIds: string[]) {
-  await assertDraftReport(projectId, reportId);
+export async function reorderDailyReportMedia(
+  projectId: string,
+  reportId: string,
+  orderedMediaIds: string[],
+  canReview = false
+) {
+  await assertDraftReport(projectId, reportId, canReview);
   const media = await prisma.dailyReportMedia.findMany({
     where: { dailyReportId: reportId, id: { in: orderedMediaIds } },
     select: { id: true }
@@ -194,8 +205,13 @@ export async function reorderDailyReportMedia(projectId: string, reportId: strin
   );
 }
 
-export async function deleteDailyReportMedia(projectId: string, reportId: string, mediaId: string) {
-  await assertDraftReport(projectId, reportId);
+export async function deleteDailyReportMedia(
+  projectId: string,
+  reportId: string,
+  mediaId: string,
+  canReview = false
+) {
+  await assertDraftReport(projectId, reportId, canReview);
   const media = await prisma.dailyReportMedia.findFirst({ where: { id: mediaId, dailyReportId: reportId } });
   if (!media) throw new Error("No se encontro la evidencia.");
 

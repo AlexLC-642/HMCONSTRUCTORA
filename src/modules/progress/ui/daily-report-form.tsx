@@ -21,7 +21,17 @@ import { ActivityProgressFields } from "./activity-progress-fields";
 import { EvidenceUploadFields } from "./evidence-upload-fields";
 import { ResourcesUsedFields } from "./resource-used-fields";
 
-type Workspace = Awaited<ReturnType<typeof getProjectProgressWorkspace>>;
+type Workspace = Awaited<ReturnType<typeof getProjectProgressWorkspace>> & {
+	/** Quien revisa corrige un informe enviado: se edita aunque no sea borrador. */
+	editInReview?: boolean;
+};
+
+/** El informe que este formulario edita, o null si registra uno nuevo. */
+function reportBeingEdited(workspace: Workspace) {
+	const report = workspace.latestReport;
+	if (!report) return null;
+	return report.status === "DRAFT" || workspace.editInReview ? report : null;
+}
 type ActivityRow = {
 	dailyReportActivityId: string;
 	scheduleActivityId: string;
@@ -149,10 +159,10 @@ function rowsFromWorkspace(workspace: Workspace): ActivityRow[] {
 	}
 
 	if (
-		workspace.latestReport?.status === "DRAFT" &&
-		workspace.latestReport.activities.length > 0
+		reportBeingEdited(workspace) &&
+		(reportBeingEdited(workspace)?.activities.length ?? 0) > 0
 	) {
-		return workspace.latestReport.activities.map((activity) => ({
+		return (reportBeingEdited(workspace)?.activities ?? []).map((activity) => ({
 			dailyReportActivityId: activity.id,
 			scheduleActivityId: activity.scheduleActivityId ?? "",
 			activityCode: activity.activityCode,
@@ -219,10 +229,7 @@ function isWithinDay(day: Date, start: Date | null, end: Date | null) {
 }
 
 function laborRows(workspace: Workspace): LaborRow[] {
-	const saved =
-		workspace.latestReport?.status === "DRAFT"
-			? workspace.latestReport.laborEntries
-			: [];
+	const saved = reportBeingEdited(workspace)?.laborEntries ?? [];
 	const rows = saved.map((entry) => ({
 		rowKey: `saved-labor-${entry.id}`,
 		workerLabel: entry.workerLabel,
@@ -241,10 +248,7 @@ function laborRows(workspace: Workspace): LaborRow[] {
 }
 
 function materialRows(workspace: Workspace): MaterialRow[] {
-	const saved =
-		workspace.latestReport?.status === "DRAFT"
-			? workspace.latestReport.materialEntries
-			: [];
+	const saved = reportBeingEdited(workspace)?.materialEntries ?? [];
 	const rows = saved.map((entry) => ({
 		rowKey: `saved-material-${entry.id}`,
 		materialId: entry.materialId ?? "",
@@ -336,8 +340,7 @@ function StepCard({
 
 export function DailyReportForm({ workspace, action }: DailyReportFormProps) {
 	const [activeStep, setActiveStep] = useState(0);
-	const report =
-		workspace.latestReport?.status === "DRAFT" ? workspace.latestReport : null;
+	const report = reportBeingEdited(workspace);
 	const rows = rowsFromWorkspace(workspace);
 	const labor = laborRows(workspace);
 	const materials = materialRows(workspace);
