@@ -45,23 +45,91 @@ type PreparedActivity = ScheduleTimelineActivity & {
 };
 
 /**
+ * Columnas de la actividad en % del ancho de la hoja. Son las mismas en el
+ * resumen y en cada mes para que las tablas queden alineadas una bajo otra.
+ */
+function fixedColumns(hasLabor: boolean): Array<[string, number]> {
+	return hasLabor
+		? [
+				["no", 3],
+				["activity", 15],
+				["labor", 8],
+				["start", 5.5],
+				["end", 5.5],
+				["days", 3.5],
+				["status", 7],
+			]
+		: [
+				["no", 3],
+				["activity", 21],
+				["start", 5.5],
+				["end", 5.5],
+				["days", 3.5],
+				["status", 7],
+			];
+}
+
+function ActivityHeadings({ hasLabor }: { hasLabor: boolean }) {
+	return (
+		<>
+			<th>No.</th>
+			<th className="text-left">Actividad</th>
+			{hasLabor ? <th>Mano de obra</th> : null}
+			<th>Inicio</th>
+			<th>Fin</th>
+			<th>Días</th>
+			<th>Estado</th>
+		</>
+	);
+}
+
+function ActivityCells({
+	activity,
+	hasLabor,
+}: {
+	activity: PreparedActivity;
+	hasLabor: boolean;
+}) {
+	return (
+		<>
+			<td className="text-center">{activity.code}</td>
+			<td>{activity.description}</td>
+			{hasLabor ? (
+				<td className="text-center">{activity.labor ?? ""}</td>
+			) : null}
+			<td className="text-center tabular-nums">
+				{shortDate.format(activity.plannedStart)}
+			</td>
+			<td className="text-center tabular-nums">
+				{shortDate.format(activity.plannedEnd)}
+			</td>
+			<td className="text-center tabular-nums">{activity.duration}</td>
+			<td className="text-center">
+				{scheduleActivityStatusLabels[activity.statusKey]}
+				{activity.progressValue > 0 && activity.progressValue < 100 ? (
+					<span className="schedule-timeline__pct">
+						{activity.progressValue.toFixed(0)}%
+					</span>
+				) : null}
+			</td>
+		</>
+	);
+}
+
+/**
  * Una barra por actividad sobre todo el proyecto, con columnas por mes: es la
- * hoja de orientación antes del detalle diario.
+ * vista de orientación antes del detalle diario.
  */
 function OverviewTable({
 	timeline,
 	activities,
+	hasLabor,
 }: {
 	timeline: DailyTimeline;
 	activities: PreparedActivity[];
+	hasLabor: boolean;
 }) {
-	const fixed: Array<[string, number]> = [
-		["no", 3],
-		["activity", 24],
-		["start", 5.5],
-		["end", 5.5],
-		["days", 3.5],
-	];
+	const fixed = fixedColumns(hasLabor);
 	const fixedTotal = fixed.reduce((sum, [, value]) => sum + value, 0);
 	const timelineWidth = 100 - fixedTotal;
 	const total = timeline.totalDays;
@@ -108,11 +176,7 @@ function OverviewTable({
 							})}
 						</tr>
 						<tr>
-							<th>No.</th>
-							<th className="text-left">Actividad</th>
-							<th>Inicio</th>
-							<th>Fin</th>
-							<th>Días</th>
+							<ActivityHeadings hasLabor={hasLabor} />
 						</tr>
 					</thead>
 					<tbody>
@@ -120,17 +184,7 @@ function OverviewTable({
 							const color = statusColor[activity.statusKey];
 							return (
 								<tr key={activity.id}>
-									<td className="text-center">{activity.code}</td>
-									<td>{activity.description}</td>
-									<td className="text-center tabular-nums">
-										{shortDate.format(activity.plannedStart)}
-									</td>
-									<td className="text-center tabular-nums">
-										{shortDate.format(activity.plannedEnd)}
-									</td>
-									<td className="text-center tabular-nums">
-										{activity.duration}
-									</td>
+									<ActivityCells activity={activity} hasLabor={hasLabor} />
 									<td className="bar-cell" colSpan={timeline.segments.length}>
 										{timeline.segments.slice(1).map((segment) => (
 											<span
@@ -185,52 +239,29 @@ function SegmentTable({
 			activity.startDay < segmentEnd &&
 			activity.startDay + activity.duration > segmentStart,
 	);
-	// Columnas fijas en % del ancho total de la hoja; los días reparten el resto
-	// con el ancho de un mes completo, para que todas las hojas tengan la misma
-	// escala aunque el primer o el último mes estén incompletos.
-	const fixed: Array<[string, number]> = hasLabor
-		? [
-				["no", 3],
-				["activity", 15],
-				["labor", 8],
-				["start", 5.5],
-				["end", 5.5],
-				["days", 3.5],
-				["status", 7],
-			]
-		: [
-				["no", 3],
-				["activity", 21],
-				["start", 5.5],
-				["end", 5.5],
-				["days", 3.5],
-				["status", 7],
-			];
+	// Todas las tablas usan el ancho completo de la hoja; los días reparten lo
+	// que dejan las columnas fijas, así un mes incompleto no deja hueco.
+	const fixed = fixedColumns(hasLabor);
 	const fixedTotal = fixed.reduce((sum, [, value]) => sum + value, 0);
-	const dayWidth = (100 - fixedTotal) / 31;
-	const tableWidth = fixedTotal + dayWidth * segmentDays;
-	const pctOfTable = (value: number) => `${(value / tableWidth) * 100}%`;
+	const dayWidth = (100 - fixedTotal) / segmentDays;
 	const pctOfSegment = (days: number) => `${(days / segmentDays) * 100}%`;
-	const fixedColumns = fixed.length;
+	const fixedCount = fixed.length;
 
 	return (
 		<section className="schedule-timeline__segment">
 			<div className="schedule-timeline__scroll">
-				<table
-					className="schedule-timeline__table"
-					style={{ width: `${tableWidth}%` }}
-				>
+				<table className="schedule-timeline__table">
 					<colgroup>
 						{fixed.map(([key, width]) => (
-							<col key={key} style={{ width: pctOfTable(width) }} />
+							<col key={key} style={{ width: `${width}%` }} />
 						))}
 						{segment.days.map((day) => (
-							<col key={day.offset} style={{ width: pctOfTable(dayWidth) }} />
+							<col key={day.offset} style={{ width: `${dayWidth}%` }} />
 						))}
 					</colgroup>
 					<thead>
 						<tr>
-							<th className="schedule-timeline__corner" colSpan={fixedColumns}>
+							<th className="schedule-timeline__corner" colSpan={fixedCount}>
 								{segment.label}
 								<span className="schedule-timeline__count">
 									{activities.length} de {allActivities.length} actividades
@@ -243,13 +274,7 @@ function SegmentTable({
 							))}
 						</tr>
 						<tr>
-							<th>No.</th>
-							<th className="text-left">Actividad</th>
-							{hasLabor ? <th>Mano de obra</th> : null}
-							<th>Inicio</th>
-							<th>Fin</th>
-							<th>Días</th>
-							<th>Estado</th>
+							<ActivityHeadings hasLabor={hasLabor} />
 							{segment.days.map((day) => (
 								<th
 									className="period"
@@ -267,7 +292,7 @@ function SegmentTable({
 							<tr>
 								<td
 									className="schedule-timeline__empty"
-									colSpan={fixedColumns + segmentDays}
+									colSpan={fixedCount + segmentDays}
 								>
 									Sin actividades programadas este mes.
 								</td>
@@ -294,29 +319,7 @@ function SegmentTable({
 								: 0;
 							return (
 								<tr key={activity.id}>
-									<td className="text-center">{activity.code}</td>
-									<td>{activity.description}</td>
-									{hasLabor ? (
-										<td className="text-center">{activity.labor ?? ""}</td>
-									) : null}
-									<td className="text-center tabular-nums">
-										{shortDate.format(activity.plannedStart)}
-									</td>
-									<td className="text-center tabular-nums">
-										{shortDate.format(activity.plannedEnd)}
-									</td>
-									<td className="text-center tabular-nums">
-										{activity.duration}
-									</td>
-									<td className="text-center">
-										{scheduleActivityStatusLabels[activity.statusKey]}
-										{activity.progressValue > 0 &&
-										activity.progressValue < 100 ? (
-											<span className="schedule-timeline__pct">
-												{activity.progressValue.toFixed(0)}%
-											</span>
-										) : null}
-									</td>
+									<ActivityCells activity={activity} hasLabor={hasLabor} />
 									<td className="bar-cell" colSpan={segmentDays}>
 										{segment.days.map((day, index) =>
 											day.isSunday ? (
@@ -402,7 +405,11 @@ export function ScheduleTimelineTable({
 	return (
 		<div className="schedule-timeline">
 			{timeline.segments.length > 1 ? (
-				<OverviewTable activities={prepared} timeline={timeline} />
+				<OverviewTable
+					activities={prepared}
+					hasLabor={hasLabor}
+					timeline={timeline}
+				/>
 			) : null}
 			{timeline.segments.map((segment) => (
 				<SegmentTable

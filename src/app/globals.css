@@ -24865,10 +24865,15 @@ input[id^="tab-seguridad-"]:checked
 	min-width: 3px;
 }
 @media print {
+	/* Los meses corren seguidos para aprovechar la hoja; un mes solo pasa a la
+	   siguiente si no cabe completo (si es más largo que una hoja, se parte y
+	   repite su encabezado). */
 	.schedule-timeline__segment + .schedule-timeline__segment {
-		margin-top: 0;
-		break-before: page;
-		page-break-before: always;
+		margin-top: 0.6rem;
+	}
+	.schedule-timeline__segment {
+		break-inside: avoid;
+		page-break-inside: avoid;
 	}
 }
 
