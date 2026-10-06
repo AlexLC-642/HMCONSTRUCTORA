@@ -51,4 +51,14 @@ describe("almacenamiento de archivos subidos", () => {
 		expect(() => resolveStoredPath("uploads/../../etc/passwd", root)).toThrow();
 		expect(() => resolveStoredPath("", root)).toThrow();
 	});
+
+	it("si el volumen está montado en .../uploads, la raíz es su carpeta padre", () => {
+		delete process.env.UPLOADS_DIR;
+		process.env.RAILWAY_VOLUME_MOUNT_PATH = "/app/public/uploads";
+		expect(uploadsRoot()).toBe(path.dirname("/app/public/uploads"));
+		expect(uploadsArePersistent()).toBe(true);
+		expect(resolveStoredPath("uploads/documents/p1/a.pdf", uploadsRoot())).toBe(
+			path.resolve("/app/public/uploads/documents/p1/a.pdf"),
+		);
+	});
 });

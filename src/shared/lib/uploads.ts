@@ -16,17 +16,32 @@ import path from "node:path";
  */
 const legacyRoot = () => path.join(process.cwd(), "public");
 
-export function uploadsRoot() {
+function configuredDir() {
 	return (
 		process.env.UPLOADS_DIR?.trim() ||
 		process.env.RAILWAY_VOLUME_MOUNT_PATH?.trim() ||
-		legacyRoot()
+		""
 	);
 }
 
-/** true si lo subido sobrevive a un nuevo despliegue. */
+/**
+ * Los storageKey empiezan con "uploads/". Si el volumen está montado justo en
+ * esa carpeta (p. ej. /app/public/uploads, como en producción), la raíz es su
+ * carpeta padre; si no, los archivos nuevos irían a .../uploads/uploads/.
+ */
+function rootFor(dir: string) {
+	const clean = dir.replace(/[/]+$/, "");
+	return path.basename(clean) === "uploads" ? path.dirname(clean) : clean;
+}
+
+export function uploadsRoot() {
+	const dir = configuredDir();
+	return dir ? rootFor(dir) : legacyRoot();
+}
+
+/** true si lo subido sobrevive a un nuevo despliegue (hay volumen o UPLOADS_DIR). */
 export function uploadsArePersistent() {
-	return uploadsRoot() !== legacyRoot();
+	return configuredDir() !== "";
 }
 
 /**
@@ -74,16 +89,17 @@ export async function readStoredFile(storageKey: string) {
 	try {
 		return await readFile(resolveStoredPath(storageKey));
 	} catch (error) {
-		if (!uploadsArePersistent()) throw error;
+		if (uploadsRoot() === legacyRoot()) throw error;
 		return readFile(resolveStoredPath(storageKey, legacyRoot()));
 	}
 }
 
 /** Borra el archivo donde esté. Nunca falla: el registro es la fuente de verdad. */
 export async function removeStoredFile(storageKey: string) {
-	const roots = uploadsArePersistent()
-		? [uploadsRoot(), legacyRoot()]
-		: [uploadsRoot()];
+	const roots =
+		uploadsRoot() === legacyRoot()
+			? [uploadsRoot()]
+			: [uploadsRoot(), legacyRoot()];
 	for (const root of roots) {
 		try {
 			await unlink(resolveStoredPath(storageKey, root));
