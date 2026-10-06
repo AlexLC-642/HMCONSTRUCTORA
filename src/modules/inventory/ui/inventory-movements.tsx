@@ -123,7 +123,13 @@ export function InventoryMovements({
 	params: Params;
 	canReviewWaste: boolean;
 }) {
-	const [open, setOpen] = useState(false);
+	// Desde el detalle de un producto se llega con ?nuevo=1&recurso=&bodega=:
+	// el formulario abre con esos datos ya elegidos.
+	const prefill = {
+		materialId: first(params.recurso) ?? "",
+		warehouseId: first(params.bodega) ?? "",
+	};
+	const [open, setOpen] = useState(first(params.nuevo) === "1");
 	const [selected, setSelected] = useState<Movement | null>(null);
 	const incoming =
 		(data.movementCounts.IN ?? 0) + (data.movementCounts.RETURN ?? 0);
@@ -450,7 +456,12 @@ export function InventoryMovements({
 			</InventoryPanel>
 
 			{open ? (
-				<MovementDialog data={data} onClose={() => setOpen(false)} />
+				<MovementDialog
+					data={data}
+					initialMaterialId={prefill.materialId}
+					initialWarehouseId={prefill.warehouseId}
+					onClose={() => setOpen(false)}
+				/>
 			) : null}
 			{selected ? (
 				<MovementDetail
@@ -746,17 +757,69 @@ function DrawerHeader({
 	);
 }
 
+/** Bodega sugerida: la que más tiene del recurso, o la única que exista. */
+function suggestedWarehouse(data: HistoryData, materialId: string) {
+	const withStock = data.stock
+		.filter((row) => row.materialId === materialId && row.quantity > 0)
+		.sort((left, right) => right.quantity - left.quantity);
+	return (
+		withStock[0]?.warehouseId ??
+		(data.warehouses.length === 1 ? (data.warehouses[0]?.id ?? "") : "")
+	);
+}
+
+/** Costo sugerido: promedio de entradas en esa bodega o el costo del catálogo. */
+function suggestedCost(
+	data: HistoryData,
+	materialId: string,
+	warehouseId: string,
+) {
+	const row = data.stock.find(
+		(item) =>
+			item.materialId === materialId && item.warehouseId === warehouseId,
+	);
+	const catalog = data.materials.find((item) => item.id === materialId);
+	const cost = row?.averageCost ?? catalog?.unitCost ?? 0;
+	return Math.round(cost * 100) / 100;
+}
+
 function MovementDialog({
 	data,
+	initialMaterialId,
+	initialWarehouseId,
 	onClose,
 }: {
 	data: HistoryData;
+	initialMaterialId: string;
+	initialWarehouseId: string;
 	onClose: () => void;
 }) {
-	const [type, setType] = useState("IN");
-	const [materialId, setMaterialId] = useState("");
+	const validInitialMaterial = data.materials.some(
+		(item) => item.id === initialMaterialId,
+	)
+		? initialMaterialId
+		: "";
+	const validInitialWarehouse = data.warehouses.some(
+		(item) => item.id === initialWarehouseId,
+	)
+		? initialWarehouseId
+		: validInitialMaterial
+			? suggestedWarehouse(data, validInitialMaterial)
+			: data.warehouses.length === 1
+				? (data.warehouses[0]?.id ?? "")
+				: "";
+	const [type, setType] = useState(validInitialMaterial ? "OUT" : "IN");
+	const [materialId, setMaterialId] = useState(validInitialMaterial);
+	const [warehouseId, setWarehouseId] = useState(validInitialWarehouse);
 	const [quantity, setQuantity] = useState(0);
-	const [unitCost, setUnitCost] = useState(0);
+	const [unitCost, setUnitCost] = useState(
+		validInitialMaterial
+			? suggestedCost(data, validInitialMaterial, validInitialWarehouse)
+			: 0,
+	);
+	// Si la persona escribe su propio costo, ya no se reemplaza al cambiar
+	// de bodega; sí al cambiar de recurso, porque es otro precio.
+	const [costEdited, setCostEdited] = useState(false);
 	const [wasteReason, setWasteReason] =
 		useState<WasteReasonValue>("CUTTING_SURPLUS");
 	const [requestWasteReview, setRequestWasteReview] = useState(false);
@@ -765,6 +828,31 @@ function MovementDialog({
 	);
 	const effectiveUnitCost =
 		unitCost > 0 ? unitCost : (selectedResource?.unitCost ?? 0);
+	const available =
+		materialId && warehouseId
+			? (data.stock.find(
+					(row) =>
+						row.materialId === materialId && row.warehouseId === warehouseId,
+				)?.quantity ?? 0)
+			: null;
+	const takesStock = ["OUT", "WASTE", "TRANSFER"].includes(type);
+	const exceedsStock = takesStock && available !== null && quantity > available;
+	const unit = selectedResource?.unit ?? "";
+	const chooseMaterial = (nextMaterialId: string) => {
+		setMaterialId(nextMaterialId);
+		if (!nextMaterialId) return;
+		const nextWarehouse =
+			warehouseId || suggestedWarehouse(data, nextMaterialId);
+		if (!warehouseId) setWarehouseId(nextWarehouse);
+		setUnitCost(suggestedCost(data, nextMaterialId, nextWarehouse));
+		setCostEdited(false);
+	};
+	const chooseWarehouse = (nextWarehouseId: string) => {
+		setWarehouseId(nextWarehouseId);
+		if (materialId && !costEdited) {
+			setUnitCost(suggestedCost(data, materialId, nextWarehouseId));
+		}
+	};
 	const hasWasteReviewPreview = Boolean(selectedResource && quantity > 0);
 	const wasteReviewTriggers =
 		type === "WASTE" && selectedResource && hasWasteReviewPreview
@@ -855,7 +943,7 @@ function MovementDialog({
 							<select
 								className={inventoryInputClass}
 								name="materialId"
-								onChange={(event) => setMaterialId(event.target.value)}
+								onChange={(event) => chooseMaterial(event.target.value)}
 								required
 								value={materialId}
 							>
@@ -872,7 +960,9 @@ function MovementDialog({
 							<select
 								className={inventoryInputClass}
 								name="warehouseId"
+								onChange={(event) => chooseWarehouse(event.target.value)}
 								required
+								value={warehouseId}
 							>
 								<option value="">Seleccionar</option>
 								{data.warehouses.map((item) => (
@@ -917,9 +1007,20 @@ function MovementDialog({
 							</label>
 						) : (
 							<label className="grid gap-1.5">
-								<span className={inventoryLabelClass}>Cantidad</span>
+								<span className={inventoryLabelClass}>
+									Cantidad
+									{unit ? (
+										<span className="normal-case tracking-normal text-[#74807b]">
+											{" "}
+											({unit})
+										</span>
+									) : null}
+								</span>
 								<input
+									aria-describedby="movement-available"
+									aria-invalid={exceedsStock || undefined}
 									className={inventoryInputClass}
+									max={takesStock && available !== null ? available : undefined}
 									min="0.01"
 									name="quantity"
 									onChange={(event) =>
@@ -929,6 +1030,16 @@ function MovementDialog({
 									step="0.01"
 									type="number"
 								/>
+								{available !== null ? (
+									<span
+										className={`text-xs ${exceedsStock ? "font-semibold text-[#b42318]" : "text-[#5d6964]"}`}
+										id="movement-available"
+									>
+										{exceedsStock
+											? `Solo hay ${available.toLocaleString("es-GT")} ${unit} en esta bodega`
+											: `Disponible en esta bodega: ${available.toLocaleString("es-GT")} ${unit}`}
+									</span>
+								) : null}
 							</label>
 						)}
 						<label className="grid gap-1.5">
@@ -937,13 +1048,21 @@ function MovementDialog({
 								className={inventoryInputClass}
 								min="0"
 								name="unitCost"
-								onChange={(event) =>
-									setUnitCost(Number(event.target.value) || 0)
-								}
+								onChange={(event) => {
+									setUnitCost(Number(event.target.value) || 0);
+									setCostEdited(true);
+								}}
 								step="0.01"
 								type="number"
-								defaultValue="0"
+								value={unitCost}
 							/>
+							{selectedResource ? (
+								<span className="text-xs text-[#5d6964]">
+									{costEdited
+										? "Costo escrito a mano"
+										: "Tomado del costo promedio o del catálogo"}
+								</span>
+							) : null}
 						</label>
 					</div>
 					{type === "WASTE" ? (

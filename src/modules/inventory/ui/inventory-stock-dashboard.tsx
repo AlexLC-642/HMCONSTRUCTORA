@@ -584,7 +584,7 @@ function StockDetail({ row, onClose }: { row: StockRow; onClose: () => void }) {
 					</dl>
 					<a
 						className={`${inventoryPrimaryButtonClass} mt-5 w-full`}
-						href="/inventory?view=movement"
+						href={`/inventory?view=movement&nuevo=1&recurso=${row.materialId}&bodega=${row.warehouseId}`}
 					>
 						Registrar movimiento
 					</a>

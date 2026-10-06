@@ -381,6 +381,8 @@ export async function getMovementHistory(
 		warehouses,
 		projects,
 		pendingWasteReviews,
+		stockRows,
+		entryCosts,
 	] = await Promise.all([
 		prisma.stockMovement.findMany({
 			where,
@@ -423,7 +425,28 @@ export async function getMovementHistory(
 				wasteReviewStatus: { in: ["PENDING", "NEEDS_ACTION"] },
 			},
 		}),
+		// Para precargar el formulario: cuánto hay de cada recurso en cada bodega.
+		prisma.stock.findMany({
+			where: { material: { active: true }, warehouse: { active: true } },
+			select: { materialId: true, warehouseId: true, quantity: true },
+		}),
+		// Mismo costo promedio de entradas que usa la vista de existencias.
+		prisma.stockMovement.groupBy({
+			by: ["materialId", "warehouseId"],
+			where: { type: "IN" },
+			_sum: { quantity: true, totalCost: true },
+		}),
 	]);
+	const entryCostIndex = new Map(
+		entryCosts.map((item) => {
+			const quantity = item._sum.quantity?.toNumber() ?? 0;
+			const total = item._sum.totalCost?.toNumber() ?? 0;
+			return [
+				`${item.materialId}:${item.warehouseId}`,
+				quantity > 0 ? total / quantity : null,
+			];
+		}),
+	);
 	const movementCounts = Object.fromEntries(
 		movementGroups.map((item) => [item.type, item._count._all]),
 	);
@@ -443,6 +466,13 @@ export async function getMovementHistory(
 		warehouses: warehouses.map(serializeWarehouse),
 		projects,
 		pendingWasteReviews,
+		stock: stockRows.map((row) => ({
+			materialId: row.materialId,
+			warehouseId: row.warehouseId,
+			quantity: row.quantity.toNumber(),
+			averageCost:
+				entryCostIndex.get(`${row.materialId}:${row.warehouseId}`) ?? null,
+		})),
 		wasteReviewAmountThreshold: env.WASTE_REVIEW_AMOUNT_GTQ,
 	};
 }
