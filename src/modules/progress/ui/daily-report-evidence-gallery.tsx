@@ -8,6 +8,7 @@ import {
 	Pencil,
 	Trash2,
 } from "lucide-react";
+import { progressMediaUrl } from "@/modules/progress/domain/media-url";
 import {
 	deleteDailyReportMediaAction,
 	moveDailyReportMediaAction,
@@ -151,7 +152,7 @@ export function DailyReportEvidenceGallery({
 											alt={mediaAlt(media, report)}
 											className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
 											loading="lazy"
-											src={media.publicUrl}
+											src={progressMediaUrl(media.id)}
 										/>
 									) : (
 										<div className="grid h-full place-items-center text-[var(--muted)]">
@@ -390,13 +391,13 @@ function EvidenceModal({
 						<img
 							alt={mediaAlt(media, report)}
 							className="max-h-[78vh] w-full object-contain"
-							src={media.publicUrl}
+							src={progressMediaUrl(media.id)}
 						/>
 					) : (
 						<video
 							className="max-h-[78vh] w-full"
 							controls
-							src={media.publicUrl}
+							src={progressMediaUrl(media.id)}
 						>
 							<track kind="captions" />
 						</video>
@@ -549,7 +550,7 @@ export function ProjectEvidenceGallery({
 														)}
 														className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
 														loading="lazy"
-														src={media.publicUrl}
+														src={progressMediaUrl(media.id)}
 													/>
 												) : (
 													<div className="grid h-full place-items-center text-[var(--muted)]">

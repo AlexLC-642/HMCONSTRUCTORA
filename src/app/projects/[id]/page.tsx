@@ -16,6 +16,7 @@ import {
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/modules/auth/application/authorization";
 import { getPortalShareStatus } from "@/modules/client-portal/application/service";
+import { progressMediaUrl } from "@/modules/progress/domain/media-url";
 import {
 	archiveProjectAction,
 	completeProjectAction,
@@ -831,7 +832,7 @@ export default async function ProjectDetailPage({
 						<MediaViewerGrid
 							items={dashboard.reports.recentMedia.map((media) => ({
 								id: media.id,
-								src: media.publicUrl,
+								src: progressMediaUrl(media.id),
 								mimeType: media.mimeType,
 								title: media.title || media.originalName,
 								subtitle: `${media.reportNumber} · ${formatDate(media.reportDate)}`,

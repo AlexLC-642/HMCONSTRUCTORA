@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { progressMediaUrl } from "@/modules/progress/domain/media-url";
 import { scheduleActivityStatusLabels } from "@/modules/schedules/domain/validation";
 import { PrintDocumentHeader } from "@/shared/ui/print-document-header";
 import type { getDailyReportById } from "../application/queries";
@@ -334,7 +335,7 @@ export function DailyReportPrintDocument({
 										<Image
 											alt={media.title ?? media.originalName}
 											height={352}
-											src={media.publicUrl}
+											src={progressMediaUrl(media.id)}
 											unoptimized
 											width={640}
 										/>

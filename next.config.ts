@@ -112,6 +112,10 @@ const nextConfig: NextConfig = {
 				headers: embeddableFileHeaders,
 			},
 			{
+				source: "/api/progress/media/:mediaId/file",
+				headers: embeddableFileHeaders,
+			},
+			{
 				source: "/sw.js",
 				headers: [
 					{
