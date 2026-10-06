@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { canEditReport, reportEditBlockedMessage } from "../domain/report-editing";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/shared/lib/prisma";
+import { removeStoredFile, writeStoredBuffer } from "@/shared/lib/uploads";
 
 const MAX_MEDIA_SIZE = 25 * 1024 * 1024;
 const allowedMimePrefixes = ["image/", "video/"];
@@ -97,9 +97,7 @@ export async function saveDailyReportMediaFiles(
     const extension = safeExtension(file.name, file.type);
     const fileName = `${randomUUID()}${extension}`;
     const storageKey = `uploads/daily-reports/${reportId}/${fileName}`;
-    const outputDir = path.join(process.cwd(), "public", "uploads", "daily-reports", reportId);
-    await mkdir(outputDir, { recursive: true });
-    await writeFile(path.join(outputDir, fileName), Buffer.from(await file.arrayBuffer()));
+    await writeStoredBuffer(storageKey, Buffer.from(await file.arrayBuffer()));
 
     const activityRef = stringValue(formData, `media.${index}.activityRef`) || stringValue(formData, `media.${index}.activityCode`);
     const parsedActivityRef = parseActivityRef(activityRef);
@@ -216,9 +214,6 @@ export async function deleteDailyReportMedia(
   if (!media) throw new Error("No se encontro la evidencia.");
 
   await prisma.dailyReportMedia.delete({ where: { id: mediaId } });
-  try {
-    await unlink(path.join(process.cwd(), "public", media.storageKey));
-  } catch {
-    // El registro ya no existe; si el archivo no esta en disco no debe bloquear el borrado logico.
-  }
+  // El registro ya no existe; si el archivo no esta en disco no bloquea el borrado.
+  await removeStoredFile(media.storageKey);
 }

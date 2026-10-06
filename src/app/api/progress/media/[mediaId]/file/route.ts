@@ -1,9 +1,8 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { canAccessProject } from "@/modules/auth/application/authorization";
 import { getCurrentUser } from "@/modules/auth/application/current-user";
 import { prisma } from "@/shared/lib/prisma";
+import { readStoredFile } from "@/shared/lib/uploads";
 import { hasPermission } from "@/shared/permissions/has-permission";
 
 /** Evidencias de informes diarios: ver src/modules/progress/domain/media-url.ts. */
@@ -47,9 +46,7 @@ export async function GET(
 
 	let buffer: Buffer;
 	try {
-		buffer = await readFile(
-			path.join(process.cwd(), "public", ...media.storageKey.split("/")),
-		);
+		buffer = await readStoredFile(media.storageKey);
 	} catch {
 		return NextResponse.json(
 			{ error: "El archivo ya no está disponible." },

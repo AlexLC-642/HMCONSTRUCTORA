@@ -116,6 +116,10 @@ const nextConfig: NextConfig = {
 				headers: embeddableFileHeaders,
 			},
 			{
+				source: "/api/portal/:token/documents/:versionId/file",
+				headers: embeddableFileHeaders,
+			},
+			{
 				source: "/sw.js",
 				headers: [
 					{

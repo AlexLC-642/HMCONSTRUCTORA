@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { unlink } from "node:fs/promises";
-import path from "node:path";
 import { storeWebsiteImageFile } from "@/modules/documents/application/storage";
 import { prisma } from "@/shared/lib/prisma";
+import { readStoredFile, removeStoredFile } from "@/shared/lib/uploads";
+
+const MAX_WEBSITE_EVIDENCE_SIZE = 15 * 1024 * 1024;
+
 import {
 	type WebsiteInquiryInput,
 	type WebsiteInquiryStatusUpdateInput,
@@ -336,16 +338,38 @@ export async function addWebsitePhotoFromEvidence(
 	const parsed = websitePhotoFromEvidenceInputSchema.parse(rawInput);
 	const evidence = await prisma.dailyReportMedia.findUniqueOrThrow({
 		where: { id: parsed.dailyReportMediaId },
-		select: { id: true, publicUrl: true },
+		select: { id: true, storageKey: true, mimeType: true, fileSize: true },
 	});
+	if (!evidence.mimeType.startsWith("image/")) {
+		throw new Error("Solo se pueden publicar fotos en el sitio web.");
+	}
+	if (evidence.fileSize > MAX_WEBSITE_EVIDENCE_SIZE) {
+		throw new Error(
+			"La foto supera 15 MB; súbela optimizada desde el sitio web.",
+		);
+	}
+	// El sitio público no tiene sesión: no puede leer la evidencia por la ruta
+	// interna. Se guarda una copia de la imagen, igual que una foto subida aquí.
+	let imageData: Uint8Array<ArrayBuffer>;
+	try {
+		imageData = new Uint8Array(await readStoredFile(evidence.storageKey));
+	} catch {
+		throw new Error(
+			"El archivo de esta evidencia ya no está disponible; vuelve a subir la foto.",
+		);
+	}
 
 	const maxPosition = await prisma.websiteProjectPhoto.aggregate({
 		_max: { position: true },
 	});
+	const photoId = randomUUID();
 	const photo = await prisma.websiteProjectPhoto.create({
 		data: {
+			id: photoId,
 			title: parsed.title,
-			imageUrl: evidence.publicUrl,
+			imageUrl: `/api/website/photos/${photoId}`,
+			imageData,
+			imageMimeType: evidence.mimeType,
 			altText: nullable(parsed.altText) ?? parsed.title,
 			sourceDailyReportMediaId: evidence.id,
 			position: (maxPosition._max.position ?? -1) + 1,
@@ -397,9 +421,7 @@ export async function deleteWebsitePhoto(id: string, context: WebsiteContext) {
 	// reused from project evidence keeps its file -- it belongs to the daily
 	// report, not to the website.
 	if (deleted.storageKey && !deleted.sourceDailyReportMediaId) {
-		await unlink(
-			path.join(process.cwd(), "public", ...deleted.storageKey.split("/")),
-		).catch(() => {});
+		await removeStoredFile(deleted.storageKey);
 	}
 
 	await prisma.auditLog.create({

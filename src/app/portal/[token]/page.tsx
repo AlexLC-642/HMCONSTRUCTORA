@@ -29,18 +29,21 @@ import {
 	budgetUnitLabel,
 	persistedLaborLineUsesJornadas,
 } from "@/modules/budgets/domain/units";
-import { getClientPortalByToken } from "@/modules/client-portal/application/service";
+import {
+	getClientPortalByToken,
+	portalDocumentFileUrl,
+} from "@/modules/client-portal/application/service";
 import { PortalDocumentPreviewModal } from "@/modules/client-portal/ui/portal-document-preview-modal";
 import { PortalProgressCharts } from "@/modules/client-portal/ui/portal-progress-charts";
 import {
 	type PortalTabKey,
 	PortalTabs,
 } from "@/modules/client-portal/ui/portal-tabs";
-import { ScheduleTimelineTable } from "@/modules/schedules/ui/schedule-timeline-table";
 import {
 	type scheduleActivityStatuses,
 	scheduleActivityStatusLabels,
 } from "@/modules/schedules/domain/validation";
+import { ScheduleTimelineTable } from "@/modules/schedules/ui/schedule-timeline-table";
 import { ThemeToggle } from "@/shared/components/theme-toggle";
 import { requestIp } from "@/shared/lib/request-ip";
 import { PrintDocumentHeader } from "@/shared/ui/print-document-header";
@@ -773,7 +776,7 @@ export default async function ClientPortalPage({
 														<img
 															alt={document.title}
 															className="size-11 shrink-0 rounded-xl object-cover"
-															src={latest.publicUrl}
+															src={portalDocumentFileUrl(token, latest.id)}
 														/>
 													) : (
 														<span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[color-mix(in_srgb,var(--brand-red)_12%,var(--surface))] text-[var(--brand-red)]">
@@ -802,7 +805,7 @@ export default async function ClientPortalPage({
 														<a
 															className="rounded-lg bg-[var(--brand-red)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#b51d2a]"
 															download
-															href={latest.publicUrl}
+															href={portalDocumentFileUrl(token, latest.id)}
 														>
 															Descargar
 														</a>
@@ -860,7 +863,18 @@ export default async function ClientPortalPage({
 					categoryName={previewDocument.category.name}
 					closeHref={`/portal/${token}?tab=documents`}
 					title={previewDocument.title}
-					version={previewDocument.versions[0] ?? null}
+					version={
+						previewDocument.versions[0]
+							? {
+									...previewDocument.versions[0],
+									// El archivo pasa por la ruta del portal, no por public/.
+									publicUrl: portalDocumentFileUrl(
+										token,
+										previewDocument.versions[0].id,
+									),
+								}
+							: null
+					}
 				/>
 			) : null}
 		</main>

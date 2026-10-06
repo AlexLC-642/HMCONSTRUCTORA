@@ -13,6 +13,7 @@ import {
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { requirePermission } from "@/modules/auth/application/authorization";
+import { progressMediaUrl } from "@/modules/progress/domain/media-url";
 import {
 	addWebsitePhotoFromEvidenceAction,
 	deleteWebsitePhotoAction,
@@ -398,7 +399,7 @@ export default async function WebsitePage({
 										<img
 											alt=""
 											className="size-14 shrink-0 rounded-md object-cover"
-											src={item.publicUrl}
+											src={progressMediaUrl(item.id)}
 										/>
 										<div className="min-w-0 flex-1">
 											<input

@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
 	isUploadRateLimited,
 	recordUploadAttempt,
 } from "@/shared/lib/upload-rate-limit";
+import { removeStoredFile, writeStoredBuffer } from "@/shared/lib/uploads";
 import { videoDurationLimitSeconds } from "../domain/catalog";
 import { readVideoDurationSeconds } from "./video-duration";
 
@@ -108,13 +108,7 @@ async function writeStoredFile(
 ) {
 	const fileName = `${randomUUID()}${extension}`;
 	const storageKey = `${storageKeyPrefix}/${fileName}`;
-	const outputDir = path.join(
-		process.cwd(),
-		"public",
-		...storageKeyPrefix.split("/"),
-	);
-	await mkdir(outputDir, { recursive: true });
-	await writeFile(path.join(outputDir, fileName), buffer);
+	await writeStoredBuffer(storageKey, buffer);
 	return {
 		fileName,
 		storageKey,
@@ -126,11 +120,7 @@ async function writeStoredFile(
 // that fails to delete (already gone, permission issue) must never block
 // deleting the record itself.
 export async function deleteStoredFile(storageKey: string) {
-	try {
-		await unlink(path.join(process.cwd(), "public", ...storageKey.split("/")));
-	} catch {
-		// Ignore - the file may already be gone.
-	}
+	await removeStoredFile(storageKey);
 }
 
 function assertUploadNotRateLimited(userId: string) {

@@ -154,13 +154,15 @@ export async function getPortalShareStatus(
 	};
 }
 
-export async function getClientPortalByToken(
+/**
+ * Enlace de portal vigente para este token, o null. Un token equivocado,
+ * vencido o revocado nunca se distingue de "demasiados intentos": siempre
+ * null (404 genérico), así no sirve para adivinar si un intento estuvo cerca.
+ */
+export async function resolvePortalShare(
 	token: string,
 	ipAddress: string | null = null,
 ) {
-	// A wrong/stale/revoked token never distinguishes itself from "rate
-	// limited" - both just return null, which the page turns into a generic
-	// 404 - so this can't be used to fingerprint whether a guess was close.
 	if (isPortalLookupRateLimited(ipAddress)) return null;
 
 	const rows = await prisma.$queryRaw<PortalShareRow[]>`
@@ -179,6 +181,15 @@ export async function getClientPortalByToken(
 		recordFailedPortalLookup(ipAddress);
 		return null;
 	}
+	return share;
+}
+
+export async function getClientPortalByToken(
+	token: string,
+	ipAddress: string | null = null,
+) {
+	const share = await resolvePortalShare(token, ipAddress);
+	if (!share) return null;
 
 	const project = (await prisma.project.findUnique({
 		where: { id: share.projectId, portalEnabled: true },
@@ -273,4 +284,9 @@ export async function getClientPortalByToken(
 			documents: project.documents.length,
 		},
 	};
+}
+
+/** URL del archivo de un documento visto desde el portal (sin sesión). */
+export function portalDocumentFileUrl(token: string, versionId: string) {
+	return `/api/portal/${encodeURIComponent(token)}/documents/${versionId}/file`;
 }
