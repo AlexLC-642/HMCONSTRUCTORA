@@ -186,6 +186,47 @@ export async function getPurchaseWorkspace(
 		}),
 	]);
 
+	const canceledIds = orders
+		.filter((order) => order.status === "CANCELED")
+		.map((order) => order.id);
+	const cancelLogs = canceledIds.length
+		? await prisma.auditLog.findMany({
+				where: {
+					entityType: "PurchaseOrder",
+					entityId: { in: canceledIds },
+					action: "UPDATE",
+				},
+				select: {
+					entityId: true,
+					createdAt: true,
+					metadata: true,
+					user: { select: { name: true } },
+				},
+				orderBy: { createdAt: "desc" },
+			})
+		: [];
+	const cancellations = new Map<
+		string,
+		{
+			at: string;
+			by: string | null;
+			reason: string | null;
+			previousStatus: string | null;
+		}
+	>();
+	for (const log of cancelLogs) {
+		const meta = (log.metadata ?? {}) as Record<string, unknown>;
+		if (!log.entityId || meta.status !== "CANCELED") continue;
+		if (cancellations.has(log.entityId)) continue;
+		cancellations.set(log.entityId, {
+			at: log.createdAt.toISOString(),
+			by: log.user?.name ?? null,
+			reason: typeof meta.reason === "string" ? meta.reason : null,
+			previousStatus:
+				typeof meta.previousStatus === "string" ? meta.previousStatus : null,
+		});
+	}
+
 	const supplierRows = suppliers.map((supplier) => ({
 		id: supplier.id,
 		code: supplier.code,
@@ -286,6 +327,7 @@ export async function getPurchaseWorkspace(
 					fileUrl: versionId ? documentFileUrl(versionId) : null,
 				};
 			}),
+			cancellation: cancellations.get(order.id) ?? null,
 			budgetExceptionReason: order.budgetExceptionReason,
 			budgetScope: purchaseOrderBudgetScope({
 				projectId: order.projectId,

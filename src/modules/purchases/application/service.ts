@@ -481,6 +481,7 @@ export async function issuePurchaseOrder(
 export async function cancelPurchaseOrder(
 	orderId: string,
 	context: PurchaseContext,
+	reason: string,
 ) {
 	return prisma.$transaction(async (tx) => {
 		// Mismo bloqueo que usa Finanzas al registrar una factura: así una
@@ -518,7 +519,13 @@ export async function cancelPurchaseOrder(
 				action: "UPDATE",
 				entityType: "PurchaseOrder",
 				entityId: order.id,
-				metadata: { number: order.number, status: "CANCELED" },
+				// El motivo vive en la bitácora: es el registro de la anulación.
+				metadata: {
+					number: order.number,
+					status: "CANCELED",
+					previousStatus: order.status,
+					reason,
+				},
 			},
 		});
 		return canceled;

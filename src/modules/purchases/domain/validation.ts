@@ -217,3 +217,12 @@ export const purchaseOrderStatusLabels = {
 	RECEIVED: "Recibida",
 	CANCELED: "Anulada",
 } as const;
+
+export const purchaseCancelInputSchema = z.object({
+	purchaseOrderId: z.string().trim().min(1, "Selecciona la orden."),
+	reason: z
+		.string()
+		.trim()
+		.min(5, "Escribe el motivo de la anulación (mínimo 5 caracteres).")
+		.max(500, "El motivo no puede superar 500 caracteres."),
+});

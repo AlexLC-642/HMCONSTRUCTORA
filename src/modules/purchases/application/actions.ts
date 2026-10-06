@@ -9,6 +9,7 @@ import {
 } from "@/modules/auth/application/authorization";
 import { createPurchaseInvoice } from "@/modules/finances/application/service";
 import {
+	purchaseCancelInputSchema,
 	purchaseOrderInputSchema,
 	purchaseReceiptInputSchema,
 	supplierInputSchema,
@@ -203,10 +204,22 @@ export async function cancelPurchaseOrderAction(
 		"compras.gestionar",
 		"purchases",
 	);
+	const parsed = purchaseCancelInputSchema.safeParse({
+		purchaseOrderId: value(formData, "purchaseOrderId"),
+		reason: value(formData, "reason"),
+	});
+	if (!parsed.success) {
+		return {
+			status: "error",
+			message: parsed.error.issues[0]?.message ?? "Revisa el motivo.",
+		};
+	}
 	try {
-		await cancelPurchaseOrder(value(formData, "purchaseOrderId"), {
-			userId: user.id,
-		});
+		await cancelPurchaseOrder(
+			parsed.data.purchaseOrderId,
+			{ userId: user.id },
+			parsed.data.reason,
+		);
 	} catch (error) {
 		return {
 			status: "error",

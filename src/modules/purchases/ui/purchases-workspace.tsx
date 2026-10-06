@@ -2,6 +2,7 @@
 
 import {
 	ArrowRight,
+	Ban,
 	Building2,
 	CalendarClock,
 	Check,
@@ -9,11 +10,8 @@ import {
 	CircleDollarSign,
 	ClipboardCheck,
 	FileText,
-	Mail,
 	MapPin,
 	PackageCheck,
-	Pencil,
-	Phone,
 	Plus,
 	ReceiptText,
 	Search,
@@ -37,7 +35,6 @@ import {
 } from "react";
 import { useFormStatus } from "react-dom";
 import {
-	cancelPurchaseOrderAction,
 	createPurchaseOrderAction,
 	issuePurchaseOrderAction,
 	type PurchaseOrderFormState,
@@ -47,10 +44,8 @@ import {
 	registerPurchaseInvoiceAction,
 	type SupplierFormState,
 	saveSupplierAction,
-	setSupplierActiveAction,
 } from "../application/actions";
 import type { getPurchaseWorkspace } from "../application/queries";
-import { ConfirmSubmitButton } from "@/shared/components/confirm-submit-button";
 import { HelpTip } from "@/shared/ui/help-tip";
 import { SelectMenu, type SelectMenuOption } from "@/shared/ui/select-menu";
 import {
@@ -59,6 +54,13 @@ import {
 	purchaseOrderCancelBlocker,
 } from "../domain/order-rules";
 import { purchaseOrderStatusLabels } from "../domain/validation";
+import {
+	CancelOrderDialog,
+	CanceledOrdersTable,
+	formatCompactMoney,
+	KpiStrip,
+	SuppliersTable,
+} from "./purchases-tables";
 
 const idleStepState: PurchaseOrderStepState = { status: "idle", message: "" };
 
@@ -66,7 +68,7 @@ type WorkspaceData = Awaited<ReturnType<typeof getPurchaseWorkspace>>;
 type Supplier = WorkspaceData["suppliers"][number];
 type Order = WorkspaceData["orders"][number];
 type Requisition = WorkspaceData["readyRequisitions"][number];
-type View = "orders" | "suppliers" | "requisitions";
+type View = "orders" | "suppliers" | "requisitions" | "canceled";
 type ProgressState = "done" | "active" | "pending" | "stopped" | "skipped";
 
 function BudgetTag({ scope }: { scope: PurchaseBudgetScope }) {
@@ -178,14 +180,6 @@ function formatNumber(value: number, decimals = 2) {
 
 function formatCurrency(value: number) {
 	return `Q ${formatNumber(value)}`;
-}
-
-function formatCompactCurrency(value: number) {
-	if (Math.abs(value) >= 1_000_000)
-		return `Q ${formatNumber(value / 1_000_000, 1)} M`;
-	if (Math.abs(value) >= 1_000)
-		return `Q ${formatNumber(value / 1_000, 1)} mil`;
-	return `Q ${formatNumber(value, 0)}`;
 }
 
 function formatDate(value: string | null) {
@@ -408,41 +402,6 @@ function OrderTotals({
 				<strong>{formatCurrency(total)}</strong>
 			</div>
 		</div>
-	);
-}
-
-function Metric({
-	label,
-	value,
-	detail,
-	icon: Icon,
-	tone,
-	onActivate,
-}: {
-	label: string;
-	value: string;
-	detail: string;
-	icon: typeof ShoppingCart;
-	tone: "red" | "amber" | "green" | "steel";
-	onActivate: () => void;
-}) {
-	return (
-		<button
-			aria-label={`Abrir ${label.toLowerCase()}`}
-			className="purchases-kpi focus-ring"
-			data-tone={tone}
-			onClick={onActivate}
-			type="button"
-		>
-			<div className="purchases-kpi__copy">
-				<span>{label}</span>
-				<strong>{value}</strong>
-				<small>{detail}</small>
-			</div>
-			<div className="purchases-kpi__mark">
-				<Icon aria-hidden="true" size={20} />
-			</div>
-		</button>
 	);
 }
 
@@ -2247,7 +2206,6 @@ function withAttempt(
 }
 
 const issueWithAttempt = withAttempt(issuePurchaseOrderAction);
-const cancelWithAttempt = withAttempt(cancelPurchaseOrderAction);
 
 function OrderStepActions({
 	order,
@@ -2264,18 +2222,12 @@ function OrderStepActions({
 }) {
 	const idle: StepState = { ...idleStepState, attempt: 0 };
 	const [issueState, issueAction] = useActionState(issueWithAttempt, idle);
-	const [cancelState, cancelAction] = useActionState(cancelWithAttempt, idle);
 	const cancelBlocker = purchaseOrderCancelBlocker({
 		status: order.status,
 		validInvoiceCount: order.invoiceCount,
 		hasReceipts: order.items.some((item) => item.receivedQuantity > 0),
 	});
-	const error =
-		cancelState.status === "error"
-			? cancelState.message
-			: issueState.status === "error"
-				? issueState.message
-				: null;
+	const error = issueState.status === "error" ? issueState.message : null;
 	const showFinance =
 		canRegisterFinance &&
 		Boolean(order.project) &&
@@ -2324,25 +2276,7 @@ function OrderStepActions({
 					</SubmitButton>
 				</form>
 			) : null}
-			{showCancel ? (
-				<form action={cancelAction}>
-					<input name="purchaseOrderId" type="hidden" value={order.id} />
-					<ConfirmSubmitButton
-						className="purchases-submit focus-ring"
-						confirmLabel="Anular orden"
-						description={
-							order.status === "ISSUED"
-								? `${order.number} quedará anulada y no podrá recibirse ni facturarse.${order.requisition ? ` El requerimiento ${order.requisition.number} volverá a quedar pendiente de compra.` : ""}`
-								: `${order.number} quedará anulada y no podrá emitirse.`
-						}
-						key={cancelState.attempt}
-						pendingLabel="Anulando..."
-						title="¿Anular esta orden de compra?"
-					>
-						Anular orden
-					</ConfirmSubmitButton>
-				</form>
-			) : null}
+			{showCancel ? <CancelOrderDialog order={order} /> : null}
 		</footer>
 	);
 }
@@ -2375,17 +2309,26 @@ export function PurchasesWorkspace({
 			data.readyRequisitions.find((item) => item.id === initialRequisitionId) ??
 			null,
 	);
+	const activeOrders = useMemo(
+		() => data.orders.filter((order) => order.status !== "CANCELED"),
+		[data.orders],
+	);
+	const canceledOrders = useMemo(
+		() => data.orders.filter((order) => order.status === "CANCELED"),
+		[data.orders],
+	);
 	const [selectedOrderId, setSelectedOrderId] = useState(
-		data.orders[0]?.id ?? "",
+		activeOrders[0]?.id ?? "",
 	);
 	const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 	const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
 	const [directPurchaseOpen, setDirectPurchaseOpen] = useState(false);
 	const selectedOrder =
-		data.orders.find((order) => order.id === selectedOrderId) ?? data.orders[0];
+		activeOrders.find((order) => order.id === selectedOrderId) ??
+		activeOrders[0];
 	const filteredOrders = useMemo(
 		() =>
-			data.orders.filter((order) => {
+			activeOrders.filter((order) => {
 				const search = query.trim().toLowerCase();
 				return (
 					(status === "ALL" || order.status === status) &&
@@ -2396,7 +2339,7 @@ export function PurchasesWorkspace({
 							.includes(search))
 				);
 			}),
-		[data.orders, query, status, onlyOutsideBudget],
+		[activeOrders, query, status, onlyOutsideBudget],
 	);
 	const filteredSuppliers = useMemo(() => {
 		const search = supplierQuery.trim().toLowerCase();
@@ -2411,12 +2354,12 @@ export function PurchasesWorkspace({
 	const orderStatusCounts = useMemo(
 		() =>
 			Object.fromEntries(
-				["DRAFT", "ISSUED", "PARTIAL", "RECEIVED", "CANCELED"].map((key) => [
+				["DRAFT", "ISSUED", "PARTIAL", "RECEIVED"].map((key) => [
 					key,
-					data.orders.filter((order) => order.status === key).length,
+					activeOrders.filter((order) => order.status === key).length,
 				]),
 			),
-		[data.orders],
+		[activeOrders],
 	);
 	const preferRequisitions = data.readyRequisitions.length > 0;
 	const outsideBudgetCount = data.metrics.outsideBudgetOrders;
@@ -2491,52 +2434,52 @@ export function PurchasesWorkspace({
 				) : null}
 			</header>
 
-			<section aria-label="Indicadores de compras" className="purchases-kpis">
-				<Metric
-					detail="Requerimientos autorizados sin orden"
-					icon={ClipboardCheck}
-					label="Por comprar"
-					tone={data.metrics.readyToBuy > 0 ? "red" : "steel"}
-					value={String(data.metrics.readyToBuy)}
-					onActivate={() => setView("requisitions")}
-				/>
-				<Metric
-					detail="Borrador, emitidas o con recepción parcial"
-					icon={ShoppingCart}
-					label="Órdenes abiertas"
-					tone="steel"
-					value={String(data.metrics.openOrders)}
-					onActivate={() => {
-						setView("orders");
-						setStatus("ALL");
-						setOnlyOutsideBudget(false);
-					}}
-				/>
-				<Metric
-					detail="Valor de las órdenes abiertas"
-					icon={CircleDollarSign}
-					label="Comprometido"
-					tone="steel"
-					value={formatCompactCurrency(data.metrics.openValue)}
-					onActivate={() => {
-						setView("orders");
-						setStatus("ALL");
-						setOnlyOutsideBudget(false);
-					}}
-				/>
-				<Metric
-					detail="Órdenes de proyecto sin partida del presupuesto"
-					icon={ShieldAlert}
-					label="Fuera de presupuesto"
-					tone={outsideBudgetCount > 0 ? "amber" : "steel"}
-					value={String(outsideBudgetCount)}
-					onActivate={() => {
-						setView("orders");
-						setStatus("ALL");
-						setOnlyOutsideBudget(true);
-					}}
-				/>
-			</section>
+			<KpiStrip
+				items={[
+					{
+						key: "ready",
+						label: "Por comprar",
+						value: String(data.metrics.readyToBuy),
+						detail: "Requerimientos autorizados sin orden",
+						attention: data.metrics.readyToBuy > 0 ? "primary" : undefined,
+						onActivate: () => setView("requisitions"),
+					},
+					{
+						key: "open",
+						label: "Órdenes abiertas",
+						value: String(data.metrics.openOrders),
+						detail: "Borrador, emitidas o con recepción parcial",
+						onActivate: () => {
+							setView("orders");
+							setStatus("ALL");
+							setOnlyOutsideBudget(false);
+						},
+					},
+					{
+						key: "committed",
+						label: "Comprometido",
+						value: formatCompactMoney(data.metrics.openValue),
+						detail: "Valor de las órdenes abiertas",
+						onActivate: () => {
+							setView("orders");
+							setStatus("ALL");
+							setOnlyOutsideBudget(false);
+						},
+					},
+					{
+						key: "outside",
+						label: "Fuera de presupuesto",
+						value: String(outsideBudgetCount),
+						detail: "Órdenes de proyecto sin partida",
+						attention: outsideBudgetCount > 0 ? "warning" : undefined,
+						onActivate: () => {
+							setView("orders");
+							setStatus("ALL");
+							setOnlyOutsideBudget(true);
+						},
+					},
+				]}
+			/>
 
 			<section className="purchases-command">
 				<div
@@ -2564,7 +2507,18 @@ export function PurchasesWorkspace({
 						type="button"
 					>
 						<ShoppingCart aria-hidden="true" size={17} />
-						Órdenes<span>{data.orders.length}</span>
+						Órdenes<span>{activeOrders.length}</span>
+					</button>
+					<button
+						aria-selected={view === "canceled"}
+						className="focus-ring"
+						data-view="canceled"
+						onClick={() => setView("canceled")}
+						role="tab"
+						type="button"
+					>
+						<Ban aria-hidden="true" size={17} />
+						Anuladas<span>{canceledOrders.length}</span>
 					</button>
 					<button
 						aria-selected={view === "suppliers"}
@@ -2581,7 +2535,7 @@ export function PurchasesWorkspace({
 
 				{view === "orders" ? (
 					<div
-						className={`purchases-command__view purchases-orders-view ${data.orders.length === 0 ? "purchases-orders-view--empty" : ""}`}
+						className={`purchases-command__view purchases-orders-view ${activeOrders.length === 0 ? "purchases-orders-view--empty" : ""}`}
 					>
 						<div className="purchases-order-list">
 							<div className="purchases-toolbar">
@@ -2605,10 +2559,11 @@ export function PurchasesWorkspace({
 									onClick={() => setStatus("ALL")}
 									type="button"
 								>
-									Todas <span>{data.orders.length}</span>
+									Todas <span>{activeOrders.length}</span>
 								</button>
-								{Object.entries(purchaseOrderStatusLabels).map(
-									([key, label]) => (
+								{Object.entries(purchaseOrderStatusLabels)
+									.filter(([key]) => key !== "CANCELED")
+									.map(([key, label]) => (
 										<button
 											aria-pressed={status === key}
 											data-status={key}
@@ -2618,8 +2573,7 @@ export function PurchasesWorkspace({
 										>
 											{label} <span>{orderStatusCounts[key] ?? 0}</span>
 										</button>
-									),
-								)}
+									))}
 								<button
 									aria-pressed={onlyOutsideBudget}
 									className="purchases-order-filters__budget"
@@ -2765,7 +2719,7 @@ export function PurchasesWorkspace({
 											</div>
 											{selectedOrder.invoiceCount === 0 ? (
 												<p>
-													Registra la factura en Finanzas para habilitar los
+													Registra la factura de la orden para habilitar los
 													abonos.
 												</p>
 											) : selectedOrder.lastPaymentDate ? (
@@ -2884,19 +2838,33 @@ export function PurchasesWorkspace({
 				) : null}
 
 				{view === "suppliers" ? (
-					<div className="purchases-command__view purchases-suppliers">
-						<header>
-							<div>
-								<h2>Directorio de proveedores</h2>
-								<p>Datos fiscales y medios de contacto.</p>
+					<SuppliersTable
+						canManage={canManage}
+						empty={
+							<div className="purchases-table-empty">
+								<Store aria-hidden="true" size={26} />
+								<strong>
+									{data.suppliers.length
+										? "Ningún proveedor coincide con la búsqueda"
+										: "No hay proveedores registrados"}
+								</strong>
+								<p>
+									{data.suppliers.length
+										? "Prueba con otro nombre, código o NIT."
+										: "Agrega el primer proveedor para iniciar una compra."}
+								</p>
 							</div>
+						}
+						onEdit={(supplier) => setSupplierModal(supplier)}
+						suppliers={filteredSuppliers}
+						toolbar={
 							<div className="purchases-section-tools">
-								<label>
+								<label className="purchases-search">
 									<Search aria-hidden="true" size={16} />
 									<input
 										aria-label="Buscar proveedor"
 										onChange={(event) => setSupplierQuery(event.target.value)}
-										placeholder="Buscar proveedor o NIT"
+										placeholder="Nombre, código o NIT"
 										value={supplierQuery}
 									/>
 								</label>
@@ -2906,129 +2874,18 @@ export function PurchasesWorkspace({
 										onClick={() => setSupplierModal("new")}
 										type="button"
 									>
-										<Plus size={18} />
+										<Plus aria-hidden="true" size={17} />
 										Nuevo proveedor
 									</button>
 								) : null}
 							</div>
-						</header>
-						{filteredSuppliers.length ? (
-							<div className="purchases-supplier-grid">
-								{filteredSuppliers.map((supplier) => (
-									<article
-										className="purchases-supplier"
-										data-active={supplier.status === "ACTIVE"}
-										key={supplier.id}
-									>
-										<header>
-											<div className="purchases-supplier__avatar">
-												{supplier.businessName.slice(0, 2).toUpperCase()}
-											</div>
-											<div>
-												<span>{supplier.code}</span>
-												<h3>{supplier.businessName}</h3>
-												{supplier.tradeName ? (
-													<p>{supplier.tradeName}</p>
-												) : null}
-											</div>
-											<span className="purchases-supplier__state">
-												{supplier.status === "ACTIVE" ? "Activo" : "Inactivo"}
-											</span>
-										</header>
-										<div className="purchases-supplier__contact">
-											<span>
-												<UserRound size={15} />
-												{supplier.contactName ?? "Sin contacto"}
-											</span>
-											<span>
-												<Phone size={15} />
-												{supplier.phone ?? "Sin teléfono"}
-											</span>
-											<span>
-												<Mail size={15} />
-												{supplier.email ?? "Sin correo"}
-											</span>
-										</div>
-										<div className="purchases-supplier__stats">
-											<div>
-												<span>Órdenes</span>
-												<strong>{supplier.orderCount}</strong>
-											</div>
-											<div>
-												<span>Valor ordenado</span>
-												<strong>
-													{formatCompactCurrency(supplier.orderedValue)}
-												</strong>
-											</div>
-											<div>
-												<span>NIT</span>
-												<strong>{supplier.taxId ?? "Sin NIT"}</strong>
-											</div>
-										</div>
-										{canManage ? (
-											<footer>
-												<button
-													className="purchases-inline-action focus-ring"
-													onClick={() => setSupplierModal(supplier)}
-													type="button"
-												>
-													<Pencil size={15} />
-													Editar
-												</button>
-												<form action={setSupplierActiveAction}>
-													<input
-														name="supplierId"
-														type="hidden"
-														value={supplier.id}
-													/>
-													<input
-														name="active"
-														type="hidden"
-														value={
-															supplier.status === "ACTIVE" ? "false" : "true"
-														}
-													/>
-													<button
-														className="purchases-supplier-toggle focus-ring"
-														data-active={supplier.status === "ACTIVE"}
-														type="submit"
-													>
-														<span />
-														{supplier.status === "ACTIVE"
-															? "Desactivar"
-															: "Activar"}
-													</button>
-												</form>
-											</footer>
-										) : null}
-									</article>
-								))}
-							</div>
-						) : (
-							<div className="purchases-empty purchases-empty--large">
-								<Store size={34} />
-								<h3>
-									{data.suppliers.length
-										? "No hay proveedores con esta búsqueda"
-										: "No hay proveedores registrados"}
-								</h3>
-								<p>
-									{data.suppliers.length
-										? "Prueba con otro nombre, código o NIT."
-										: "Agrega el primer proveedor para iniciar una compra."}
-								</p>
-								{canManage ? (
-									<button
-										className="purchases-button purchases-button--red focus-ring"
-										onClick={() => setSupplierModal("new")}
-										type="button"
-									>
-										Crear proveedor
-									</button>
-								) : null}
-							</div>
-						)}
-					</div>
+						}
+						totalCount={data.suppliers.length}
+					/>
+				) : null}
+
+				{view === "canceled" ? (
+					<CanceledOrdersTable orders={canceledOrders} />
 				) : null}
 
 				{view === "requisitions" ? (

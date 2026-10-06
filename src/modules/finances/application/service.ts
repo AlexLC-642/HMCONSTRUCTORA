@@ -32,6 +32,22 @@ function date(value: string) {
 	return new Date(`${value}T00:00:00.000Z`);
 }
 
+/** Sin proveedor escrito no se puede descartar que sea el mismo: se trata como igual. */
+function sameVendor(
+	vendor: string | null,
+	supplierNames: Array<string | null | undefined>,
+) {
+	if (!vendor) return true;
+	const clean = (value: string) =>
+		value
+			.normalize("NFD")
+			.replace(/[\u0300-\u036f]/g, "")
+			.replace(/[^a-z0-9]/gi, "")
+			.toLowerCase();
+	const typed = clean(vendor);
+	return supplierNames.some((name) => name && clean(name) === typed);
+}
+
 function normalizeDocumentNumber(value?: string | null) {
 	const clean = value?.trim().replace(/\s+/g, " ");
 	return clean ? clean.toUpperCase() : null;
@@ -246,6 +262,35 @@ export async function createExpense(
 	return prisma.$transaction(async (tx) => {
 		const vendor = nullable(parsed.vendor);
 		const documentNumber = normalizeDocumentNumber(parsed.documentNumber);
+
+		if (documentNumber) {
+			// Una factura de orden de compra ya es gasto del proyecto: entra por
+			// Compras. Si el número coincide con una de ellas y el proveedor es el
+			// mismo (o no se indicó), se rechaza para no contarla dos veces.
+			const purchaseInvoice = await tx.financialExpense.findFirst({
+				where: {
+					projectId: parsed.projectId,
+					documentNumber,
+					status: "VALID",
+					purchaseOrderId: { not: null },
+				},
+				select: {
+					purchaseOrder: { select: { number: true } },
+					supplier: { select: { businessName: true, tradeName: true } },
+				},
+			});
+			if (
+				purchaseInvoice &&
+				sameVendor(vendor, [
+					purchaseInvoice.supplier?.businessName,
+					purchaseInvoice.supplier?.tradeName,
+				])
+			) {
+				throw new Error(
+					`La factura ${documentNumber} ya está registrada en Compras (${purchaseInvoice.purchaseOrder?.number ?? "orden de compra"}). No la registres otra vez.`,
+				);
+			}
+		}
 
 		if (documentNumber && vendor) {
 			const duplicate = await tx.financialExpense.findFirst({

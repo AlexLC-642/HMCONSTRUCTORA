@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	purchaseCancelInputSchema,
 	purchaseOrderInputSchema,
 	purchaseReceiptInputSchema,
 	supplierInputSchema,
@@ -181,5 +182,22 @@ describe("purchase validation", () => {
 				items: [{ purchaseOrderItemId: "line-1", quantity: -1 }],
 			}).success,
 		).toBe(false);
+	});
+});
+
+describe("anulación de orden", () => {
+	it("exige un motivo para dejar registro", () => {
+		expect(
+			purchaseCancelInputSchema.safeParse({
+				purchaseOrderId: "order-1",
+				reason: "",
+			}).success,
+		).toBe(false);
+		expect(
+			purchaseCancelInputSchema.safeParse({
+				purchaseOrderId: "order-1",
+				reason: "El proveedor no tenía existencia.",
+			}).success,
+		).toBe(true);
 	});
 });

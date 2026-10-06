@@ -20,7 +20,9 @@ export default async function PurchasesPage({
 	});
 	const rawView = first(params.view);
 	const initialView =
-		rawView === "suppliers" || rawView === "requisitions"
+		rawView === "suppliers" ||
+		rawView === "requisitions" ||
+		rawView === "canceled"
 			? rawView
 			: data.orders.length === 0 && data.readyRequisitions.length > 0
 				? "requisitions"
