@@ -5,14 +5,27 @@ import {
 	expenseGroupLabel,
 	expenseSectionCode,
 } from "@/modules/finances/application/statement";
+import { projectExpenseInputSchema } from "@/modules/finances/domain/validation";
 
 describe("resumen financiero", () => {
 	it("separa compromisos, pagos a proveedores y caja sin contar anulados", () => {
 		const result = calculateFinanceSummary(
 			new Prisma.Decimal(850000),
 			[
-				{ subtotal: new Prisma.Decimal(63000), status: "VALID", supplierPayments: [{ amount: new Prisma.Decimal(10000), status: "REGISTERED" }] },
-				{ subtotal: new Prisma.Decimal(9000), status: "VOID", supplierPayments: [{ amount: new Prisma.Decimal(9000), status: "REGISTERED" }] },
+				{
+					subtotal: new Prisma.Decimal(63000),
+					status: "VALID",
+					supplierPayments: [
+						{ amount: new Prisma.Decimal(10000), status: "REGISTERED" },
+					],
+				},
+				{
+					subtotal: new Prisma.Decimal(9000),
+					status: "VOID",
+					supplierPayments: [
+						{ amount: new Prisma.Decimal(9000), status: "REGISTERED" },
+					],
+				},
 			],
 			[{ amount: new Prisma.Decimal(20000), status: "REGISTERED" }],
 		);
@@ -25,8 +38,27 @@ describe("resumen financiero", () => {
 
 	it("usa el renglón presupuestario y no la palabra Compra como etapa", () => {
 		expect(expenseGroupLabel({ phase: "Compra" })).toBe("Sin etapa asignada");
-		expect(expenseGroupLabel({ phase: "Compra", requisitionItem: { budgetLineItem: { section: { code: "2", name: "Movimiento de tierras" } } } })).toBe("2 - Movimiento de tierras");
-		expect(expenseGroupLabel({ phase: "Compra", requisitionItem: { scheduleActivity: { budgetSectionCode: "1", budgetSectionName: "Trabajos preliminares" } } })).toBe("1 - Trabajos preliminares");
+		expect(
+			expenseGroupLabel({
+				phase: "Compra",
+				requisitionItem: {
+					budgetLineItem: {
+						section: { code: "2", name: "Movimiento de tierras" },
+					},
+				},
+			}),
+		).toBe("2 - Movimiento de tierras");
+		expect(
+			expenseGroupLabel({
+				phase: "Compra",
+				requisitionItem: {
+					scheduleActivity: {
+						budgetSectionCode: "1",
+						budgetSectionName: "Trabajos preliminares",
+					},
+				},
+			}),
+		).toBe("1 - Trabajos preliminares");
 	});
 });
 
@@ -48,5 +80,37 @@ describe("renglón de cada gasto para el resumen por renglón", () => {
 		expect(expenseSectionCode({ budgetSectionNo: " 3 " })).toBe("3");
 		expect(expenseSectionCode({ phase: "Fase 1" })).toBeNull();
 		expect(expenseSectionCode({ budgetSectionNo: "  " })).toBeNull();
+	});
+});
+
+describe("gasto del proyecto", () => {
+	const base = {
+		projectId: "p1",
+		expenseDate: "2026-10-06",
+		description: "Planilla semana 40",
+		subtotal: "1500",
+	};
+
+	it("acepta mano de obra sin comprobante", () => {
+		expect(
+			projectExpenseInputSchema.safeParse({ ...base, type: "Mano de obra" })
+				.success,
+		).toBe(true);
+	});
+
+	it("exige factura o recibo para material comprado en obra", () => {
+		const result = projectExpenseInputSchema.safeParse({
+			...base,
+			type: "Material",
+		});
+		expect(result.success).toBe(false);
+		expect(
+			projectExpenseInputSchema.safeParse({
+				...base,
+				type: "Material",
+				documentNumber: "A-123",
+				documentType: "FACTURA",
+			}).success,
+		).toBe(true);
 	});
 });

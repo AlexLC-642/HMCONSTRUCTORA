@@ -8,7 +8,7 @@ import {
 	ChevronRight,
 	CircleDollarSign,
 	ClipboardCheck,
-	FileCheck2,
+	FileText,
 	Mail,
 	MapPin,
 	PackageCheck,
@@ -17,6 +17,7 @@ import {
 	Plus,
 	ReceiptText,
 	Search,
+	ShieldAlert,
 	ShieldCheck,
 	ShoppingCart,
 	Store,
@@ -43,6 +44,7 @@ import {
 	quickCreatePurchaseMaterialAction,
 	type PurchaseOrderStepState,
 	receivePurchaseOrderAction,
+	registerPurchaseInvoiceAction,
 	type SupplierFormState,
 	saveSupplierAction,
 	setSupplierActiveAction,
@@ -52,8 +54,9 @@ import { ConfirmSubmitButton } from "@/shared/components/confirm-submit-button";
 import { HelpTip } from "@/shared/ui/help-tip";
 import { SelectMenu, type SelectMenuOption } from "@/shared/ui/select-menu";
 import {
+	type PurchaseBudgetScope,
+	purchaseBudgetScopeLabels,
 	purchaseOrderCancelBlocker,
-	purchaseOrderTracksFinance,
 } from "../domain/order-rules";
 import { purchaseOrderStatusLabels } from "../domain/validation";
 
@@ -64,53 +67,88 @@ type Supplier = WorkspaceData["suppliers"][number];
 type Order = WorkspaceData["orders"][number];
 type Requisition = WorkspaceData["readyRequisitions"][number];
 type View = "orders" | "suppliers" | "requisitions";
-type FlowState = "done" | "active" | "pending" | "stopped" | "skipped";
+type ProgressState = "done" | "active" | "pending" | "stopped" | "skipped";
 
-function FlowStep({
-	icon: Icon,
-	label,
-	state,
-}: {
-	icon: typeof ShoppingCart;
-	label: string;
-	state: FlowState;
-}) {
-	const doneLabels: Record<string, string> = {
-		Origen: "Definido",
-		Solicitud: "Autorizada",
-		"Compra directa": "Registrada",
-		Proveedor: "Asignado",
-		Orden: "Emitida",
-		Recepción: "Recibida",
-		Finanzas: "Registrado",
-	};
-	const activeLabels: Record<string, string> = {
-		Origen: "Por definir",
-		Solicitud: "Por autorizar",
-		"Compra directa": "En preparación",
-		Proveedor: "Por agregar",
-		Orden: "En curso",
-		Recepción: "En recepción",
-		Finanzas: "Por registrar",
-	};
-	const stateLabel =
-		state === "done"
-			? (doneLabels[label] ?? "Completo")
-			: state === "active"
-				? (activeLabels[label] ?? "En curso")
-				: state === "stopped"
-					? "Anulado"
-					: state === "skipped"
-						? "No aplica"
-						: "Pendiente";
+function BudgetTag({ scope }: { scope: PurchaseBudgetScope }) {
 	return (
-		<div data-state={state} title={`${label}: ${stateLabel}`}>
-			<span>
-				<Icon aria-hidden="true" size={17} />
-			</span>
-			<strong>{label}</strong>
-			<small>{stateLabel}</small>
-		</div>
+		<span className="purchases-budget-tag" data-scope={scope}>
+			{purchaseBudgetScopeLabels[scope]}
+		</span>
+	);
+}
+
+/** Avance de una orden: emisión → recepción en bodega → factura en Finanzas. */
+function OrderProgress({ order }: { order: Order }) {
+	const canceled = order.status === "CANCELED";
+	const received = order.status === "RECEIVED";
+	const invoiceComplete =
+		order.invoiceCount > 0 && order.invoicedAmount >= order.total;
+	const steps: Array<{ label: string; state: ProgressState; detail: string }> =
+		[
+			{
+				label: "Orden",
+				state: canceled
+					? "stopped"
+					: order.status === "DRAFT"
+						? "active"
+						: "done",
+				detail: canceled
+					? "Anulada"
+					: order.status === "DRAFT"
+						? "Borrador, falta emitir"
+						: `Emitida ${formatDate(order.issuedAt ?? order.issueDate)}`,
+			},
+			{
+				label: "Recepción en bodega",
+				state: canceled
+					? "stopped"
+					: received
+						? "done"
+						: order.status === "DRAFT"
+							? "pending"
+							: "active",
+				detail: received
+					? "Material completo"
+					: order.status === "PARTIAL"
+						? "Recepción parcial"
+						: order.status === "ISSUED"
+							? "Esperando entrega"
+							: "Pendiente",
+			},
+			{
+				label: "Factura en Finanzas",
+				state: canceled
+					? "stopped"
+					: !order.project
+						? "skipped"
+						: invoiceComplete
+							? "done"
+							: order.status === "DRAFT"
+								? "pending"
+								: "active",
+				detail: !order.project
+					? "No aplica a bodega"
+					: invoiceComplete
+						? "Factura registrada"
+						: order.invoiceCount > 0
+							? "Factura parcial"
+							: "Por registrar",
+			},
+		];
+	return (
+		<ol aria-label="Avance de la orden" className="purchases-steps">
+			{steps.map((step, index) => (
+				<li data-state={step.state} key={step.label}>
+					<span aria-hidden="true" className="purchases-steps__dot">
+						{step.state === "done" ? <Check size={13} /> : index + 1}
+					</span>
+					<span className="purchases-steps__copy">
+						<strong>{step.label}</strong>
+						<small>{step.detail}</small>
+					</span>
+				</li>
+			))}
+		</ol>
 	);
 }
 
@@ -413,6 +451,109 @@ function StatusBadge({ status }: { status: Order["status"] }) {
 		<span className="purchases-status" data-status={status}>
 			{purchaseOrderStatusLabels[status]}
 		</span>
+	);
+}
+
+function isOutsideBudget(order: Order) {
+	return order.budgetScope === "OUTSIDE" || order.budgetScope === "MIXED";
+}
+
+/** Explica por qué una orden de proyecto quedó (total o parcialmente) sin partida. */
+function BudgetNote({ order }: { order: Order }) {
+	if (order.status === "CANCELED" || !isOutsideBudget(order)) return null;
+	const outsideLines = order.items.filter((item) => item.outsideBudget).length;
+	return (
+		<div className="purchases-budget-note" role="note">
+			<ShieldAlert aria-hidden="true" size={18} />
+			<p>
+				<strong>
+					{order.budgetScope === "OUTSIDE"
+						? "Compra fuera de presupuesto"
+						: `${outsideLines} ${outsideLines === 1 ? "renglón fuera" : "renglones fuera"} de presupuesto`}
+				</strong>
+				{order.budgetScope === "OUTSIDE"
+					? (order.budgetExceptionReason ??
+						"Se compró sin requerimiento, así que no descuenta de ninguna partida.")
+					: "El requerimiento justificó esos renglones; el resto descuenta de su partida."}
+			</p>
+		</div>
+	);
+}
+
+/**
+ * Qué pasa con la factura del proveedor. La orden de compra no emite factura:
+ * el proveedor la emite a HM y Finanzas la registra como gasto del proyecto.
+ */
+function FinancePanel({ order }: { order: Order }) {
+	if (order.status === "CANCELED") return null;
+	if (!order.project) {
+		return (
+			<section className="purchases-finance" data-tracked="false">
+				<ReceiptText aria-hidden="true" size={18} />
+				<div>
+					<strong>Factura y costo</strong>
+					<p>
+						Compra de la compañía para bodega: no es gasto de un proyecto. El
+						costo llega a cada obra cuando el material sale de bodega hacia
+						ella.
+					</p>
+				</div>
+			</section>
+		);
+	}
+	const pending = Math.max(0, order.total - order.invoicedAmount);
+	return (
+		<section className="purchases-finance">
+			<ReceiptText aria-hidden="true" size={18} />
+			<div>
+				<strong>Factura y pago · {order.project.name}</strong>
+				<p>
+					{order.status === "DRAFT"
+						? "Emite la orden. Cuando el proveedor entregue la factura a nombre de HM, regístrala aquí: queda como gasto del proyecto en Finanzas, sin capturarla dos veces."
+						: order.invoiceCount === 0
+							? "El proveedor emite la factura a nombre de HM. Regístrala aquí con «Registrar factura»: queda como gasto del proyecto en Finanzas, donde se registran los pagos."
+							: pending > 0
+								? `Hay ${order.invoiceCount === 1 ? "1 factura registrada" : `${order.invoiceCount} facturas registradas`}; faltan ${formatCurrency(pending)} por facturar.`
+								: "La factura cubre el total de la orden. Los pagos se registran en Finanzas."}
+				</p>
+				{order.invoices.length > 0 ? (
+					<ul className="purchases-invoices">
+						{order.invoices.map((invoice) => (
+							<li key={invoice.id}>
+								<span>
+									<strong>Factura {invoice.number ?? "sin número"}</strong>
+									<small>{formatDate(invoice.date)}</small>
+								</span>
+								<strong>{formatCurrency(invoice.amount)}</strong>
+								{invoice.fileUrl ? (
+									<a
+										className="purchases-inline-action focus-ring"
+										href={invoice.fileUrl}
+										rel="noopener"
+										target="_blank"
+									>
+										<FileText aria-hidden="true" size={15} />
+										Ver archivo
+									</a>
+								) : null}
+							</li>
+						))}
+					</ul>
+				) : null}
+				{order.paymentType !== "CREDIT" ? (
+					<dl>
+						<div>
+							<dt>Facturado</dt>
+							<dd>{formatCurrency(order.invoicedAmount)}</dd>
+						</div>
+						<div>
+							<dt>Pagado</dt>
+							<dd>{formatCurrency(order.paidAmount)}</dd>
+						</div>
+					</dl>
+				) : null}
+			</div>
+		</section>
 	);
 }
 
@@ -813,9 +954,9 @@ function OrderForm({
 
 	return (
 		<ModalShell
-			description="Desde una solicitud autorizada"
+			description="Desde un requerimiento autorizado"
 			onClose={onClose}
-			title="Comprar solicitud"
+			title="Comprar requerimiento"
 		>
 			<form
 				action={formAction}
@@ -835,7 +976,7 @@ function OrderForm({
 						<ClipboardCheck aria-hidden="true" size={20} />
 					</div>
 					<div className="purchases-order-origin__identity">
-						<span>Solicitud autorizada</span>
+						<span>Requerimiento autorizado</span>
 						<strong>{requisition.number}</strong>
 						<p>{requisition.title}</p>
 					</div>
@@ -942,7 +1083,7 @@ function OrderForm({
 							<h3 className="purchases-label">
 								Precios acordados
 								<HelpTip label="Ayuda: precios">
-									Las cantidades vienen de la solicitud; escribe el costo
+									Las cantidades vienen del requerimiento; escribe el costo
 									unitario acordado.
 								</HelpTip>
 							</h3>
@@ -1188,8 +1329,6 @@ type DirectLine = {
 	unitCost: number;
 };
 
-type PurchaseDestination = "WAREHOUSE" | "PROJECT";
-
 function DirectPurchaseForm({
 	data,
 	today,
@@ -1214,10 +1353,6 @@ function DirectPurchaseForm({
 	const [warehouseId, setWarehouseId] = useState(
 		data.warehouses.length === 1 ? (data.warehouses[0]?.id ?? "") : "",
 	);
-	const [destination, setDestination] =
-		useState<PurchaseDestination>("WAREHOUSE");
-	const [projectId, setProjectId] = useState("");
-	const [justification, setJustification] = useState("");
 	const [expectedDate, setExpectedDate] = useState("");
 	const [showMissing, setShowMissing] = useState(false);
 	const [lines, setLines] = useState<DirectLine[]>([]);
@@ -1374,24 +1509,14 @@ function DirectPurchaseForm({
 			description: warehouse.code,
 		}),
 	);
-	const projectChoices: SelectMenuOption[] = data.projects.map((project) => ({
-		value: project.id,
-		label: project.name,
-		description: project.code ?? undefined,
-	}));
 	const missingSupplier = supplierChoices.length === 0;
 	const missingWarehouse = data.warehouses.length === 0;
 	const missingMaterials = materials.length === 0;
 	const cannotSave = missingSupplier || missingWarehouse;
-	const forProject = destination === "PROJECT";
 	const missing = [
 		!supplierId ? "el proveedor" : null,
 		!expectedDate ? "la entrega prevista" : null,
 		!warehouseId ? "la bodega" : null,
-		forProject && !projectId ? "el proyecto" : null,
-		forProject && justification.trim().length < 10
-			? "el motivo de la compra"
-			: null,
 		lines.length === 0 ? "al menos un artículo" : null,
 		lines.some((line) => !(line.quantity > 0) || !(line.unitCost > 0))
 			? "cantidad y costo de cada artículo"
@@ -1400,9 +1525,9 @@ function DirectPurchaseForm({
 
 	return (
 		<ModalShell
-			description="Sin solicitud previa"
+			description="Sin requerimiento previo"
 			onClose={onClose}
-			title="Nueva compra"
+			title="Compra directa"
 		>
 			<form
 				action={formAction}
@@ -1417,11 +1542,7 @@ function DirectPurchaseForm({
 			>
 				<input name="requisitionId" type="hidden" value="" />
 				<input name="items" type="hidden" value={serializedItems} />
-				<input
-					name="projectId"
-					type="hidden"
-					value={forProject ? projectId : ""}
-				/>
+				<input name="projectId" type="hidden" value="" />
 				{cannotSave ? (
 					<section className="purchases-readiness" role="status">
 						<div>
@@ -1526,47 +1647,18 @@ function DirectPurchaseForm({
 					<header>
 						<Warehouse aria-hidden="true" size={18} />
 						<div>
-							<h3>Destino y pago</h3>
+							<h3>Bodega y pago</h3>
 						</div>
 					</header>
 					<div className="purchases-order-form__stack">
-						<fieldset className="purchases-choice">
-							<legend>¿Para qué es esta compra?</legend>
-							<label className="purchases-choice__option">
-								<input
-									checked={!forProject}
-									name="purchaseDestination"
-									onChange={() => setDestination("WAREHOUSE")}
-									type="radio"
-									value="WAREHOUSE"
-								/>
-								<span>
-									<strong>Para bodega</strong>
-									<small>Se controla en Inventario</small>
-								</span>
-							</label>
-							<label
-								className="purchases-choice__option"
-								data-disabled={data.projects.length === 0 || undefined}
-							>
-								<input
-									checked={forProject}
-									disabled={data.projects.length === 0}
-									name="purchaseDestination"
-									onChange={() => setDestination("PROJECT")}
-									type="radio"
-									value="PROJECT"
-								/>
-								<span>
-									<strong>Para un proyecto</strong>
-									<small>
-										{data.projects.length === 0
-											? "No hay proyectos disponibles"
-											: "Se factura en Finanzas del proyecto"}
-									</small>
-								</span>
-							</label>
-						</fieldset>
+						<p className="purchases-scope-note">
+							<Warehouse aria-hidden="true" size={16} />
+							<span>
+								Compra de la compañía: entra a bodega y se controla en
+								Inventario. Lo que se gasta directo en un proyecto se registra
+								en <a href="/finances">Finanzas</a>.
+							</span>
+						</p>
 						<div className="purchases-order-form__pair">
 							<div className="purchases-field">
 								<span id="direct-order-warehouse-label">Bodega que recibe</span>
@@ -1587,54 +1679,10 @@ function DirectPurchaseForm({
 								/>
 								<FieldError message={errorFor("warehouseId")} />
 							</div>
-							{forProject ? (
-								<div className="purchases-field purchases-reveal">
-									<span id="direct-order-project-label">Proyecto</span>
-									<SelectMenu
-										aria-labelledby="direct-order-project-label"
-										emptyMessage="Ningún proyecto coincide."
-										invalid={
-											Boolean(errorFor("projectId")) ||
-											(showMissing && !projectId)
-										}
-										onChange={setProjectId}
-										options={projectChoices}
-										placeholder="Elegir proyecto"
-										searchPlaceholder="Buscar por nombre o código"
-										searchable
-										value={projectId}
-									/>
-									<FieldError message={errorFor("projectId")} />
-								</div>
-							) : null}
 						</div>
-						{forProject ? (
-							<label className="purchases-reveal">
-								<span className="purchases-label">
-									Motivo de la compra
-									<HelpTip label="Ayuda: motivo">
-										Las compras de proyecto normalmente salen de una solicitud.
-										Explica por qué esta no (mínimo 10 caracteres).
-									</HelpTip>
-								</span>
-								<textarea
-									aria-invalid={
-										Boolean(errorFor("budgetExceptionReason")) ||
-										(showMissing && justification.trim().length < 10)
-									}
-									maxLength={1000}
-									name="budgetExceptionReason"
-									onChange={(event) => setJustification(event.target.value)}
-									placeholder="Ej. Material urgente para la losa"
-									rows={2}
-									value={justification}
-								/>
-								<FieldError message={errorFor("budgetExceptionReason")} />
-							</label>
-						) : null}
 						<PaymentConditionFields
-							creditAvailable={forProject}
-							creditUnavailableReason="Solo para proyectos"
+							creditAvailable={false}
+							creditUnavailableReason="Solo para compras de proyecto"
 							errorFor={errorFor}
 							today={today}
 						/>
@@ -1934,6 +1982,121 @@ function DirectPurchaseForm({
 	);
 }
 
+/** Factura del proveedor para una orden de proyecto; se guarda una sola vez. */
+function InvoiceForm({
+	order,
+	today,
+	onClose,
+}: {
+	order: Order;
+	today: string;
+	onClose: () => void;
+}) {
+	const [state, formAction] = useActionState(
+		registerPurchaseInvoiceAction,
+		idleStepState,
+	);
+	const available = Math.max(0, order.total - order.invoicedAmount);
+	const [fileName, setFileName] = useState("");
+	return (
+		<ModalShell
+			description={`${order.number} · ${order.supplier.businessName}`}
+			onClose={onClose}
+			title="Registrar factura"
+		>
+			<form action={formAction} className="purchases-invoice-form">
+				<input name="projectId" type="hidden" value={order.project?.id ?? ""} />
+				<input name="purchaseOrderId" type="hidden" value={order.id} />
+				{state.status === "error" ? (
+					<div
+						aria-live="polite"
+						className="purchases-form__error"
+						role="alert"
+					>
+						<strong>No se guardó la factura</strong>
+						<span>{state.message}</span>
+					</div>
+				) : null}
+				<p className="purchases-scope-note">
+					<ReceiptText aria-hidden="true" size={16} />
+					<span>
+						Se registra una sola vez: queda como gasto de{" "}
+						<strong>{order.project?.name}</strong> en Finanzas, donde se
+						registran los pagos al proveedor.
+					</span>
+				</p>
+				<div className="purchases-invoice-form__grid">
+					<label>
+						<span>Número de factura</span>
+						<input
+							autoComplete="off"
+							name="documentNumber"
+							placeholder="Serie y número"
+							required
+						/>
+					</label>
+					<label>
+						<span>Fecha de la factura</span>
+						<input
+							defaultValue={today}
+							max={today}
+							name="expenseDate"
+							required
+							type="date"
+						/>
+					</label>
+					<label>
+						<span>Monto</span>
+						<input
+							defaultValue={available.toFixed(2)}
+							max={available.toFixed(2)}
+							min="0.01"
+							name="subtotal"
+							required
+							step="0.01"
+							type="number"
+						/>
+						<small>
+							Por facturar {formatCurrency(available)} de{" "}
+							{formatCurrency(order.total)}. Puede ser parcial.
+						</small>
+					</label>
+					<label className="purchases-invoice-form__file">
+						<span>Archivo de la factura</span>
+						<input
+							accept="application/pdf,image/*"
+							name="documentFile"
+							onChange={(event) =>
+								setFileName(event.target.files?.[0]?.name ?? "")
+							}
+							required
+							type="file"
+						/>
+						<small>{fileName || "PDF o foto, obligatorio"}</small>
+					</label>
+					<label className="purchases-invoice-form__wide">
+						<span>Observaciones (opcional)</span>
+						<textarea maxLength={1000} name="notes" rows={2} />
+					</label>
+				</div>
+				<footer className="purchases-invoice-form__footer">
+					<button
+						className="purchases-button purchases-button--ghost focus-ring"
+						onClick={onClose}
+						type="button"
+					>
+						Cancelar
+					</button>
+					<SubmitButton>
+						<ReceiptText size={17} />
+						Guardar factura
+					</SubmitButton>
+				</footer>
+			</form>
+		</ModalShell>
+	);
+}
+
 function ReceiptForm({
 	order,
 	today,
@@ -2091,11 +2254,13 @@ function OrderStepActions({
 	canManage,
 	canRegisterFinance,
 	onReceive,
+	onInvoice,
 }: {
 	order: Order;
 	canManage: boolean;
 	canRegisterFinance: boolean;
 	onReceive: () => void;
+	onInvoice: () => void;
 }) {
 	const idle: StepState = { ...idleStepState, attempt: 0 };
 	const [issueState, issueAction] = useActionState(issueWithAttempt, idle);
@@ -2112,7 +2277,10 @@ function OrderStepActions({
 				? issueState.message
 				: null;
 	const showFinance =
-		canRegisterFinance && order.project && order.status !== "DRAFT";
+		canRegisterFinance &&
+		Boolean(order.project) &&
+		order.status !== "DRAFT" &&
+		order.total - order.invoicedAmount > 0.004;
 	const showReceive = canManage && ["ISSUED", "PARTIAL"].includes(order.status);
 	const showIssue = canManage && order.status === "DRAFT";
 	const showCancel =
@@ -2129,13 +2297,14 @@ function OrderStepActions({
 					{error}
 				</p>
 			) : null}
-			{showFinance && order.project ? (
-				<a
+			{showFinance ? (
+				<button
 					className="purchases-button purchases-button--ghost focus-ring"
-					href={`/finances?projectId=${order.project.id}`}
+					onClick={onInvoice}
+					type="button"
 				>
-					<ReceiptText size={17} /> Registrar factura en Finanzas
-				</a>
+					<ReceiptText size={17} /> Registrar factura
+				</button>
 			) : null}
 			{showReceive ? (
 				<button
@@ -2163,7 +2332,7 @@ function OrderStepActions({
 						confirmLabel="Anular orden"
 						description={
 							order.status === "ISSUED"
-								? `${order.number} quedará anulada y no podrá recibirse ni facturarse.${order.requisition ? ` La solicitud ${order.requisition.number} volverá a quedar pendiente de compra.` : ""}`
+								? `${order.number} quedará anulada y no podrá recibirse ni facturarse.${order.requisition ? ` El requerimiento ${order.requisition.number} volverá a quedar pendiente de compra.` : ""}`
 								: `${order.number} quedará anulada y no podrá emitirse.`
 						}
 						key={cancelState.attempt}
@@ -2196,6 +2365,7 @@ export function PurchasesWorkspace({
 	const [view, setView] = useState<View>(initialView);
 	const [query, setQuery] = useState("");
 	const [status, setStatus] = useState("ALL");
+	const [onlyOutsideBudget, setOnlyOutsideBudget] = useState(false);
 	const [supplierQuery, setSupplierQuery] = useState("");
 	const [supplierModal, setSupplierModal] = useState<Supplier | "new" | null>(
 		null,
@@ -2209,6 +2379,7 @@ export function PurchasesWorkspace({
 		data.orders[0]?.id ?? "",
 	);
 	const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+	const [invoiceOrder, setInvoiceOrder] = useState<Order | null>(null);
 	const [directPurchaseOpen, setDirectPurchaseOpen] = useState(false);
 	const selectedOrder =
 		data.orders.find((order) => order.id === selectedOrderId) ?? data.orders[0];
@@ -2218,13 +2389,14 @@ export function PurchasesWorkspace({
 				const search = query.trim().toLowerCase();
 				return (
 					(status === "ALL" || order.status === status) &&
+					(!onlyOutsideBudget || isOutsideBudget(order)) &&
 					(!search ||
 						`${order.number} ${order.supplier.businessName} ${order.requisition?.number ?? "compra directa"}`
 							.toLowerCase()
 							.includes(search))
 				);
 			}),
-		[data.orders, query, status],
+		[data.orders, query, status, onlyOutsideBudget],
 	);
 	const filteredSuppliers = useMemo(() => {
 		const search = supplierQuery.trim().toLowerCase();
@@ -2246,65 +2418,8 @@ export function PurchasesWorkspace({
 			),
 		[data.orders],
 	);
-	const orderStopped = selectedOrder?.status === "CANCELED";
-	const orderComplete = selectedOrder?.status === "RECEIVED";
-	const hasReceipt = Boolean(
-		selectedOrder?.items.some((item) => item.receivedQuantity > 0),
-	);
-	const invoiceComplete = Boolean(
-		selectedOrder && selectedOrder.invoicedAmount >= selectedOrder.total,
-	);
-	const selectedOrderFlow: FlowState[] = selectedOrder
-		? [
-				"done",
-				"done",
-				orderStopped ? "stopped" : orderComplete ? "done" : "active",
-				orderStopped
-					? "stopped"
-					: orderComplete
-						? "done"
-						: hasReceipt
-							? "active"
-							: "pending",
-				orderStopped
-					? "stopped"
-					: !selectedOrder.project
-						? "skipped"
-						: invoiceComplete
-							? "done"
-							: selectedOrder.invoiceCount > 0
-								? "active"
-								: "pending",
-			]
-		: ["pending", "pending", "pending", "pending", "pending"];
-	const flowStates: FlowState[] =
-		view === "orders"
-			? selectedOrderFlow
-			: view === "requisitions"
-				? [
-						data.readyRequisitions.length > 0 ? "done" : "active",
-						data.metrics.activeSuppliers > 0 ? "done" : "active",
-						data.readyRequisitions.length > 0 &&
-						data.metrics.activeSuppliers > 0
-							? "active"
-							: "pending",
-						"pending",
-						"pending",
-					]
-				: [
-						data.readyRequisitions.length > 0 ? "done" : "pending",
-						data.metrics.activeSuppliers > 0 ? "done" : "active",
-						"pending",
-						"pending",
-						"pending",
-					];
-	const firstFlowLabel = selectedOrder
-		? selectedOrder.requisition
-			? "Solicitud"
-			: "Compra directa"
-		: view === "requisitions"
-			? "Solicitud"
-			: "Origen";
+	const preferRequisitions = data.readyRequisitions.length > 0;
+	const outsideBudgetCount = data.metrics.outsideBudgetOrders;
 
 	return (
 		<div className="purchases-workspace">
@@ -2319,6 +2434,13 @@ export function PurchasesWorkspace({
 					today={today}
 				/>
 			) : null}
+			{invoiceOrder ? (
+				<InvoiceForm
+					onClose={() => setInvoiceOrder(null)}
+					order={invoiceOrder}
+					today={today}
+				/>
+			) : null}
 			{receiptOrder ? (
 				<ReceiptForm
 					onClose={() => setReceiptOrder(null)}
@@ -2326,107 +2448,93 @@ export function PurchasesWorkspace({
 					today={today}
 				/>
 			) : null}
-			<section className="purchases-hero">
-				<div className="purchases-hero__texture" />
-				<div className="purchases-hero__content">
-					<div className="purchases-hero__title">
-						<div className="purchases-hero__icon">
-							<ShoppingCart aria-hidden="true" size={24} />
-						</div>
-						<div className="purchases-hero__context">
-							<h1 className="sr-only">Compras</h1>
-							<strong>Inicia una operación</strong>
-							<span>Compra directa o desde una solicitud autorizada.</span>
-						</div>
-					</div>
-					{canManage ? (
-						<div className="purchases-hero__actions">
-							<button
-								className="purchases-button purchases-button--red focus-ring"
-								onClick={() => setDirectPurchaseOpen(true)}
-								type="button"
-							>
-								<ShoppingCart size={18} />
-								Nueva compra
-							</button>
-							<button
-								className="purchases-button purchases-button--amber focus-ring"
-								onClick={() => setView("requisitions")}
-								type="button"
-							>
-								<ClipboardCheck size={18} />
-								Comprar desde solicitud
-							</button>
-							<button
-								className="purchases-button purchases-button--green focus-ring"
-								onClick={() => setSupplierModal("new")}
-								type="button"
-							>
-								<Store size={18} />
-								Agregar proveedor
-							</button>
-						</div>
-					) : null}
-					<div className="purchases-flow">
-						<FlowStep
-							icon={ClipboardCheck}
-							label={firstFlowLabel}
-							state={flowStates[0]}
-						/>
-						<ChevronRight size={16} />
-						<FlowStep icon={Store} label="Proveedor" state={flowStates[1]} />
-						<ChevronRight size={16} />
-						<FlowStep icon={FileCheck2} label="Orden" state={flowStates[2]} />
-						<ChevronRight size={16} />
-						<FlowStep icon={Truck} label="Recepción" state={flowStates[3]} />
-						<ChevronRight size={16} />
-						<FlowStep
-							icon={ReceiptText}
-							label="Finanzas"
-							state={flowStates[4]}
-						/>
-					</div>
+			<header className="purchases-header">
+				<div className="purchases-header__copy">
+					<h1>Compras</h1>
+					<p>
+						Del requerimiento autorizado a la orden, la recepción en bodega y la
+						factura en Finanzas.
+					</p>
 				</div>
-			</section>
+				{canManage ? (
+					<div className="purchases-header__actions">
+						<button
+							className={`purchases-button ${preferRequisitions ? "purchases-button--red" : "purchases-button--ghost"} focus-ring`}
+							onClick={() => setView("requisitions")}
+							type="button"
+						>
+							<ClipboardCheck aria-hidden="true" size={17} />
+							Comprar requerimiento
+							{preferRequisitions ? (
+								<span className="purchases-header__count">
+									{data.readyRequisitions.length}
+								</span>
+							) : null}
+						</button>
+						<button
+							className={`purchases-button ${preferRequisitions ? "purchases-button--ghost" : "purchases-button--red"} focus-ring`}
+							onClick={() => setDirectPurchaseOpen(true)}
+							type="button"
+						>
+							<ShoppingCart aria-hidden="true" size={17} />
+							Compra directa
+						</button>
+						<button
+							className="purchases-button purchases-button--quiet focus-ring"
+							onClick={() => setSupplierModal("new")}
+							type="button"
+						>
+							<Plus aria-hidden="true" size={17} />
+							Proveedor
+						</button>
+					</div>
+				) : null}
+			</header>
 
 			<section aria-label="Indicadores de compras" className="purchases-kpis">
 				<Metric
-					detail="Borradores, emitidas o parciales"
+					detail="Requerimientos autorizados sin orden"
+					icon={ClipboardCheck}
+					label="Por comprar"
+					tone={data.metrics.readyToBuy > 0 ? "red" : "steel"}
+					value={String(data.metrics.readyToBuy)}
+					onActivate={() => setView("requisitions")}
+				/>
+				<Metric
+					detail="Borrador, emitidas o con recepción parcial"
 					icon={ShoppingCart}
-					label="Compras abiertas"
-					tone="red"
+					label="Órdenes abiertas"
+					tone="steel"
 					value={String(data.metrics.openOrders)}
 					onActivate={() => {
 						setView("orders");
 						setStatus("ALL");
+						setOnlyOutsideBudget(false);
 					}}
 				/>
 				<Metric
-					detail="Valor comprometido pendiente de cierre"
+					detail="Valor de las órdenes abiertas"
 					icon={CircleDollarSign}
 					label="Comprometido"
-					tone="amber"
+					tone="steel"
 					value={formatCompactCurrency(data.metrics.openValue)}
 					onActivate={() => {
 						setView("orders");
 						setStatus("ALL");
+						setOnlyOutsideBudget(false);
 					}}
 				/>
 				<Metric
-					detail="Disponibles para nuevas compras"
-					icon={ShieldCheck}
-					label="Proveedores activos"
-					tone="green"
-					value={String(data.metrics.activeSuppliers)}
-					onActivate={() => setView("suppliers")}
-				/>
-				<Metric
-					detail="Solicitudes autorizadas sin orden"
-					icon={ClipboardCheck}
-					label="Pendientes de compra"
-					tone="steel"
-					value={String(data.metrics.readyToBuy)}
-					onActivate={() => setView("requisitions")}
+					detail="Órdenes de proyecto sin partida del presupuesto"
+					icon={ShieldAlert}
+					label="Fuera de presupuesto"
+					tone={outsideBudgetCount > 0 ? "amber" : "steel"}
+					value={String(outsideBudgetCount)}
+					onActivate={() => {
+						setView("orders");
+						setStatus("ALL");
+						setOnlyOutsideBudget(true);
+					}}
 				/>
 			</section>
 
@@ -2437,17 +2545,6 @@ export function PurchasesWorkspace({
 					aria-label="Vistas de compras"
 				>
 					<button
-						aria-selected={view === "orders"}
-						className="focus-ring"
-						data-view="orders"
-						onClick={() => setView("orders")}
-						role="tab"
-						type="button"
-					>
-						<ShoppingCart size={17} />
-						Compras<span>{data.orders.length}</span>
-					</button>
-					<button
 						aria-selected={view === "requisitions"}
 						className="focus-ring"
 						data-view="requisitions"
@@ -2455,8 +2552,19 @@ export function PurchasesWorkspace({
 						role="tab"
 						type="button"
 					>
-						<ClipboardCheck size={17} />
-						Pendientes de compra<span>{data.readyRequisitions.length}</span>
+						<ClipboardCheck aria-hidden="true" size={17} />
+						Por comprar<span>{data.readyRequisitions.length}</span>
+					</button>
+					<button
+						aria-selected={view === "orders"}
+						className="focus-ring"
+						data-view="orders"
+						onClick={() => setView("orders")}
+						role="tab"
+						type="button"
+					>
+						<ShoppingCart aria-hidden="true" size={17} />
+						Órdenes<span>{data.orders.length}</span>
 					</button>
 					<button
 						aria-selected={view === "suppliers"}
@@ -2466,7 +2574,7 @@ export function PurchasesWorkspace({
 						role="tab"
 						type="button"
 					>
-						<Store size={17} />
+						<Store aria-hidden="true" size={17} />
 						Proveedores<span>{data.suppliers.length}</span>
 					</button>
 				</div>
@@ -2512,6 +2620,14 @@ export function PurchasesWorkspace({
 										</button>
 									),
 								)}
+								<button
+									aria-pressed={onlyOutsideBudget}
+									className="purchases-order-filters__budget"
+									onClick={() => setOnlyOutsideBudget((current) => !current)}
+									type="button"
+								>
+									Fuera de presupuesto <span>{outsideBudgetCount}</span>
+								</button>
 							</fieldset>
 							<div className="purchases-order-list__scroll">
 								{filteredOrders.length ? (
@@ -2528,9 +2644,12 @@ export function PurchasesWorkspace({
 												<StatusBadge status={order.status} />
 											</div>
 											<p>{order.supplier.businessName}</p>
-											<small className="purchases-order-row__trace">
-												{getOrderTrace(order)}
-											</small>
+											<div className="purchases-order-row__meta">
+												<BudgetTag scope={order.budgetScope} />
+												<small className="purchases-order-row__trace">
+													{getOrderTrace(order)}
+												</small>
+											</div>
 											<div>
 												<span>
 													{destinationLabel(order.requisition, order)}
@@ -2557,13 +2676,16 @@ export function PurchasesWorkspace({
 									<header>
 										<div>
 											<span>
-												{selectedOrder.requisition?.number ?? "Compra directa"}
+												{selectedOrder.requisition
+													? `Requerimiento ${selectedOrder.requisition.number}`
+													: "Compra directa"}
 											</span>
 											<h2>{selectedOrder.number}</h2>
 											<p>{selectedOrder.supplier.businessName}</p>
 										</div>
 										<StatusBadge status={selectedOrder.status} />
 									</header>
+									<OrderProgress order={selectedOrder} />
 									<div className="purchases-order-detail__facts">
 										<div>
 											<CalendarClock size={18} />
@@ -2593,18 +2715,17 @@ export function PurchasesWorkspace({
 												</strong>
 											</span>
 										</div>
-										<div>
-											<ReceiptText size={18} />
+										<div data-budget={selectedOrder.budgetScope}>
+											<ShieldCheck size={18} />
 											<span>
-												Facturación
+												Presupuesto
 												<strong>
-													{selectedOrder.invoiceCount
-														? `${formatCurrency(selectedOrder.invoicedAmount)} · ${selectedOrder.invoiceCount}`
-														: "Sin factura"}
+													{purchaseBudgetScopeLabels[selectedOrder.budgetScope]}
 												</strong>
 											</span>
 										</div>
 									</div>
+									<BudgetNote order={selectedOrder} />
 									{selectedOrder.paymentType === "CREDIT" ? (
 										<section
 											className="purchases-credit-tracker"
@@ -2679,6 +2800,20 @@ export function PurchasesWorkspace({
 														)}{" "}
 														{item.unit ?? ""} × {formatCurrency(item.unitCost)}
 													</small>
+													{selectedOrder.project ? (
+														<small
+															className="purchases-line-budget"
+															data-outside={
+																item.outsideBudget ||
+																!item.budgetLine ||
+																undefined
+															}
+														>
+															{item.budgetLine
+																? `Partida ${item.budgetLine.sectionCode} · ${item.budgetLine.sectionName}`
+																: "Sin partida"}
+														</small>
+													) : null}
 													<small className="purchases-order-detail__received">
 														Recibido {formatNumber(item.receivedQuantity)} de{" "}
 														{formatNumber(item.quantity)}
@@ -2706,21 +2841,13 @@ export function PurchasesWorkspace({
 											<strong>{formatCurrency(selectedOrder.total)}</strong>
 										</div>
 									</div>
-									{!purchaseOrderTracksFinance({
-										projectId: selectedOrder.project?.id ?? null,
-									}) && selectedOrder.status !== "CANCELED" ? (
-										<p className="purchases-finance-note" data-tracked="false">
-											<ReceiptText aria-hidden="true" size={16} />
-											<span>
-												Compra de bodega: no genera gasto en Finanzas.
-											</span>
-										</p>
-									) : null}
+									<FinancePanel order={selectedOrder} />
 									{selectedOrder.status !== "CANCELED" ? (
 										<OrderStepActions
 											canManage={canManage}
 											canRegisterFinance={canRegisterFinance}
 											key={selectedOrder.id}
+											onInvoice={() => setInvoiceOrder(selectedOrder)}
 											onReceive={() => setReceiptOrder(selectedOrder)}
 											order={selectedOrder}
 										/>
@@ -2730,21 +2857,24 @@ export function PurchasesWorkspace({
 								<div className="purchases-empty purchases-empty--orders">
 									<ShoppingCart size={32} />
 									<h3>Todavía no hay órdenes</h3>
-									<p>Registra una compra directa o utiliza una solicitud.</p>
+									<p>
+										Compra un requerimiento autorizado o registra una compra
+										directa.
+									</p>
 									<div className="purchases-empty__actions">
 										<button
 											className="purchases-button purchases-button--red focus-ring"
 											onClick={() => setDirectPurchaseOpen(true)}
 											type="button"
 										>
-											<ShoppingCart size={17} /> Nueva compra
+											<ShoppingCart size={17} /> Compra directa
 										</button>
 										<button
 											className="purchases-button purchases-button--ghost focus-ring"
 											onClick={() => setView("requisitions")}
 											type="button"
 										>
-											<ClipboardCheck size={17} /> Usar solicitud
+											<ClipboardCheck size={17} /> Ver requerimientos
 										</button>
 									</div>
 								</div>
@@ -2905,14 +3035,17 @@ export function PurchasesWorkspace({
 					<div className="purchases-command__view purchases-requisitions">
 						<header>
 							<div>
-								<h2>Pendientes de compra</h2>
-								<p>Solicitudes autorizadas que todavía no tienen una orden.</p>
+								<h2>Por comprar</h2>
+								<p>
+									Requerimientos autorizados sin orden. Sus renglones ya vienen
+									ligados a una partida del presupuesto.
+								</p>
 							</div>
 							<a
 								className="purchases-inline-link focus-ring"
 								href="/requisitions"
 							>
-								Ver solicitudes
+								Ver requerimientos
 								<ArrowRight size={16} />
 							</a>
 						</header>
@@ -3011,7 +3144,7 @@ export function PurchasesWorkspace({
 						) : (
 							<div className="purchases-empty purchases-empty--large">
 								<ClipboardCheck size={34} />
-								<h3>No hay solicitudes autorizadas pendientes</h3>
+								<h3>No hay requerimientos autorizados pendientes</h3>
 								<p>
 									Las necesidades se registran y autorizan en Requerimientos.
 								</p>

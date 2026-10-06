@@ -5,6 +5,8 @@ import {
 } from "@/modules/auth/application/authorization";
 import type { AuthenticatedUser } from "@/modules/auth/domain/types";
 import { prisma } from "@/shared/lib/prisma";
+import { documentFileUrl } from "@/modules/documents/domain/catalog";
+import { purchaseOrderBudgetScope } from "../domain/order-rules";
 
 export type PurchaseFilters = {
 	query?: string;
@@ -97,6 +99,17 @@ export async function getPurchaseWorkspace(
 					select: {
 						id: true,
 						subtotal: true,
+						documentNumber: true,
+						expenseDate: true,
+						supportingDocument: {
+							select: {
+								versions: {
+									select: { id: true },
+									orderBy: { versionNumber: "desc" },
+									take: 1,
+								},
+							},
+						},
 						supplierPayments: {
 							where: { status: "REGISTERED" },
 							select: { amount: true, paymentDate: true },
@@ -113,7 +126,22 @@ export async function getPurchaseWorkspace(
 						destinationType: true,
 					},
 				},
-				items: { orderBy: { description: "asc" } },
+				items: {
+					orderBy: { description: "asc" },
+					include: {
+						requisitionItem: {
+							select: {
+								outsideBudget: true,
+								budgetLineItem: {
+									select: {
+										description: true,
+										section: { select: { code: true, name: true } },
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 			orderBy: [{ issueDate: "desc" }, { createdAt: "desc" }],
 		}),
@@ -248,15 +276,44 @@ export async function getPurchaseWorkspace(
 			project: order.project,
 			warehouse: order.warehouse,
 			requisition: order.requisition,
-			items: order.items.map((item) => ({
-				id: item.id,
-				description: item.description,
-				quantity: item.quantity.toNumber(),
-				unit: item.unit,
-				unitCost: item.unitCost.toNumber(),
-				subtotal: item.subtotal.toNumber(),
-				receivedQuantity: item.receivedQuantity.toNumber(),
-			})),
+			invoices: order.financialExpenses.map((expense) => {
+				const versionId = expense.supportingDocument?.versions[0]?.id;
+				return {
+					id: expense.id,
+					number: expense.documentNumber,
+					date: expense.expenseDate.toISOString(),
+					amount: expense.subtotal.toNumber(),
+					fileUrl: versionId ? documentFileUrl(versionId) : null,
+				};
+			}),
+			budgetExceptionReason: order.budgetExceptionReason,
+			budgetScope: purchaseOrderBudgetScope({
+				projectId: order.projectId,
+				requisitionId: order.requisitionId,
+				items: order.items.map((item) => ({
+					outsideBudget: Boolean(item.requisitionItem?.outsideBudget),
+				})),
+			}),
+			items: order.items.map((item) => {
+				const line = item.requisitionItem?.budgetLineItem;
+				return {
+					id: item.id,
+					description: item.description,
+					quantity: item.quantity.toNumber(),
+					unit: item.unit,
+					unitCost: item.unitCost.toNumber(),
+					subtotal: item.subtotal.toNumber(),
+					receivedQuantity: item.receivedQuantity.toNumber(),
+					outsideBudget: Boolean(item.requisitionItem?.outsideBudget),
+					budgetLine: line
+						? {
+								description: line.description,
+								sectionCode: line.section.code,
+								sectionName: line.section.name,
+							}
+						: null,
+				};
+			}),
 		};
 	});
 	const requisitionRows = readyRequisitions.map((requisition) => ({
@@ -301,6 +358,11 @@ export async function getPurchaseWorkspace(
 		})),
 		metrics: {
 			openOrders: openOrders.length,
+			outsideBudgetOrders: orderRows.filter(
+				(order) =>
+					order.status !== "CANCELED" &&
+					(order.budgetScope === "OUTSIDE" || order.budgetScope === "MIXED"),
+			).length,
 			openValue: openOrders.reduce((total, order) => total + order.total, 0),
 			activeSuppliers: supplierRows.filter(
 				(supplier) => supplier.status === "ACTIVE",

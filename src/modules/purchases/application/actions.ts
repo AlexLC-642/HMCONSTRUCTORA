@@ -3,7 +3,11 @@
 import type { Route } from "next";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireProjectScopePortfolioPermission } from "@/modules/auth/application/authorization";
+import {
+	requireProjectScopePortfolioPermission,
+	requireScopedProjectPermission,
+} from "@/modules/auth/application/authorization";
+import { createPurchaseInvoice } from "@/modules/finances/application/service";
 import {
 	purchaseOrderInputSchema,
 	purchaseReceiptInputSchema,
@@ -250,6 +254,47 @@ export async function receivePurchaseOrderAction(
 		return {
 			status: "error",
 			message: userMessage(error, "No se pudo registrar la recepción."),
+		};
+	}
+	purchaseRefresh();
+}
+
+/**
+ * La factura de una orden se ingresa en Compras. Se guarda con el mismo
+ * servicio de Finanzas, así que el gasto del proyecto aparece allá sin
+ * capturarlo otra vez.
+ */
+export async function registerPurchaseInvoiceAction(
+	_previous: PurchaseOrderStepState,
+	formData: FormData,
+): Promise<PurchaseOrderStepState> {
+	const projectId = String(formData.get("projectId") ?? "");
+	const user = await requireScopedProjectPermission(
+		projectId,
+		"finanzas.registrar",
+		"finances",
+	);
+	const file = formData.get("documentFile");
+	if (!(file instanceof File) || file.size <= 0) {
+		return { status: "error", message: "Adjunta el archivo de la factura." };
+	}
+	try {
+		await createPurchaseInvoice(
+			{
+				projectId,
+				purchaseOrderId: String(formData.get("purchaseOrderId") ?? ""),
+				expenseDate: String(formData.get("expenseDate") ?? ""),
+				documentNumber: String(formData.get("documentNumber") ?? ""),
+				subtotal: String(formData.get("subtotal") ?? ""),
+				notes: String(formData.get("notes") ?? ""),
+			},
+			file,
+			{ userId: user.id },
+		);
+	} catch (error) {
+		return {
+			status: "error",
+			message: userMessage(error, "No se pudo registrar la factura."),
 		};
 	}
 	purchaseRefresh();

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	purchaseOrderBudgetScope,
 	purchaseOrderCancelBlocker,
 	purchaseOrderTracksFinance,
 } from "@/modules/purchases/domain/order-rules";
@@ -64,5 +65,37 @@ describe("purchase order cancel rules", () => {
 	it("tracks finance only for project purchases", () => {
 		expect(purchaseOrderTracksFinance({ projectId: "p1" })).toBe(true);
 		expect(purchaseOrderTracksFinance({ projectId: null })).toBe(false);
+	});
+
+	it("classifies how an order relates to the project budget", () => {
+		const budgeted = [{ outsideBudget: false }];
+		expect(
+			purchaseOrderBudgetScope({
+				projectId: null,
+				requisitionId: "r1",
+				items: budgeted,
+			}),
+		).toBe("WAREHOUSE");
+		expect(
+			purchaseOrderBudgetScope({
+				projectId: "p1",
+				requisitionId: null,
+				items: budgeted,
+			}),
+		).toBe("OUTSIDE");
+		expect(
+			purchaseOrderBudgetScope({
+				projectId: "p1",
+				requisitionId: "r1",
+				items: budgeted,
+			}),
+		).toBe("BUDGETED");
+		expect(
+			purchaseOrderBudgetScope({
+				projectId: "p1",
+				requisitionId: "r1",
+				items: [...budgeted, { outsideBudget: true }],
+			}),
+		).toBe("MIXED");
 	});
 });

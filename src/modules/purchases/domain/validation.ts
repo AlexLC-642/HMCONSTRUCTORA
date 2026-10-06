@@ -144,15 +144,14 @@ export const purchaseOrderInputSchema = z
 			});
 			return;
 		}
-		if (
-			input.projectId &&
-			(!input.budgetExceptionReason || input.budgetExceptionReason.length < 10)
-		) {
+		// Compras es la compra de la compañía: sin requerimiento, la compra va a
+		// bodega. Un gasto propio de un proyecto se registra en Finanzas.
+		if (input.projectId) {
 			context.addIssue({
 				code: "custom",
-				path: ["budgetExceptionReason"],
+				path: ["projectId"],
 				message:
-					"Explique por qué la compra del proyecto se realizará sin una solicitud presupuestada.",
+					"La compra directa es para bodega. Los gastos de un proyecto se registran en Finanzas.",
 			});
 		}
 		if (!input.warehouseId) {

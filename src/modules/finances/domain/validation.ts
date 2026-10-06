@@ -33,6 +33,26 @@ export const expenseInputSchema = z.object({
 	notes: z.string().trim().optional(),
 });
 
+/**
+ * Gasto del proyecto. Si es material comprado en obra debe llevar su factura o
+ * recibo: es la única constancia de esa compra (no pasa por Compras).
+ */
+export const projectExpenseInputSchema = expenseInputSchema.superRefine(
+	(input, context) => {
+		if (
+			input.type?.toLowerCase() === "material" &&
+			!input.documentNumber?.trim()
+		) {
+			context.addIssue({
+				code: "custom",
+				path: ["documentNumber"],
+				message:
+					"El material comprado en obra necesita el número y archivo de su factura o recibo.",
+			});
+		}
+	},
+);
+
 export const expenseDocumentInputSchema = z.object({
 	financialExpenseId: z.string().trim().min(1, "Selecciona el gasto."),
 	documentNumber: z

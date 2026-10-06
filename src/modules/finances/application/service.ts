@@ -8,7 +8,7 @@ import {
 	type ExpenseDocumentInput,
 	type ExpenseInput,
 	expenseDocumentInputSchema,
-	expenseInputSchema,
+	projectExpenseInputSchema,
 	type PaymentInput,
 	type PurchaseInvoiceInput,
 	paymentInputSchema,
@@ -206,7 +206,7 @@ export async function createExpense(
 	context: FinanceContext,
 	receiptFile?: File,
 ) {
-	const parsed = expenseInputSchema.parse(rawInput) as ExpenseInput;
+	const parsed = projectExpenseInputSchema.parse(rawInput) as ExpenseInput;
 	const hasReceipt = receiptFile instanceof File && receiptFile.size > 0;
 	if (Boolean(parsed.documentNumber?.trim()) !== hasReceipt) {
 		throw new Error(

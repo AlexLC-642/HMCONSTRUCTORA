@@ -142,7 +142,7 @@ describe("purchase validation", () => {
 		).toBe(false);
 	});
 
-	it("requires justification when a direct purchase is assigned to a project", () => {
+	it("keeps direct purchases for the warehouse; project spending goes to Finanzas", () => {
 		const directProjectPurchase = {
 			...validOrder,
 			requisitionId: "",
@@ -160,7 +160,7 @@ describe("purchase validation", () => {
 				budgetExceptionReason:
 					"Compra urgente no contemplada en el presupuesto aprobado.",
 			}).success,
-		).toBe(true);
+		).toBe(false);
 	});
 
 	it("requires a positive received quantity and delivery reference", () => {

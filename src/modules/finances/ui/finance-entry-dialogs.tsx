@@ -15,7 +15,6 @@ import { useEffect, useId, useState } from "react";
 import {
 	createClientPaymentAction,
 	createExpenseAction,
-	createPurchaseInvoiceAction,
 } from "@/modules/finances/application/actions";
 import { HelpTip } from "@/shared/ui/help-tip";
 import { SelectMenu, type SelectMenuOption } from "@/shared/ui/select-menu";
@@ -38,7 +37,7 @@ type InvoiceOrderOption = {
 	supplier: { id: string; businessName: string };
 };
 
-type DialogKind = "invoice" | "expense" | "payment" | null;
+type DialogKind = "expense" | "payment" | null;
 
 const inputClass =
 	"focus-ring h-11 w-full rounded-lg border border-[#cbd3cc] bg-white px-3 text-sm text-[#172023] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:border-[#9daaa1]";
@@ -61,7 +60,7 @@ const paymentMethodOptions: SelectMenuOption[] = [
 const expenseTypeOptions: SelectMenuOption[] = [
 	{ value: "Mano de obra", label: "Mano de obra" },
 	{ value: "Servicio", label: "Servicio o flete" },
-	{ value: "Material", label: "Material (compra menor)" },
+	{ value: "Material", label: "Material comprado en obra" },
 	{ value: "Supervisión", label: "Supervisión" },
 	{ value: "Trabajo adicional", label: "Trabajo adicional" },
 	{ value: "Gasto externo", label: "Gasto externo" },
@@ -252,31 +251,25 @@ export function FinanceEntryDialogs({
 }: {
 	projectId: string;
 	sections: BudgetSectionOption[];
+	/** Órdenes del proyecto con saldo por facturar; la factura se ingresa en Compras. */
 	invoiceOrders: InvoiceOrderOption[];
 	today: string;
 }) {
 	const ids = useId();
 	const [dialog, setDialog] = useState<DialogKind>(null);
 	const [expenseFileName, setExpenseFileName] = useState("");
-	const [invoiceFileName, setInvoiceFileName] = useState("");
-	const invoiceableOrders = invoiceOrders.filter((order) => order.available > 0);
-	const [invoiceOrderId, setInvoiceOrderId] = useState(
-		invoiceableOrders[0]?.id ?? "",
-	);
+	const pendingInvoices = invoiceOrders.filter(
+		(order) => order.available > 0,
+	).length;
 	const [expenseType, setExpenseType] = useState("");
 	const [expenseSection, setExpenseSection] = useState("");
 	const [expenseMethod, setExpenseMethod] = useState("");
 	const [documentType, setDocumentType] = useState("");
 	const [paymentSection, setPaymentSection] = useState("");
 	const [paymentMethod, setPaymentMethod] = useState("Transferencia");
-	const canInvoice = invoiceableOrders.length > 0;
-	const selectedInvoiceOrder = invoiceOrders.find(
-		(order) => order.id === invoiceOrderId,
-	);
 	const close = () => {
 		setDialog(null);
 		setExpenseFileName("");
-		setInvoiceFileName("");
 		setExpenseType("");
 		setExpenseSection("");
 		setExpenseMethod("");
@@ -285,13 +278,6 @@ export function FinanceEntryDialogs({
 		setPaymentMethod("Transferencia");
 	};
 
-	const invoiceOrderOptions: SelectMenuOption[] = invoiceableOrders.map(
-		(order) => ({
-			value: order.id,
-			label: `${order.number} · ${order.supplier.businessName}`,
-			description: `Por facturar ${currency.format(order.available)}`,
-		}),
-	);
 	const expenseSectionOptions: SelectMenuOption[] = [
 		{ value: "", label: "Sin renglón" },
 		...sections.map((section) => ({
@@ -312,26 +298,25 @@ export function FinanceEntryDialogs({
 		<>
 			{/* Mismos botones por color que la barra de Compras. */}
 			<div className="flex flex-wrap items-center gap-2">
-				<button
-					className="purchases-button purchases-button--red focus-ring"
-					disabled={!canInvoice}
-					onClick={() => setDialog("invoice")}
-					title={
-						canInvoice
-							? "Factura de una orden de compra"
-							: "No hay órdenes de compra emitidas por facturar"
-					}
-					type="button"
-				>
-					<FileCheck2 aria-hidden="true" size={17} /> Factura de compra
-				</button>
+				{pendingInvoices > 0 ? (
+					<a
+						className="purchases-button purchases-button--ghost focus-ring"
+						href="/purchases"
+						title="Las facturas de órdenes de compra se registran en Compras"
+					>
+						<ShoppingCart aria-hidden="true" size={17} />
+						{pendingInvoices === 1
+							? "1 orden por facturar en Compras"
+							: `${pendingInvoices} órdenes por facturar en Compras`}
+					</a>
+				) : null}
 				<button
 					className="purchases-button purchases-button--amber focus-ring"
 					onClick={() => setDialog("expense")}
-					title="Pagos sin orden de compra"
+					title="Gasto del proyecto: mano de obra, servicios o material comprado en obra"
 					type="button"
 				>
-					<ReceiptText aria-hidden="true" size={17} /> Gasto directo
+					<ReceiptText aria-hidden="true" size={17} /> Gasto del proyecto
 				</button>
 				<button
 					className="purchases-button purchases-button--green focus-ring"
@@ -343,121 +328,21 @@ export function FinanceEntryDialogs({
 				</button>
 			</div>
 
-			{dialog === "invoice" ? (
-				<ModalShell
-					description="De una orden emitida en Compras"
-					help="Los pagos al proveedor se registran después en Cuentas por pagar."
-					icon={ShoppingCart}
-					onClose={close}
-					title="Factura de compra"
-				>
-					<form
-						action={createPurchaseInvoiceAction}
-						className="finance-entry-form flex min-h-0 flex-1 flex-col"
-					>
-						<input name="projectId" type="hidden" value={projectId} />
-						<div className="overflow-y-auto p-5 sm:p-6">
-							<div className="grid gap-4 sm:grid-cols-2">
-								<Field
-									className="sm:col-span-2"
-									label="Orden de compra"
-									labelId={`${ids}-order`}
-								>
-									<SelectMenu
-										aria-labelledby={`${ids}-order`}
-										emptyMessage="Ninguna orden coincide."
-										name="purchaseOrderId"
-										onChange={setInvoiceOrderId}
-										options={invoiceOrderOptions}
-										placeholder="Elegir orden"
-										searchPlaceholder="Buscar orden o proveedor"
-										searchable
-										value={invoiceOrderId}
-									/>
-								</Field>
-								<Field label="Número de factura">
-									<input
-										className={inputClass}
-										name="documentNumber"
-										placeholder="Serie y número"
-										required
-									/>
-								</Field>
-								<Field label="Fecha">
-									<input
-										className={inputClass}
-										defaultValue={today}
-										name="expenseDate"
-										required
-										type="date"
-									/>
-								</Field>
-								<Field
-									help={
-										selectedInvoiceOrder
-											? `Pendiente de facturar: ${currency.format(selectedInvoiceOrder.available)} de ${currency.format(selectedInvoiceOrder.total)}. Puede ser parcial.`
-											: "Puede ser parcial si el proveedor factura por entregas."
-									}
-									label="Monto"
-								>
-									<input
-										className={inputClass}
-										defaultValue={selectedInvoiceOrder?.available ?? ""}
-										key={selectedInvoiceOrder?.id ?? "invoice-total"}
-										max={selectedInvoiceOrder?.available}
-										min="0.01"
-										name="subtotal"
-										required
-										step="0.01"
-										type="number"
-									/>
-								</Field>
-								<Field label="Archivo">
-									<FileField
-										fileName={invoiceFileName}
-										name="documentFile"
-										onFile={setInvoiceFileName}
-										required
-									/>
-								</Field>
-								<MoreDetails>
-									<Field className="sm:col-span-2" label="Observaciones">
-										<textarea
-											className={`${inputClass} min-h-20 py-3`}
-											name="notes"
-										/>
-									</Field>
-								</MoreDetails>
-							</div>
-						</div>
-						<DialogFooter
-							onClose={close}
-							submit={
-								<FinanceSubmitButton
-									className="focus-ring inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--brand-red)] px-5 font-semibold text-white shadow-[0_10px_24px_rgba(200,32,47,0.22)]"
-									icon={<FileCheck2 size={17} />}
-									label="Guardar factura"
-								/>
-							}
-						/>
-					</form>
-				</ModalShell>
-			) : null}
-
 			{dialog === "expense" ? (
 				<ModalShell
-					description="Pagos sin orden de compra"
+					description="Mano de obra, servicios o material comprado en obra"
 					help={
 						<>
-							Mano de obra, fletes, servicios o compras menores.
+							Lo que se pagó directo para este proyecto, con su factura o
+							recibo.
 							<br />
-							Si el material se compró con orden de compra, usa{" "}
-							<strong>Factura de compra</strong> para no duplicarlo.
+							Las facturas de órdenes de compra se registran en{" "}
+							<strong>Compras</strong> y aparecen aquí solas; no las repitas.
 						</>
 					}
 					icon={ReceiptText}
 					onClose={close}
-					title="Gasto directo"
+					title="Gasto del proyecto"
 				>
 					<form
 						action={createExpenseAction}

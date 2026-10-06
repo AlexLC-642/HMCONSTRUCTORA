@@ -41,3 +41,34 @@ export function purchaseOrderTracksFinance(order: {
 }) {
 	return Boolean(order.projectId);
 }
+
+/**
+ * Relación de una orden con el presupuesto del proyecto:
+ * - WAREHOUSE: compra de bodega; no consume presupuesto al comprarse, el costo
+ *   llega al proyecto cuando el material sale de bodega.
+ * - BUDGETED: viene de un requerimiento cuyos renglones están ligados a partidas.
+ * - MIXED: viene de un requerimiento con algún renglón fuera de presupuesto.
+ * - OUTSIDE: compra directa para un proyecto, sin requerimiento ni partida.
+ */
+export type PurchaseBudgetScope =
+	| "WAREHOUSE"
+	| "BUDGETED"
+	| "MIXED"
+	| "OUTSIDE";
+
+export function purchaseOrderBudgetScope(order: {
+	projectId: string | null;
+	requisitionId: string | null;
+	items: Array<{ outsideBudget: boolean }>;
+}): PurchaseBudgetScope {
+	if (!order.projectId) return "WAREHOUSE";
+	if (!order.requisitionId) return "OUTSIDE";
+	return order.items.some((item) => item.outsideBudget) ? "MIXED" : "BUDGETED";
+}
+
+export const purchaseBudgetScopeLabels: Record<PurchaseBudgetScope, string> = {
+	WAREHOUSE: "Stock de bodega",
+	BUDGETED: "Dentro de presupuesto",
+	MIXED: "Parcialmente fuera de presupuesto",
+	OUTSIDE: "Fuera de presupuesto",
+};

@@ -143,7 +143,10 @@ function Panel({
 }
 
 type FinancesPageProps = {
-	searchParams: Promise<{ projectId?: string; tab?: string }>;
+	searchParams: Promise<{
+		projectId?: string;
+		tab?: string;
+	}>;
 };
 
 export default async function FinancesPage({
