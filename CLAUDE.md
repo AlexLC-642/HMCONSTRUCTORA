@@ -65,6 +65,8 @@ Inicialización del proyecto (desarrollo local):
 6. `npm run prisma:seed` (crea roles/permisos iniciales y el usuario semilla — ver README.md para las credenciales de desarrollo).
 7. `npm run dev` (Next.js con Turbopack).
 
+Despliegue en Railway (proyecto `handsome-illumination`, servicio `HMCONSTRUCTORA`): volumen `hmconstructora-volume` montado en `/app/public/uploads`. **Pre-deploy Command vacío** — Railway corre el pre-deploy en un contenedor sin volúmenes y su chequeo bloquea el despliegue ("expects a volume mounted…"). Migraciones y seed van en el Start Command: `npx prisma migrate deploy && npm run prisma:seed && npm run start -- --hostname 0.0.0.0 --port $PORT`. No crear otro volumen ni cambiar la ruta de montaje.
+
 Scripts de verificación relevantes (ver package.json): `npm run typecheck`, `npm run lint` (Biome), `npm run test` (Vitest, pruebas en `tests/*.test.ts` — no `tests/unit|integration|e2e`, esa subdivisión nunca se implementó), `npm run build`.
 
 Documentos vivos a los que referirse para más detalle (ver docs/README.md para el índice completo, incluyendo cuáles están desactualizados): `docs/architecture.md`, `docs/modules.md`, `docs/project-structure.md`, `docs/data-model.md`, `docs/roles-permissions.md`, `docs/database-audit.md`, `docs/security-audit.md`.
