@@ -24844,6 +24844,26 @@ input[id^="tab-seguridad-"]:checked
 	border: 1px solid #d5dbd7;
 	background: #f0f2f0;
 }
+.schedule-timeline__count {
+	margin-left: 0.75rem;
+	color: #b9c4bf;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	text-transform: none;
+}
+.schedule-timeline__table .schedule-timeline__empty {
+	padding: 10px;
+	color: #666;
+	font-style: italic;
+	text-align: center;
+}
+.schedule-timeline__table .grid-line--month {
+	border-left-color: #b8c1bc;
+}
+/* Una actividad de un día en un proyecto largo debe seguir viéndose. */
+.schedule-timeline__overview .bar {
+	min-width: 3px;
+}
 @media print {
 	.schedule-timeline__segment + .schedule-timeline__segment {
 		margin-top: 0;

@@ -73,15 +73,15 @@ export async function getPurchaseWorkspace(
 				...(query
 					? {
 							OR: [
-								{ number: { contains: query, mode: "insensitive" } },
+								{ number: { contains: query } },
 								{
 									supplier: {
-										businessName: { contains: query, mode: "insensitive" },
+										businessName: { contains: query },
 									},
 								},
 								{
 									requisition: {
-										number: { contains: query, mode: "insensitive" },
+										number: { contains: query },
 									},
 								},
 							],

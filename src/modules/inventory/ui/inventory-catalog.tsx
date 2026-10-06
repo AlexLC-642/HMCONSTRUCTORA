@@ -12,12 +12,13 @@ import {
 	PackageOpen,
 	Plus,
 	Search,
-	Wrench,
 	Warehouse as WarehouseIcon,
+	Wrench,
 	X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { AutoFilterForm } from "@/shared/ui/auto-filter-form";
+import { HelpTip } from "@/shared/ui/help-tip";
 import {
 	createInventoryMaterialAction,
 	createWarehouseAction,
@@ -55,6 +56,12 @@ function resourceTypeLabel(value: Material["resourceType"]) {
 	if (value === "EQUIPMENT") return "Equipo";
 	return "Material";
 }
+/** Especificación, marca y modelo en una línea para distinguir recursos parecidos. */
+function materialDetail(material: Material) {
+	return [material.specification, material.brand, material.model]
+		.filter(Boolean)
+		.join(" · ");
+}
 function href(params: Params, changes: Record<string, string>) {
 	const query = new URLSearchParams();
 	Object.entries(params).forEach(([key, value]) => {
@@ -87,7 +94,8 @@ export function InventoryCatalog({
 
 	useEffect(() => {
 		function close(event: KeyboardEvent) {
-			if (event.key === "Escape") setDialog(null);
+			// HelpTip marca su propio Escape como manejado: solo cierra la ayuda.
+			if (event.key === "Escape" && !event.defaultPrevented) setDialog(null);
 		}
 		window.addEventListener("keydown", close);
 		return () => window.removeEventListener("keydown", close);
@@ -149,14 +157,14 @@ export function InventoryCatalog({
 				className="kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
 			>
 				<InventoryMetric
-					detail={`${data.resourceCounts.TOOL ?? 0} herramientas`}
+					detail={`${data.resourceCounts.MATERIAL ?? 0} materiales · ${data.resourceCounts.TOOL ?? 0} herramientas · ${data.resourceCounts.EQUIPMENT ?? 0} equipos`}
 					icon={Boxes}
 					label="Recursos"
 					tone="graphite"
 					value={data.activeMaterials + data.inactiveMaterials}
 				/>
 				<InventoryMetric
-					detail={`${data.resourceCounts.EQUIPMENT ?? 0} equipos`}
+					detail={`${data.inactiveMaterials} inactivos`}
 					icon={Wrench}
 					label="Activos"
 					tone="green"
@@ -190,7 +198,10 @@ export function InventoryCatalog({
 					title="Crear recurso"
 					onClose={() => setDialog(null)}
 				>
-					<MaterialForm onClose={() => setDialog(null)} />
+					<MaterialForm
+						onClose={() => setDialog(null)}
+						units={data.unitsCatalog}
+					/>
 				</CatalogDrawer>
 			) : null}
 			{dialog === "warehouse" ? (
@@ -210,7 +221,11 @@ export function InventoryCatalog({
 					title="Editar recurso"
 					onClose={() => setDialog(null)}
 				>
-					<MaterialForm material={dialog} onClose={() => setDialog(null)} />
+					<MaterialForm
+						material={dialog}
+						onClose={() => setDialog(null)}
+						units={data.unitsCatalog}
+					/>
 				</CatalogDrawer>
 			) : null}
 		</div>
@@ -237,23 +252,35 @@ function Materials({
 				aria-label="Tipos de recurso"
 				className="inventory-scrollbar flex gap-2 overflow-x-auto border-b border-[#dde2de] px-4 py-3"
 			>
-				{[
-					["", "Todos", Boxes],
-					["MATERIAL", "Materiales", PackageOpen],
-					["TOOL", "Herramientas", Hammer],
-					["EQUIPMENT", "Equipos", Wrench],
-				].map(([value, label, Icon]) => (
+				{(
+					[
+						["", "Todos", Boxes, data.activeMaterials],
+						[
+							"MATERIAL",
+							"Materiales",
+							PackageOpen,
+							data.resourceCounts.MATERIAL ?? 0,
+						],
+						["TOOL", "Herramientas", Hammer, data.resourceCounts.TOOL ?? 0],
+						[
+							"EQUIPMENT",
+							"Equipos",
+							Wrench,
+							data.resourceCounts.EQUIPMENT ?? 0,
+						],
+					] as const
+				).map(([value, label, Icon, count]) => (
 					<a
 						aria-current={resourceType === value ? "page" : undefined}
 						className="inventory-catalog-tab focus-ring inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3.5 text-sm font-bold"
-						href={href(params, {
-							resourceType: String(value),
-							page: "1",
-						})}
-						key={String(value)}
+						href={href(params, { resourceType: value, page: "1" })}
+						key={value}
 					>
 						<Icon aria-hidden="true" size={16} />
-						{String(label)}
+						{label}
+						<span className="rounded-md bg-black/5 px-1.5 text-xs tabular-nums opacity-80">
+							{count}
+						</span>
 					</a>
 				))}
 			</nav>
@@ -265,7 +292,9 @@ function Materials({
 				<input name="catalog" type="hidden" value="materials" />
 				<input name="resourceType" type="hidden" value={resourceType} />
 				<label className="relative">
-					<span className="sr-only">Buscar por código o material</span>
+					<span className="sr-only">
+						Buscar por nombre, código, marca, modelo o medida
+					</span>
 					<Search
 						aria-hidden="true"
 						className="absolute left-3.5 top-3.5 text-[#6d7974]"
@@ -275,7 +304,7 @@ function Materials({
 						className={`${inventoryInputClass} pl-10`}
 						defaultValue={query}
 						name="q"
-						placeholder="Código o nombre del material"
+						placeholder="Buscar por nombre, código, marca o medida"
 						type="text"
 					/>
 				</label>
@@ -307,11 +336,22 @@ function Materials({
 			</AutoFilterForm>
 			<div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e1e5e1] px-4 py-3 sm:px-5">
 				<div>
-					<h2 className="font-bold">Materiales</h2>
+					<h2 className="font-bold">Recursos</h2>
 					<p className="text-xs text-[#68746f]">
-						{data.totalMaterials} resultados · catálogo de recursos
+						{data.totalMaterials}{" "}
+						{data.totalMaterials === 1 ? "resultado" : "resultados"}
+						{query ? ` para “${query}”` : ""}
 					</p>
 				</div>
+				{query || status || unit || resourceType ? (
+					<a
+						className={`${inventorySecondaryButtonClass} min-h-9 px-3`}
+						href="/inventory?view=catalog"
+					>
+						<X aria-hidden="true" size={15} />
+						Limpiar filtros
+					</a>
+				) : null}
 			</div>
 			{data.materials.length ? (
 				<>
@@ -319,27 +359,40 @@ function Materials({
 						<table className="inventory-table w-full min-w-[1000px] text-sm">
 							<thead>
 								<tr>
-									{[
-										"Código",
-										"Recurso",
-										"Tipo",
-										"Unidad",
-										"Costo base",
-										"Stock mínimo",
-										"Stock total",
-										"Bodegas",
-										"Estado",
-										"Acción",
-									].map((heading) => (
-										<th key={heading}>{heading}</th>
-									))}
+									<th>Código</th>
+									<th>Recurso</th>
+									<th>Tipo</th>
+									<th>Unidad</th>
+									<th>Costo base</th>
+									<th>
+										<span className="inline-flex items-center gap-1">
+											Stock mínimo
+											<HelpTip label="Ayuda: stock mínimo">
+												Cuando la existencia total baja a este número, el
+												recurso se marca como <strong>Bajo mínimo</strong>.
+											</HelpTip>
+										</span>
+									</th>
+									<th>Stock total</th>
+									<th>Bodegas</th>
+									<th>Estado</th>
+									<th>Acción</th>
 								</tr>
 							</thead>
 							<tbody>
 								{data.materials.map((material) => (
 									<tr key={material.id}>
-										<td className="font-bold">{material.code}</td>
-										<td className="font-bold">{material.name}</td>
+										<td className="whitespace-nowrap text-xs font-semibold text-[#5e6b66]">
+											{material.code}
+										</td>
+										<td>
+											<span className="block font-bold">{material.name}</span>
+											{materialDetail(material) ? (
+												<span className="mt-0.5 block max-w-[34ch] truncate text-xs text-[#68746f]">
+													{materialDetail(material)}
+												</span>
+											) : null}
+										</td>
 										<td>{resourceTypeLabel(material.resourceType)}</td>
 										<td>{material.unit}</td>
 										<td className="tabular-nums">
@@ -387,6 +440,11 @@ function Materials({
 											{resourceTypeLabel(material.resourceType)} ·{" "}
 											{material.unit}
 										</p>
+										{materialDetail(material) ? (
+											<p className="mt-0.5 truncate text-xs text-[#68746f]">
+												{materialDetail(material)}
+											</p>
+										) : null}
 									</div>
 									<MaterialStatus material={material} />
 								</div>
@@ -652,12 +710,41 @@ function CatalogDrawer({
 	);
 }
 
+function FieldLabel({
+	children,
+	help,
+	optional = false,
+}: {
+	children: ReactNode;
+	help?: ReactNode;
+	optional?: boolean;
+}) {
+	return (
+		<span className="flex items-center gap-1">
+			<span className={inventoryLabelClass}>
+				{children}
+				{optional ? (
+					<span className="normal-case tracking-normal text-[#74807b]">
+						{" "}
+						(opcional)
+					</span>
+				) : null}
+			</span>
+			{help ? (
+				<HelpTip label={`Ayuda: ${String(children)}`}>{help}</HelpTip>
+			) : null}
+		</span>
+	);
+}
+
 function MaterialForm({
 	material,
 	onClose,
+	units,
 }: {
 	material?: Material;
 	onClose: () => void;
+	units: string[];
 }) {
 	const action = material
 		? updateInventoryMaterialAction
@@ -714,13 +801,27 @@ function MaterialForm({
 		<form action={action} className="grid gap-4">
 			{material ? <input name="id" type="hidden" value={material.id} /> : null}
 			<div className="grid gap-1.5">
-				<span className={inventoryLabelClass}>Código</span>
+				<FieldLabel help="El sistema lo genera solo y no cambia. Sirve para buscar el recurso rápido en movimientos y requerimientos.">
+					Código
+				</FieldLabel>
 				<div className="flex min-h-12 items-center rounded-xl bg-[#e9ede9] px-3.5 text-sm font-semibold text-[#57645f]">
 					{material?.code ?? "Se asignará al guardar"}
 				</div>
 			</div>
 			<fieldset className="grid gap-2">
-				<legend className={inventoryLabelClass}>Tipo de recurso</legend>
+				<legend className="mb-2">
+					<FieldLabel
+						help={
+							<>
+								<strong>Material:</strong> se gasta (cemento, varilla).{" "}
+								<strong>Herramienta:</strong> se presta y regresa.{" "}
+								<strong>Equipo:</strong> maquinaria con marca y modelo.
+							</>
+						}
+					>
+						Tipo de recurso
+					</FieldLabel>
+				</legend>
 				<input name="resourceType" type="hidden" value={resourceType} />
 				<div className="grid gap-2 sm:grid-cols-3">
 					{Object.entries(resourceConfig).map(([value, option]) => {
@@ -753,11 +854,10 @@ function MaterialForm({
 					})}
 				</div>
 			</fieldset>
-			<div className="rounded-xl bg-[#f7f1e8] px-4 py-3 text-sm leading-5 text-[#6d4b16]">
-				<strong>{config.label}:</strong> {config.detail}
-			</div>
 			<label className="grid gap-1.5">
-				<span className={inventoryLabelClass}>{config.nameLabel}</span>
+				<FieldLabel help="Escribe el nombre como lo pide la gente en obra; así será fácil encontrarlo después.">
+					{config.nameLabel}
+				</FieldLabel>
 				<input
 					className={inventoryInputClass}
 					name="name"
@@ -767,7 +867,12 @@ function MaterialForm({
 				/>
 			</label>
 			<label className="grid gap-1.5">
-				<span className={inventoryLabelClass}>{config.specLabel}</span>
+				<FieldLabel
+					help="Medida, calibre o capacidad. Ayuda a distinguir recursos parecidos (ej. PVC 1/2 vs 3/4) y también se puede buscar."
+					optional
+				>
+					{config.specLabel}
+				</FieldLabel>
 				<input
 					className={inventoryInputClass}
 					defaultValue={material?.specification ?? ""}
@@ -777,7 +882,7 @@ function MaterialForm({
 			</label>
 			<div className="grid gap-4 sm:grid-cols-2">
 				<label className="grid gap-1.5">
-					<span className={inventoryLabelClass}>Marca</span>
+					<FieldLabel optional>Marca</FieldLabel>
 					<input
 						className={inventoryInputClass}
 						defaultValue={material?.brand ?? ""}
@@ -787,9 +892,7 @@ function MaterialForm({
 				</label>
 				{resourceType !== "MATERIAL" ? (
 					<label className="grid gap-1.5">
-						<span className={inventoryLabelClass}>
-							Modelo o serie comercial
-						</span>
+						<FieldLabel optional>Modelo o serie comercial</FieldLabel>
 						<input
 							className={inventoryInputClass}
 							defaultValue={material?.model ?? ""}
@@ -803,17 +906,28 @@ function MaterialForm({
 			</div>
 			<div className="grid gap-4 sm:grid-cols-2">
 				<label className="grid gap-1.5">
-					<span className={inventoryLabelClass}>{config.unitLabel}</span>
+					<FieldLabel help="Cómo se cuenta al entrar y salir de bodega. Elige una de la lista para no tener “saco” y “sacos” como unidades distintas.">
+						{config.unitLabel}
+					</FieldLabel>
 					<input
+						autoComplete="off"
 						className={inventoryInputClass}
 						name="unit"
 						defaultValue={material?.unit}
+						list="inventory-unit-options"
 						placeholder={config.unitPlaceholder}
 						required
 					/>
+					<datalist id="inventory-unit-options">
+						{units.map((item) => (
+							<option key={item} value={item} />
+						))}
+					</datalist>
 				</label>
 				<label className="grid gap-1.5">
-					<span className={inventoryLabelClass}>{config.costLabel}</span>
+					<FieldLabel help="Precio de referencia por unidad. Se usa para valorizar la bodega; cada compra registra su propio precio.">
+						{config.costLabel}
+					</FieldLabel>
 					<input
 						className={inventoryInputClass}
 						min="0"
@@ -825,7 +939,9 @@ function MaterialForm({
 				</label>
 			</div>
 			<label className="grid gap-1.5">
-				<span className={inventoryLabelClass}>{config.minimumLabel}</span>
+				<FieldLabel help="Cuando la existencia baje a este número aparecerá la alerta “Bajo mínimo”. Deja 0 si no quieres alerta.">
+					{config.minimumLabel}
+				</FieldLabel>
 				<input
 					className={inventoryInputClass}
 					min="0"
@@ -853,12 +969,7 @@ function MaterialForm({
 				</label>
 			) : null}
 			<label className="grid gap-1.5">
-				<span className={inventoryLabelClass}>
-					Notas{" "}
-					<span className="normal-case tracking-normal text-[#74807b]">
-						(opcional)
-					</span>
-				</span>
+				<FieldLabel optional>Notas</FieldLabel>
 				<textarea
 					className={inventoryTextareaClass}
 					name="notes"

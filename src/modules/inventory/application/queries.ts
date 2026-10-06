@@ -59,13 +59,16 @@ export async function getInventoryCatalog(
 		...(query
 			? {
 					OR: [
-						{ code: { contains: query, mode: "insensitive" as const } },
-						{ name: { contains: query, mode: "insensitive" as const } },
+						{ code: { contains: query } },
+						{ name: { contains: query } },
+						{ specification: { contains: query } },
+						{ brand: { contains: query } },
+						{ model: { contains: query } },
 					],
 				}
 			: {}),
 		...(status ? { active: status === "active" } : {}),
-		...(unit ? { unit: { equals: unit, mode: "insensitive" as const } } : {}),
+		...(unit ? { unit: { equals: unit } } : {}),
 		...(resourceType ? { resourceType } : {}),
 	};
 
@@ -190,10 +193,7 @@ export async function getStockDashboard(filters: InventoryListFilters = {}) {
 			active: true,
 			...(query
 				? {
-						OR: [
-							{ code: { contains: query, mode: "insensitive" as const } },
-							{ name: { contains: query, mode: "insensitive" as const } },
-						],
+						OR: [{ code: { contains: query } }, { name: { contains: query } }],
 					}
 				: {}),
 			...(materialId ? { id: materialId } : {}),
@@ -363,10 +363,10 @@ export async function getMovementHistory(
 		...(query
 			? {
 					OR: [
-						{ reference: { contains: query, mode: "insensitive" as const } },
+						{ reference: { contains: query } },
 						{
 							material: {
-								name: { contains: query, mode: "insensitive" as const },
+								name: { contains: query },
 							},
 						},
 					],
