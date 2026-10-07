@@ -204,10 +204,11 @@ export async function getStockDashboard(filters: InventoryListFilters = {}) {
 		where: { active: true },
 		orderBy: { name: "asc" },
 	});
+	// Sin filtro de bodega: las tarjetas de bodega resumen todas, y la tabla se
+	// filtra después.
 	const stocks = await prisma.stock.findMany({
 		where: {
 			...(materialId ? { materialId } : {}),
-			...(warehouseId ? { warehouseId } : {}),
 		},
 		include: { material: true, warehouse: true },
 		orderBy: [{ material: { name: "asc" } }, { warehouse: { name: "asc" } }],
@@ -217,7 +218,6 @@ export async function getStockDashboard(filters: InventoryListFilters = {}) {
 		where: {
 			type: "IN",
 			...(materialId ? { materialId } : {}),
-			...(warehouseId ? { warehouseId } : {}),
 		},
 		_sum: { quantity: true, totalCost: true },
 	});
@@ -255,6 +255,7 @@ export async function getStockDashboard(filters: InventoryListFilters = {}) {
 				code: stock.material.code,
 				name: stock.material.name,
 				unit: stock.material.unit,
+				resourceType: stock.material.resourceType,
 				minimumStock: stock.material.minimumStock.toNumber(),
 			},
 			warehouse: {
@@ -268,7 +269,17 @@ export async function getStockDashboard(filters: InventoryListFilters = {}) {
 			status: rowStatus,
 		};
 	});
-	const rows = allRows.filter((row) => !status || row.status === status);
+	// El buscador filtra el catálogo; las existencias deben seguir el mismo
+	// filtro (antes la tabla ignoraba la búsqueda).
+	const visibleMaterialIds = new Set(materials.map((material) => material.id));
+	const searchedRows = query
+		? allRows.filter((row) => visibleMaterialIds.has(row.materialId))
+		: allRows;
+	const rows = searchedRows.filter(
+		(row) =>
+			(!warehouseId || row.warehouseId === warehouseId) &&
+			(!status || row.status === status),
+	);
 	const stockByMaterial = new Map<string, number>();
 	for (const row of rows)
 		stockByMaterial.set(
@@ -290,14 +301,21 @@ export async function getStockDashboard(filters: InventoryListFilters = {}) {
 	}
 	const warehouseValues = allWarehouses
 		.map((warehouse) => {
-			const warehouseRows = rows.filter(
+			const warehouseRows = searchedRows.filter(
 				(row) => row.warehouseId === warehouse.id,
 			);
+			const byType = { MATERIAL: 0, TOOL: 0, EQUIPMENT: 0 };
+			for (const row of warehouseRows) {
+				if (row.quantity > 0) byType[row.material.resourceType] += 1;
+			}
 			return {
 				id: warehouse.id,
 				code: warehouse.code,
 				name: warehouse.name,
 				value: warehouseRows.reduce((sum, row) => sum + row.value, 0),
+				alerts: warehouseRows.filter((row) => row.status !== "available")
+					.length,
+				byType,
 				materialCount: new Set(
 					warehouseRows
 						.filter((row) => row.quantity > 0)
@@ -317,6 +335,10 @@ export async function getStockDashboard(filters: InventoryListFilters = {}) {
 		activeMaterials: materials.length,
 		activeWarehouses: allWarehouses.length,
 		positionCount: rows.filter((row) => row.quantity > 0).length,
+		// Recursos distintos con existencia (un recurso en dos bodegas cuenta una vez).
+		resourcesInStock: new Set(
+			rows.filter((row) => row.quantity > 0).map((row) => row.materialId),
+		).size,
 		inventoryValue: rows.reduce((sum, row) => sum + row.value, 0),
 	};
 }

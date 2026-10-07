@@ -586,7 +586,7 @@ function DailyReportsTable({ reports }: { reports: DailyReportRow[] }) {
 					</tbody>
 				</table>
 			</div>
-			<div className="grid gap-3 p-3 md:hidden">
+			<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
 				{reports.map((report) => (
 					<div
 						className="rounded-2xl border border-[#dfe4df] bg-[#f9faf8] p-4"
@@ -731,7 +731,7 @@ function ManualReportsTable({
 					</tbody>
 				</table>
 			</div>
-			<div className="grid gap-3 p-3 md:hidden">
+			<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
 				{documents.map((document) => {
 					const latest = document.versions[0];
 					const date = latest

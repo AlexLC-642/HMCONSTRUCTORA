@@ -18,6 +18,7 @@ import {
 	type PurchaseOrderStepState,
 	setSupplierActiveAction,
 } from "../application/actions";
+import { StatStrip } from "@/shared/ui/stat-strip";
 import type { getCompanyInvoices } from "../application/company-invoices";
 import type { getPurchaseWorkspace } from "../application/queries";
 
@@ -67,23 +68,7 @@ export type KpiItem = {
 };
 
 export function KpiStrip({ items }: { items: KpiItem[] }) {
-	return (
-		<section aria-label="Indicadores de compras" className="purchases-stats">
-			{items.map((item) => (
-				<button
-					className="purchases-stat focus-ring"
-					data-attention={item.attention}
-					key={item.key}
-					onClick={item.onActivate}
-					type="button"
-				>
-					<span className="purchases-stat__label">{item.label}</span>
-					<strong className="purchases-stat__value">{item.value}</strong>
-					<span className="purchases-stat__detail">{item.detail}</span>
-				</button>
-			))}
-		</section>
-	);
+	return <StatStrip items={items} label="Indicadores de compras" />;
 }
 
 export function formatCompactMoney(value: number) {

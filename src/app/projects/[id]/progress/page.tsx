@@ -202,29 +202,29 @@ export default async function ProjectProgressPage({
 
 				<div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
 					<nav
-						className="flex rounded-xl border border-[var(--border)] bg-[#f4f5f2] p-1"
+						className="flex max-w-full overflow-x-auto rounded-xl border border-[var(--border)] bg-[#f4f5f2] p-1 [scrollbar-width:none]"
 						aria-label="Vistas del informe diario"
 					>
 						<a
-							className={`focus-ring rounded-lg px-4 py-2 text-sm font-semibold transition ${activeTab === "resumen" ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+							className={`focus-ring shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${activeTab === "resumen" ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
 							href={`/projects/${id}/progress`}
 						>
 							Resumen
 						</a>
 						<a
-							className={`focus-ring rounded-lg px-4 py-2 text-sm font-semibold transition ${activeTab === "registro" ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+							className={`focus-ring shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${activeTab === "registro" ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
 							href={`/projects/${id}/progress?tab=registro`}
 						>
 							Registrar jornada
 						</a>
 						<a
-							className={`focus-ring rounded-lg px-4 py-2 text-sm font-semibold transition ${activeTab === "historial" ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+							className={`focus-ring shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${activeTab === "historial" ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
 							href={`/projects/${id}/progress?tab=historial`}
 						>
 							Historial
 						</a>
 						<a
-							className={`focus-ring rounded-lg px-4 py-2 text-sm font-semibold transition ${activeTab === "evidencias" ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
+							className={`focus-ring shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${activeTab === "evidencias" ? "bg-white text-[var(--foreground)] shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}
 							href={`/projects/${id}/progress?tab=evidencias`}
 						>
 							Evidencias

@@ -1,22 +1,22 @@
 "use client";
 
 import {
+	ArrowLeftRight,
 	Boxes,
-	CircleDollarSign,
 	Eye,
+	Hammer,
 	PackageCheck,
 	PackageOpen,
 	TriangleAlert,
 	Warehouse,
+	Wrench,
 	X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { chartTooltip, hmChartColors } from "@/shared/ui/charts/chart-theme";
-import { EChart } from "@/shared/ui/charts/e-chart";
+import { type ReactNode, useEffect, useState } from "react";
+import { StatStrip } from "@/shared/ui/stat-strip";
 import type { getStockDashboard } from "../application/queries";
 import {
 	InventoryEmpty,
-	InventoryMetric,
 	InventoryPanel,
 	InventorySectionHeader,
 	InventoryStatus,
@@ -32,6 +32,10 @@ const currency = new Intl.NumberFormat("es-GT", {
 	currency: "GTQ",
 });
 const number = new Intl.NumberFormat("es-GT", { maximumFractionDigits: 2 });
+
+function movementHref(row: StockRow) {
+	return `/inventory?view=movement&nuevo=1&recurso=${row.materialId}&bodega=${row.warehouseId}`;
+}
 
 function stateLabel(status: string) {
 	return status === "empty"
@@ -49,17 +53,37 @@ function stateTone(status: string): "danger" | "warning" | "success" {
 			: "success";
 }
 
+const resourceTypeGroups = [
+	{ key: "MATERIAL", label: "Materiales", icon: Boxes },
+	{ key: "TOOL", label: "Herramientas", icon: Hammer },
+	{ key: "EQUIPMENT", label: "Maquinaria y equipo", icon: Wrench },
+] as const;
+
 export function InventoryStockDashboard({
 	data,
+	toolbar,
+	activeStatus,
+	activeWarehouse,
 }: {
 	data: Dashboard;
 	params?: Record<string, string | string[] | undefined>;
+	/** Filtros de la página: se muestran dentro del panel de existencias. */
+	toolbar?: ReactNode;
+	activeStatus?: string;
+	activeWarehouse?: string;
 }) {
 	const [dialogRow, setDialogRow] = useState<StockRow | null>(null);
-	const totalHealth =
-		data.health.available + data.health.low + data.health.empty;
-	const filterHref = (status: string) =>
-		`/inventory?view=stock&status=${status}`;
+	const stockHref = (changes: { status?: string; warehouseId?: string }) => {
+		const query = new URLSearchParams({ view: "stock" });
+		const status = changes.status ?? activeStatus ?? "";
+		const warehouseId = changes.warehouseId ?? activeWarehouse ?? "";
+		if (status) query.set("status", status);
+		if (warehouseId) query.set("warehouseId", warehouseId);
+		return `/inventory?${query.toString()}`;
+	};
+	const selectedWarehouse = data.warehouseValues.find(
+		(warehouse) => warehouse.id === activeWarehouse,
+	);
 
 	useEffect(() => {
 		function close(event: KeyboardEvent) {
@@ -70,289 +94,124 @@ export function InventoryStockDashboard({
 	}, []);
 
 	return (
-		<div className="space-y-5">
-			<section
-				aria-label="Resumen del inventario"
-				className="kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-			>
-				<InventoryMetric
-					detail="en el catálogo"
-					icon={PackageCheck}
-					label="Materiales activos"
-					tone="red"
-					value={data.activeMaterials}
-				/>
-				<InventoryMetric
-					detail="ubicaciones operativas"
-					icon={Warehouse}
-					label="Bodegas"
-					tone="blue"
-					value={data.activeWarehouses}
-				/>
-				<InventoryMetric
-					detail="con saldo disponible"
-					icon={Boxes}
-					label="Posiciones de stock"
-					tone="green"
-					value={data.positionCount}
-				/>
-				<InventoryMetric
-					detail="valor estimado actual"
-					icon={CircleDollarSign}
-					label="Valor del inventario"
-					tone="amber"
-					value={currency.format(data.inventoryValue)}
-				/>
-			</section>
+		<div className="space-y-4">
+			<StatStrip
+				items={[
+					{
+						key: "materials",
+						label: "Recursos con existencia",
+						value: `${data.resourcesInStock}`,
+						detail: `de ${data.activeMaterials} en el catálogo`,
+						active: !activeStatus,
+						href: stockHref({ status: "" }),
+					},
+					{
+						key: "value",
+						label: "Valor del inventario",
+						value: currency.format(data.inventoryValue),
+						detail: selectedWarehouse
+							? `En ${selectedWarehouse.name}`
+							: "Todas las bodegas",
+					},
+					{
+						key: "low",
+						label: "Bajo mínimo",
+						value: String(data.health.low),
+						detail: "Conviene reponer pronto",
+						attention: data.health.low > 0 ? "warning" : undefined,
+						active: activeStatus === "low",
+						href: stockHref({ status: "low" }),
+					},
+					{
+						key: "empty",
+						label: "Sin existencias",
+						value: String(data.health.empty),
+						detail: "Agotados",
+						attention: data.health.empty > 0 ? "danger" : undefined,
+						active: activeStatus === "empty",
+						href: stockHref({ status: "empty" }),
+					},
+				]}
+				label="Resumen del inventario"
+			/>
 
-			<div className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+			<div className="inventory-overview">
 				<InventoryPanel>
 					<InventorySectionHeader
-						description="Disponibilidad frente al stock mínimo."
-						icon={PackageCheck}
-						title="Salud del inventario"
-					/>
-					{totalHealth ? (
-						<div className="p-4 sm:p-5">
-							<div className="relative">
-								<EChart
-									className="h-[220px] w-full"
-									onChartClick={(event) => {
-										const name = (event as { name?: string }).name;
-										window.location.href = filterHref(
-											name === "Bajo mínimo"
-												? "low"
-												: name === "Sin existencias"
-													? "empty"
-													: "available",
-										);
-									}}
-									option={{
-										tooltip: {
-											...chartTooltip(),
-											trigger: "item",
-											formatter: "{b}<br/>{c} materiales ({d}%)",
-										},
-										legend: { show: false },
-										series: [
-											{
-												type: "pie",
-												radius: ["58%", "76%"],
-												label: { show: false },
-												itemStyle: { borderColor: "#fff", borderWidth: 3 },
-												data: [
-													{
-														name: "Disponible",
-														value: data.health.available,
-														itemStyle: { color: hmChartColors.green },
-													},
-													{
-														name: "Bajo mínimo",
-														value: data.health.low,
-														itemStyle: { color: hmChartColors.amber },
-													},
-													{
-														name: "Sin existencias",
-														value: data.health.empty,
-														itemStyle: { color: "#c8202f" },
-													},
-												],
-											},
-										],
-									}}
-								/>
-								<div className="pointer-events-none absolute inset-x-0 top-[78px] text-center">
-									<strong className="block text-3xl font-bold tracking-[-0.03em] tabular-nums">
-										{totalHealth}
-									</strong>
-									<span className="text-xs font-medium text-[#68746f]">
-										materiales
-									</span>
-								</div>
-							</div>
-							<div className="grid gap-2 sm:grid-cols-3">
-								<a
-									className="rounded-xl bg-[#e8f5ee] px-3 py-2.5 text-sm font-semibold text-[#126348] transition hover:bg-[#dcefe5]"
-									href={filterHref("available")}
-								>
-									Disponible{" "}
-									<strong className="float-right tabular-nums">
-										{data.health.available}
-									</strong>
-								</a>
-								<a
-									className="rounded-xl bg-[#fff3d7] px-3 py-2.5 text-sm font-semibold text-[#805400] transition hover:bg-[#fce9bc]"
-									href={filterHref("low")}
-								>
-									Bajo mínimo{" "}
-									<strong className="float-right tabular-nums">
-										{data.health.low}
-									</strong>
-								</a>
-								<a
-									className="rounded-xl bg-[#f9e8e9] px-3 py-2.5 text-sm font-semibold text-[#991b29] transition hover:bg-[#f4dadd]"
-									href={filterHref("empty")}
-								>
-									Sin stock{" "}
-									<strong className="float-right tabular-nums">
-										{data.health.empty}
-									</strong>
-								</a>
-							</div>
-						</div>
-					) : (
-						<InventoryEmpty
-							description="Los indicadores aparecerán cuando registres el primer material y su existencia."
-							icon={PackageOpen}
-							title="Todavía no hay stock"
-						/>
-					)}
-				</InventoryPanel>
-
-				<InventoryPanel>
-					<InventorySectionHeader
-						description="Valor estimado de los materiales almacenados."
+						description="Elige una bodega para ver solo su stock, ordenado por tipo."
 						icon={Warehouse}
-						title="Distribución por bodega"
+						title="Bodegas"
 					/>
-					{data.warehouseValues.length === 1 &&
-					data.warehouseValues[0].value > 0 ? (
-						<div className="p-5 sm:p-6">
-							<div className="flex flex-wrap items-end justify-between gap-3">
-								<div>
-									<p className="text-sm font-bold text-[#273330]">
-										{data.warehouseValues[0].name}
-									</p>
-									<p className="text-xs text-[#68746f]">
-										{data.warehouseValues[0].code}
-									</p>
-								</div>
-								<strong className="text-2xl font-bold tracking-[-0.03em] text-[#126348] tabular-nums">
-									{currency.format(data.warehouseValues[0].value)}
-								</strong>
-							</div>
-							<div className="mt-8 h-3 overflow-hidden rounded-full bg-[#e1e6e1]">
-								<div className="h-full w-full rounded-full bg-[#197456]" />
-							</div>
-							<div className="mt-3 flex justify-between gap-3 text-xs font-medium text-[#68746f]">
-								<span>100% del valor registrado</span>
-								<span>{data.warehouseValues[0].materialCount} materiales</span>
-							</div>
-						</div>
-					) : data.warehouseValues.some((item) => item.value > 0) ? (
-						<div className="p-4 sm:p-5">
-							<EChart
-								className="h-[265px] w-full"
-								option={{
-									tooltip: {
-										...chartTooltip(),
-										trigger: "axis",
-										formatter: (items: unknown) => {
-											const item = (
-												items as Array<{
-													name: string;
-													value: number;
-													data: { materialCount: number };
-												}>
-											)[0];
-											return `${item.name}<br/>${currency.format(item.value)}<br/>${item.data.materialCount} materiales`;
-										},
-									},
-									grid: {
-										left: 12,
-										right: 28,
-										top: 12,
-										bottom: 12,
-										containLabel: true,
-									},
-									xAxis: {
-										type: "value",
-										axisLabel: {
-											formatter: (value: number) => currency.format(value),
-										},
-										splitLine: { lineStyle: { color: "#e3e7e3" } },
-									},
-									yAxis: {
-										type: "category",
-										inverse: true,
-										data: data.warehouseValues.map((item) => item.code),
-										axisLine: { show: false },
-										axisTick: { show: false },
-									},
-									series: [
-										{
-											type: "bar",
-											barMaxWidth: 22,
-											itemStyle: { borderRadius: [0, 5, 5, 0] },
-											data: data.warehouseValues.map((item) => ({
-												value: item.value,
-												name: item.name,
-												materialCount: item.materialCount,
-												itemStyle: { color: hmChartColors.green },
-											})),
-										},
-									],
-								}}
-							/>
-						</div>
-					) : (
-						<InventoryEmpty
-							description="Agrega costos y existencias para comparar el valor almacenado en cada bodega."
-							icon={Warehouse}
-							title="Sin valores para comparar"
-						/>
-					)}
+					<nav aria-label="Bodegas" className="inventory-warehouses">
+						<a
+							aria-current={!activeWarehouse ? "page" : undefined}
+							href={stockHref({ warehouseId: "" })}
+						>
+							<strong>Todas las bodegas</strong>
+							<span className="inventory-warehouses__value">
+								{currency.format(
+									data.warehouseValues.reduce(
+										(sum, warehouse) => sum + warehouse.value,
+										0,
+									),
+								)}
+							</span>
+							<span className="inventory-warehouses__types">
+								{data.warehouseValues.length}{" "}
+								{data.warehouseValues.length === 1 ? "bodega" : "bodegas"}
+							</span>
+						</a>
+						{data.warehouseValues.map((warehouse) => (
+							<a
+								aria-current={
+									activeWarehouse === warehouse.id ? "page" : undefined
+								}
+								data-alert={warehouse.alerts > 0 || undefined}
+								href={stockHref({ warehouseId: warehouse.id })}
+								key={warehouse.id}
+							>
+								<strong>{warehouse.name}</strong>
+								<span className="inventory-warehouses__value">
+									{currency.format(warehouse.value)}
+								</span>
+								<span className="inventory-warehouses__types">
+									{resourceTypeGroups
+										.map((group) => ({
+											label: group.label.toLowerCase(),
+											count: warehouse.byType[group.key],
+										}))
+										.filter((item) => item.count > 0)
+										.map((item) => `${item.count} ${item.label}`)
+										.join(" · ") || "Sin existencias"}
+								</span>
+								{warehouse.alerts > 0 ? (
+									<em>{warehouse.alerts} por reponer</em>
+								) : null}
+							</a>
+						))}
+					</nav>
+				</InventoryPanel>
+				<InventoryPanel>
+					<InventorySectionHeader
+						description="Existencia frente al mínimo definido."
+						icon={TriangleAlert}
+						title="Estado y reposición"
+					/>
+					<StockHealth
+						activeStatus={activeStatus}
+						filterHref={(status) => stockHref({ status })}
+						health={data.health}
+						rows={data.rows}
+					/>
 				</InventoryPanel>
 			</div>
 
-			{data.alerts.length ? (
-				<InventoryPanel>
-					<InventorySectionHeader
-						action={
-							<a
-								className="text-sm font-bold text-[#a71928] hover:underline"
-								href={filterHref("low")}
-							>
-								Revisar todos
-							</a>
-						}
-						description="Materiales agotados o próximos al mínimo."
-						icon={TriangleAlert}
-						title="Atención requerida"
-					/>
-					<div className="divide-y divide-[#e1e5e1]">
-						{data.alerts.map((row) => (
-							<button
-								className="flex w-full items-center justify-between gap-4 px-4 py-3.5 text-left transition hover:bg-[#f7f8f5] sm:px-5"
-								key={row.id}
-								onClick={() => setDialogRow(row)}
-								type="button"
-							>
-								<div className="min-w-0">
-									<strong className="block truncate text-sm text-[#17201f]">
-										{row.material.name}
-									</strong>
-									<p className="mt-0.5 text-xs text-[#68746f]">
-										{row.warehouse.name} · {number.format(row.quantity)} de
-										mínimo {number.format(row.material.minimumStock)}{" "}
-										{row.material.unit}
-									</p>
-								</div>
-								<InventoryStatus tone={stateTone(row.status)}>
-									{stateLabel(row.status)}
-								</InventoryStatus>
-							</button>
-						))}
-					</div>
-				</InventoryPanel>
-			) : totalHealth > 0 ? (
-				<div className="flex items-center gap-3 rounded-2xl bg-[#e5f5ed] px-4 py-3.5 text-sm font-semibold text-[#126348] shadow-[0_10px_26px_rgba(18,99,72,0.1)]">
-					<PackageCheck aria-hidden="true" size={18} />
-					El stock está dentro de los niveles definidos.
-				</div>
-			) : null}
-
-			<StockRows data={data} onSelect={setDialogRow} />
+			<StockRows
+				data={data}
+				onSelect={setDialogRow}
+				title={selectedWarehouse ? selectedWarehouse.name : "Todas las bodegas"}
+				toolbar={toolbar}
+			/>
 			{dialogRow ? (
 				<StockDetail row={dialogRow} onClose={() => setDialogRow(null)} />
 			) : null}
@@ -360,139 +219,178 @@ export function InventoryStockDashboard({
 	);
 }
 
+/** Barra segmentada del estado + lista de materiales por reponer. */
+function StockHealth({
+	health,
+	rows,
+	filterHref,
+	activeStatus,
+}: {
+	health: Dashboard["health"];
+	rows: StockRow[];
+	filterHref: (status: string) => string;
+	activeStatus?: string;
+}) {
+	const total = health.available + health.low + health.empty;
+	const segments = [
+		{ key: "available", label: "Disponible", value: health.available },
+		{ key: "low", label: "Bajo mínimo", value: health.low },
+		{ key: "empty", label: "Sin existencias", value: health.empty },
+	];
+	const toRestock = rows
+		.filter((row) => row.status !== "available")
+		.sort(
+			(a, b) =>
+				a.quantity / (a.material.minimumStock || 1) -
+				b.quantity / (b.material.minimumStock || 1),
+		)
+		.slice(0, 5);
+	if (total === 0) {
+		return (
+			<InventoryEmpty
+				description="Registra recursos y existencias para ver su estado."
+				icon={PackageOpen}
+				title="Todavía no hay stock"
+			/>
+		);
+	}
+	return (
+		<div className="grid grid-cols-1 gap-4 p-4 sm:p-5">
+			<div className="min-w-0">
+				<div aria-hidden="true" className="inventory-health-bar">
+					{segments.map((segment) =>
+						segment.value > 0 ? (
+							<span
+								data-status={segment.key}
+								key={segment.key}
+								style={{ flexGrow: segment.value }}
+							/>
+						) : null,
+					)}
+				</div>
+				<div className="inventory-health-legend">
+					{segments.map((segment) => (
+						<a
+							aria-current={activeStatus === segment.key ? "true" : undefined}
+							data-status={segment.key}
+							href={filterHref(segment.key)}
+							key={segment.key}
+						>
+							<i aria-hidden="true" />
+							{segment.label}
+							<strong>{segment.value}</strong>
+						</a>
+					))}
+				</div>
+			</div>
+			{toRestock.length ? (
+				<ul className="inventory-restock">
+					{toRestock.map((row) => {
+						const minimum = row.material.minimumStock;
+						const ratio = minimum > 0 ? Math.min(1, row.quantity / minimum) : 0;
+						return (
+							<li key={row.id}>
+								<div className="min-w-0">
+									<strong>{row.material.name}</strong>
+									<small>
+										{row.warehouse.name} · {number.format(row.quantity)} de{" "}
+										{number.format(minimum)} {row.material.unit}
+									</small>
+									<span aria-hidden="true" className="inventory-restock__bar">
+										<span
+											data-status={row.status}
+											style={{ width: `${Math.max(ratio * 100, 2)}%` }}
+										/>
+									</span>
+								</div>
+								<a
+									className="inventory-restock__action focus-ring"
+									href={movementHref(row)}
+								>
+									Registrar entrada
+								</a>
+							</li>
+						);
+					})}
+				</ul>
+			) : (
+				<p className="inventory-restock__ok">
+					<PackageCheck aria-hidden="true" size={16} />
+					Todo está por encima del mínimo.
+				</p>
+			)}
+		</div>
+	);
+}
+
+/**
+ * Existencias en una sola tabla. El tipo se elige con pestañas (como en
+ * Catálogo) y la bodega con las tarjetas de arriba: la lista se mantiene corta.
+ */
 function StockRows({
 	data,
 	onSelect,
+	toolbar,
+	title,
 }: {
 	data: Dashboard;
 	onSelect: (row: StockRow) => void;
+	toolbar?: ReactNode;
+	title: string;
 }) {
+	const [type, setType] = useState<"" | "MATERIAL" | "TOOL" | "EQUIPMENT">("");
+	const counts = {
+		MATERIAL: data.rows.filter(
+			(row) => row.material.resourceType === "MATERIAL",
+		).length,
+		TOOL: data.rows.filter((row) => row.material.resourceType === "TOOL")
+			.length,
+		EQUIPMENT: data.rows.filter(
+			(row) => row.material.resourceType === "EQUIPMENT",
+		).length,
+	};
+	const rows = type
+		? data.rows.filter((row) => row.material.resourceType === type)
+		: data.rows;
+	const showWarehouse =
+		new Set(data.rows.map((row) => row.warehouseId)).size > 1;
+	const tabs = [
+		["", "Todos", Boxes, data.rows.length],
+		["MATERIAL", "Materiales", PackageOpen, counts.MATERIAL],
+		["TOOL", "Herramientas", Hammer, counts.TOOL],
+		["EQUIPMENT", "Maquinaria y equipo", Wrench, counts.EQUIPMENT],
+	] as const;
+
 	return (
 		<InventoryPanel>
 			<InventorySectionHeader
-				description="Existencia, costo y estado por material y bodega."
+				description={`${rows.length} ${rows.length === 1 ? "registro" : "registros"} · ${currency.format(rows.reduce((sum, row) => sum + row.value, 0))} en existencias.`}
 				icon={Boxes}
-				title="Existencias"
+				title={`Existencias · ${title}`}
 			/>
-			{data.rows.length ? (
-				<>
-					<div className="inventory-scrollbar hidden overflow-x-auto md:block">
-						<table className="inventory-table w-full min-w-[980px] text-sm">
-							<thead>
-								<tr>
-									{[
-										"Material",
-										"Bodega",
-										"Existencia",
-										"Costo unitario",
-										"Valor",
-										"Mínimo",
-										"Estado",
-										"Acción",
-									].map((heading) => (
-										<th key={heading}>{heading}</th>
-									))}
-								</tr>
-							</thead>
-							<tbody>
-								{data.rows.map((row) => (
-									<tr key={row.id}>
-										<td className="font-bold text-[#202a28]">
-											{row.material.name}
-											<small className="mt-0.5 block text-xs font-medium text-[#6a7671]">
-												{row.material.code}
-											</small>
-										</td>
-										<td>
-											{row.warehouse.name}
-											<small className="mt-0.5 block text-xs text-[#6a7671]">
-												{row.warehouse.code}
-											</small>
-										</td>
-										<td className="font-semibold tabular-nums">
-											{number.format(row.quantity)} {row.material.unit}
-										</td>
-										<td className="tabular-nums">
-											{currency.format(row.unitCost)}
-										</td>
-										<td className="font-semibold tabular-nums">
-											{currency.format(row.value)}
-										</td>
-										<td className="tabular-nums">
-											{number.format(row.material.minimumStock)}
-										</td>
-										<td>
-											<InventoryStatus tone={stateTone(row.status)}>
-												{stateLabel(row.status)}
-											</InventoryStatus>
-										</td>
-										<td>
-											<button
-												className={inventorySecondaryButtonClass}
-												onClick={() => onSelect(row)}
-												type="button"
-											>
-												<Eye aria-hidden="true" size={15} />
-												Detalle
-											</button>
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					</div>
-					<div className="grid gap-3 p-3 md:hidden">
-						{data.rows.map((row) => (
-							<article
-								className="rounded-2xl bg-[#f3f5f1] p-4 shadow-[inset_0_0_0_1px_rgba(48,62,56,0.08)]"
-								key={row.id}
-							>
-								<div className="flex items-start justify-between gap-3">
-									<div className="min-w-0">
-										<strong className="block truncate">
-											{row.material.name}
-										</strong>
-										<p className="mt-0.5 text-xs text-[#68746f]">
-											{row.material.code} · {row.warehouse.name}
-										</p>
-									</div>
-									<InventoryStatus tone={stateTone(row.status)}>
-										{stateLabel(row.status)}
-									</InventoryStatus>
-								</div>
-								<dl className="mt-4 grid grid-cols-3 gap-2 text-xs text-[#68746f]">
-									<div>
-										<dt>Existencia</dt>
-										<dd className="mt-1 font-bold text-[#202a28]">
-											{number.format(row.quantity)} {row.material.unit}
-										</dd>
-									</div>
-									<div>
-										<dt>Mínimo</dt>
-										<dd className="mt-1 font-bold text-[#202a28]">
-											{number.format(row.material.minimumStock)}
-										</dd>
-									</div>
-									<div>
-										<dt>Valor</dt>
-										<dd className="mt-1 font-bold text-[#202a28]">
-											{currency.format(row.value)}
-										</dd>
-									</div>
-								</dl>
-								<button
-									className={`${inventorySecondaryButtonClass} mt-4 w-full`}
-									onClick={() => onSelect(row)}
-									type="button"
-								>
-									<Eye aria-hidden="true" size={15} />
-									Ver detalle
-								</button>
-							</article>
-						))}
-					</div>
-				</>
-			) : (
+			<nav
+				aria-label="Tipos de recurso"
+				className="inventory-scrollbar flex gap-2 overflow-x-auto border-t border-[var(--border)] px-4 py-3"
+			>
+				{tabs.map(([value, label, Icon, count]) => (
+					<button
+						aria-pressed={type === value}
+						className="inventory-catalog-tab focus-ring inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3.5 text-sm font-bold"
+						disabled={value !== "" && count === 0}
+						key={value}
+						onClick={() => setType(value)}
+						type="button"
+					>
+						<Icon aria-hidden="true" size={16} />
+						{label}
+						<span className="rounded-md bg-black/5 px-1.5 text-xs tabular-nums opacity-80">
+							{count}
+						</span>
+					</button>
+				))}
+			</nav>
+			{toolbar}
+			{rows.length === 0 ? (
 				<InventoryEmpty
 					action={
 						<a
@@ -502,12 +400,172 @@ function StockRows({
 							Abrir catálogo
 						</a>
 					}
-					description="Crea materiales y registra el primer movimiento para comenzar a controlar existencias."
+					description="No hay existencias con estos filtros. Cambia la búsqueda o registra un movimiento."
 					icon={PackageOpen}
-					title="No hay existencias registradas"
+					title="Sin existencias para mostrar"
+				/>
+			) : (
+				<StockTable
+					onSelect={onSelect}
+					rows={rows}
+					showWarehouse={showWarehouse}
 				/>
 			)}
 		</InventoryPanel>
+	);
+}
+
+function StockTable({
+	rows,
+	onSelect,
+	showWarehouse,
+}: {
+	rows: StockRow[];
+	onSelect: (row: StockRow) => void;
+	/** Con varias bodegas visibles, cada fila dice en cuál está. */
+	showWarehouse: boolean;
+}) {
+	return (
+		<>
+			<div className="hidden overflow-x-auto md:block">
+				<table className="inventory-stock-table inventory-stock-table--flat">
+					<colgroup>
+						<col />
+						<col style={{ width: "22%" }} />
+						<col style={{ width: "15%" }} />
+						<col style={{ width: "14%" }} />
+						<col style={{ width: "11.5rem" }} />
+					</colgroup>
+					<thead>
+						<tr>
+							<th scope="col">Recurso</th>
+							<th scope="col">Existencia</th>
+							<th className="inventory-num" scope="col">
+								Valor
+							</th>
+							<th scope="col">Estado</th>
+							<th className="inventory-actions" scope="col">
+								<span className="sr-only">Acciones</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						{rows.map((row) => (
+							<tr key={row.id}>
+								<td>
+									<strong>{row.material.name}</strong>
+									<small>
+										{row.material.code}
+										{showWarehouse ? ` · ${row.warehouse.name}` : ""}
+									</small>
+								</td>
+								<td>
+									<span className="font-semibold tabular-nums">
+										{number.format(row.quantity)} {row.material.unit}
+									</span>
+									{row.material.minimumStock > 0 ? (
+										<span className="inventory-stock-level">
+											<span
+												aria-hidden="true"
+												className="inventory-restock__bar"
+											>
+												<span
+													data-status={row.status}
+													style={{
+														width: `${Math.max(Math.min(1, row.quantity / (row.material.minimumStock * 2)) * 100, 2)}%`,
+													}}
+												/>
+											</span>
+											<small>
+												mín. {number.format(row.material.minimumStock)}
+											</small>
+										</span>
+									) : null}
+								</td>
+								<td className="inventory-num">
+									<strong>{currency.format(row.value)}</strong>
+									<small>{currency.format(row.unitCost)} c/u</small>
+								</td>
+								<td>
+									<InventoryStatus tone={stateTone(row.status)}>
+										{stateLabel(row.status)}
+									</InventoryStatus>
+								</td>
+								<td className="inventory-actions">
+									<span className="inventory-row-actions">
+										<a
+											className="inventory-row-action focus-ring"
+											href={movementHref(row)}
+											title="Registrar entrada, salida o traslado"
+										>
+											<ArrowLeftRight aria-hidden="true" size={14} />
+											Movimiento
+										</a>
+										<button
+											aria-label={`Ver detalle de ${row.material.name}`}
+											className="inventory-row-action inventory-row-action--icon focus-ring"
+											onClick={() => onSelect(row)}
+											title="Ver detalle"
+											type="button"
+										>
+											<Eye aria-hidden="true" size={14} />
+										</button>
+									</span>
+								</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+			<div className="grid grid-cols-1 gap-2 p-3 md:hidden">
+				{rows.map((row) => (
+					<article className="inventory-stock-card" key={row.id}>
+						<div className="flex items-start justify-between gap-3">
+							<div className="min-w-0">
+								<strong className="block truncate">{row.material.name}</strong>
+								<small>{row.material.code}</small>
+							</div>
+							<InventoryStatus tone={stateTone(row.status)}>
+								{stateLabel(row.status)}
+							</InventoryStatus>
+						</div>
+						<dl>
+							<div>
+								<dt>Existencia</dt>
+								<dd>
+									{number.format(row.quantity)} {row.material.unit}
+								</dd>
+							</div>
+							<div>
+								<dt>Mínimo</dt>
+								<dd>{number.format(row.material.minimumStock)}</dd>
+							</div>
+							<div>
+								<dt>Valor</dt>
+								<dd>{currency.format(row.value)}</dd>
+							</div>
+						</dl>
+						<div className="grid grid-cols-2 gap-2">
+							<a
+								className={inventorySecondaryButtonClass}
+								href={movementHref(row)}
+							>
+								<ArrowLeftRight aria-hidden="true" size={15} />
+								Movimiento
+							</a>
+							<button
+								className={inventorySecondaryButtonClass}
+								onClick={() => onSelect(row)}
+								type="button"
+							>
+								<Eye aria-hidden="true" size={15} />
+								Detalle
+							</button>
+						</div>
+					</article>
+				))}
+			</div>
+		</>
 	);
 }
 
@@ -584,7 +642,7 @@ function StockDetail({ row, onClose }: { row: StockRow; onClose: () => void }) {
 					</dl>
 					<a
 						className={`${inventoryPrimaryButtonClass} mt-5 w-full`}
-						href={`/inventory?view=movement&nuevo=1&recurso=${row.materialId}&bodega=${row.warehouseId}`}
+						href={movementHref(row)}
 					>
 						Registrar movimiento
 					</a>

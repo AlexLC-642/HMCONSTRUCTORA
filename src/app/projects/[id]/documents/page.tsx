@@ -643,7 +643,7 @@ export default async function ProjectDocumentsPage({
 									)}
 								</tbody>
 							</table>
-							<div className="grid gap-3 p-3 md:hidden">
+							<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
 								{fileDocuments.map((document) => {
 									const latest = document.versions[0];
 									const isPortal =

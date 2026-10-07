@@ -519,7 +519,7 @@ export default async function DocumentsPage({
 									</tbody>
 								</table>
 							</div>
-							<div className="grid gap-3 p-3 md:hidden">
+							<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
 								{recentDocuments.map((doc) => {
 									const latest = doc.versions[0];
 									const modDate = latest
@@ -767,7 +767,7 @@ export default async function DocumentsPage({
 										</tbody>
 									</table>
 								</div>
-								<div className="grid gap-3 p-3 md:hidden">
+								<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
 									{paginatedDocuments.map((document) => {
 										const latest = document.versions[0];
 										return (

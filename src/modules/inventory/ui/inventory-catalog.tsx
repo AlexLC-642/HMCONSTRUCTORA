@@ -2,7 +2,6 @@
 
 import {
 	Boxes,
-	CircleDollarSign,
 	Cog,
 	Edit3,
 	Hammer,
@@ -19,6 +18,7 @@ import {
 import { type ReactNode, useEffect, useState } from "react";
 import { AutoFilterForm } from "@/shared/ui/auto-filter-form";
 import { HelpTip } from "@/shared/ui/help-tip";
+import { StatStrip } from "@/shared/ui/stat-strip";
 import {
 	createInventoryMaterialAction,
 	createWarehouseAction,
@@ -27,7 +27,6 @@ import {
 import type { getInventoryCatalog } from "../application/queries";
 import {
 	InventoryEmpty,
-	InventoryMetric,
 	InventoryPanel,
 	InventorySectionHeader,
 	InventoryStatus,
@@ -152,39 +151,49 @@ export function InventoryCatalog({
 				</nav>
 			</InventoryPanel>
 
-			<section
-				aria-label="Resumen del catálogo"
-				className="kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-			>
-				<InventoryMetric
-					detail={`${data.resourceCounts.MATERIAL ?? 0} materiales · ${data.resourceCounts.TOOL ?? 0} herramientas · ${data.resourceCounts.EQUIPMENT ?? 0} equipos`}
-					icon={Boxes}
-					label="Recursos"
-					tone="graphite"
-					value={data.activeMaterials + data.inactiveMaterials}
-				/>
-				<InventoryMetric
-					detail={`${data.inactiveMaterials} inactivos`}
-					icon={Wrench}
-					label="Activos"
-					tone="green"
-					value={data.activeMaterials}
-				/>
-				<InventoryMetric
-					detail="ubicaciones registradas"
-					icon={WarehouseIcon}
-					label="Bodegas"
-					tone="blue"
-					value={data.warehouses.length}
-				/>
-				<InventoryMetric
-					detail="existencias acumuladas"
-					icon={CircleDollarSign}
-					label="Valor en catálogo"
-					tone="amber"
-					value={currency.format(stockValue)}
-				/>
-			</section>
+			<StatStrip
+				items={[
+					{
+						key: "active",
+						label: "Recursos activos",
+						value: String(data.activeMaterials),
+						detail: `${data.resourceCounts.MATERIAL ?? 0} materiales · ${data.resourceCounts.TOOL ?? 0} herramientas · ${data.resourceCounts.EQUIPMENT ?? 0} equipos`,
+						active: view === "materials" && first(params.status) === "active",
+						href: href(params, {
+							catalog: "materials",
+							status: "active",
+							page: "1",
+						}),
+					},
+					{
+						key: "inactive",
+						label: "Inactivos",
+						value: String(data.inactiveMaterials),
+						detail: "No aparecen al registrar movimientos",
+						active: view === "materials" && first(params.status) === "inactive",
+						href: href(params, {
+							catalog: "materials",
+							status: "inactive",
+							page: "1",
+						}),
+					},
+					{
+						key: "warehouses",
+						label: "Bodegas",
+						value: String(data.warehouses.length),
+						detail: "Ubicaciones registradas",
+						active: view === "warehouses",
+						href: href(params, { catalog: "warehouses", page: "1" }),
+					},
+					{
+						key: "value",
+						label: "Valor en existencias",
+						value: currency.format(stockValue),
+						detail: "Según el stock actual",
+					},
+				]}
+				label="Resumen del catálogo"
+			/>
 
 			{view === "materials" ? (
 				<Materials data={data} params={params} onEdit={setDialog} />
@@ -426,7 +435,7 @@ function Materials({
 							</tbody>
 						</table>
 					</div>
-					<div className="grid gap-3 p-3 md:hidden">
+					<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
 						{data.materials.map((material) => (
 							<article
 								className="rounded-2xl bg-[#f3f5f1] p-4 shadow-[inset_0_0_0_1px_rgba(48,62,56,0.08)]"
@@ -566,7 +575,7 @@ function Warehouses({ data, params }: { data: Catalog; params: Params }) {
 							</tbody>
 						</table>
 					</div>
-					<div className="grid gap-3 p-3 md:hidden">
+					<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
 						{data.warehouses.map((warehouse) => (
 							<article
 								className="rounded-2xl bg-[#f3f5f1] p-4 shadow-[inset_0_0_0_1px_rgba(48,62,56,0.08)]"

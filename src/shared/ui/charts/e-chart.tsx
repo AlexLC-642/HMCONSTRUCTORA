@@ -12,7 +12,7 @@ import {
 import type { ECharts, EChartsCoreOption } from "echarts/core";
 import * as echarts from "echarts/core";
 import { SVGRenderer } from "echarts/renderers";
-import { useEffect, useRef } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
 
 echarts.use([
 	BarChart,
@@ -31,12 +31,15 @@ echarts.use([
 type EChartProps = {
 	option: EChartsCoreOption;
 	className?: string;
+	/** Para alturas que dependen de los datos (p. ej. una barra por material). */
+	style?: CSSProperties;
 	onChartClick?: (params: unknown) => void;
 };
 
 export function EChart({
 	option,
 	className = "h-[320px] w-full",
+	style,
 	onChartClick,
 }: EChartProps) {
 	const nodeRef = useRef<HTMLDivElement>(null);
@@ -71,5 +74,7 @@ export function EChart({
 		chartRef.current?.setOption(option, { notMerge: true, lazyUpdate: true });
 	}, [option]);
 
-	return <div aria-hidden="true" className={className} ref={nodeRef} />;
+	return (
+		<div aria-hidden="true" className={className} ref={nodeRef} style={style} />
+	);
 }

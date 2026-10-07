@@ -985,7 +985,7 @@ export function DashboardWorkspace({
 					subtitle="Ultimos registros aprobados o enviados."
 					title="Actividad reciente"
 				>
-					<div className="grid gap-2">
+					<div className="grid grid-cols-1 gap-2">
 						{metrics.recentActivity.map((item) => (
 							<a
 								className="focus-ring flex items-start gap-3 rounded-xl bg-white px-3 py-3 shadow-[0_8px_20px_rgba(37,48,51,0.07)] transition hover:-translate-y-0.5 hover:bg-[#fff8f2] hover:shadow-[0_14px_30px_rgba(37,48,51,0.12)]"

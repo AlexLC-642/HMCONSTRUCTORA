@@ -143,6 +143,15 @@ function progressTone(progress: number) {
 export function ScheduleForm({ initialValue, readOnly, projectRange, action }: ScheduleFormProps) {
   const [value, setValue] = useState<ScheduleInput>(initialValue);
   const [undoActivities, setUndoActivities] = useState<Activity[] | null>(null);
+  // En el teléfono cada actividad se ve resumida; sus campos se abren con "Editar".
+  const [openActivities, setOpenActivities] = useState<Set<string>>(new Set());
+  const toggleActivity = (id: string) =>
+    setOpenActivities((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const range = projectRange && isValidPlanningRange(projectRange.start, projectRange.end) ? projectRange : undefined;
   const outOfRangeCount = range
     ? value.activities.filter((activity) => activity.plannedStart < range.start || activity.plannedEnd > range.end).length
@@ -306,15 +315,33 @@ export function ScheduleForm({ initialValue, readOnly, projectRange, action }: S
           {value.activities.map((activity, index) => {
             const progress = Math.max(0, Math.min(100, Number(activity.progress) || 0));
             const duration = daysBetween(toDate(activity.plannedStart), toDate(activity.plannedEnd));
+            const rowKey = activity.id ?? `row-${index}`;
+            const isOpen = openActivities.has(rowKey);
+            const mobileHidden = isOpen ? "" : "max-md:hidden";
             return (
               <motion.article
                 animate={{ opacity: 1, y: 0 }}
-                className="grid gap-4 px-5 py-4 transition hover:bg-[#fbfaf6] xl:grid-cols-[88px_minmax(280px,1.2fr)_minmax(420px,2fr)]"
+                className="grid grid-cols-1 gap-4 px-4 py-4 transition hover:bg-[#fbfaf6] sm:px-5 xl:grid-cols-[88px_minmax(280px,1.2fr)_minmax(420px,2fr)]"
                 initial={{ opacity: 0, y: 10 }}
                 key={activity.id}
                 transition={{ delay: Math.min(index * 0.025, 0.18), duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
               >
-                <div className="flex items-start gap-3 xl:block">
+                <div className="flex items-start gap-3 md:hidden">
+                  <span className="grid h-9 min-w-9 place-items-center rounded-md bg-[#eef3ef] px-2 text-sm font-bold tabular-nums text-[#253033]">{activity.code || index + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-[#111719]">{activity.description || "Sin descripción"}</p>
+                    <p className="mt-0.5 text-xs text-[#66706b]">{activity.plannedStart} → {activity.plannedEnd} · {duration} días</p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${statusMeta[activity.status].pill}`}><span className={`size-1.5 rounded-full ${statusMeta[activity.status].dot}`} />{statusMeta[activity.status].label}</span>
+                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e7ebe5]"><span className={`block h-full rounded-full ${statusMeta[activity.status].bar}`} style={{ width: `${progress}%` }} /></span>
+                      <span className="text-xs font-bold tabular-nums">{progress.toFixed(progress % 1 === 0 ? 0 : 1)}%</span>
+                    </div>
+                  </div>
+                  <button aria-expanded={isOpen} className="focus-ring h-9 shrink-0 rounded-md border border-[#cfd5ce] bg-white px-3 text-xs font-semibold text-[#253033]" onClick={() => toggleActivity(rowKey)} type="button">
+                    {isOpen ? "Cerrar" : readOnly ? "Ver" : "Editar"}
+                  </button>
+                </div>
+                <div className={`flex items-start gap-3 xl:block ${mobileHidden}`}>
                   <input disabled={readOnly} required aria-label={`Codigo de actividad ${index + 1}`} className={`${inputClass} h-10 w-16 text-center font-semibold tabular-nums`} value={activity.code} onChange={(event) => updateActivity(index, { code: event.target.value })} />
                   <div className="mt-0 text-xs text-[#66706b] xl:mt-3">
                     <span className="block font-semibold text-[#253033]">{duration} dias</span>
@@ -322,7 +349,7 @@ export function ScheduleForm({ initialValue, readOnly, projectRange, action }: S
                   </div>
                 </div>
 
-                <div className="min-w-0 space-y-3">
+                <div className={`min-w-0 space-y-3 ${mobileHidden}`}>
                   <label className="grid gap-1.5">
                     <span className={labelClass}>Descripcion</span>
                     <textarea disabled={readOnly} required rows={2} className={`${inputClass} h-auto min-h-20 py-3 leading-6`} value={activity.description} onChange={(event) => updateActivity(index, { description: event.target.value })} />
@@ -339,7 +366,7 @@ export function ScheduleForm({ initialValue, readOnly, projectRange, action }: S
                   </div>
                 </div>
 
-                <div className="grid gap-3">
+                <div className={`grid gap-3 ${mobileHidden}`}>
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_180px]">
                     <label className="grid gap-1.5">
                       <span className={labelClass}>Inicio plan</span>
@@ -391,7 +418,7 @@ export function ScheduleForm({ initialValue, readOnly, projectRange, action }: S
 
       {!readOnly ? (
         <div className="flex flex-wrap gap-2">
-          <button className="focus-ring inline-flex h-12 items-center gap-2 rounded-md border border-[#cfd5ce] bg-white px-5 text-sm font-semibold text-[#253033] shadow-[0_10px_24px_rgba(37,48,51,0.08)] transition hover:-translate-y-0.5 hover:bg-[#fbfaf6]" type="button" onClick={() => { setUndoActivities(null); setValue({ ...value, activities: [...value.activities, emptyActivity(value.activities.length + 1, value.activities.at(-1), range)] }); }}>
+          <button className="focus-ring inline-flex h-12 items-center gap-2 rounded-md border border-[#cfd5ce] bg-white px-5 text-sm font-semibold text-[#253033] shadow-[0_10px_24px_rgba(37,48,51,0.08)] transition hover:-translate-y-0.5 hover:bg-[#fbfaf6]" type="button" onClick={() => { setUndoActivities(null); const created = emptyActivity(value.activities.length + 1, value.activities.at(-1), range); setOpenActivities((current) => new Set(current).add(created.id ?? `row-${value.activities.length}`)); setValue({ ...value, activities: [...value.activities, created] }); }}>
             <Plus aria-hidden="true" size={18} />
             Agregar actividad
           </button>

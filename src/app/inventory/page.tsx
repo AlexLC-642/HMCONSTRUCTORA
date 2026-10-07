@@ -85,59 +85,63 @@ export default async function InventoryPage({
 	return (
 		<main className="mx-auto max-w-[1520px] space-y-5 px-3 pb-10 md:px-6">
 			<InventoryWorkspaceHeader view="stock" />
-			<AutoFilterForm
-				action="/inventory"
-				className="inventory-panel grid gap-2 p-3 sm:p-4 md:grid-cols-[minmax(220px,1fr)_190px_190px]"
-			>
-				<input name="view" type="hidden" value="stock" />
-				<label className="relative">
-					<span className="sr-only">Buscar material o código</span>
-					<Search
-						aria-hidden="true"
-						className="absolute left-3.5 top-3.5 text-[#6d7974]"
-						size={18}
-					/>
-					<input
-						className={`${inventoryInputClass} pl-10`}
-						defaultValue={filterValue(params.q)}
-						name="q"
-						placeholder="Buscar material o código"
-						type="text"
-					/>
-				</label>
-				<label>
-					<span className="sr-only">Filtrar por bodega</span>
-					<select
-						className={inventoryInputClass}
-						defaultValue={filterValue(params.warehouseId)}
-						name="warehouseId"
+			<InventoryStockDashboard
+				activeStatus={filterValue(params.status)}
+				activeWarehouse={filterValue(params.warehouseId)}
+				data={data}
+				toolbar={
+					<AutoFilterForm
+						action="/inventory"
+						className="inventory-stock-filters"
+						key="stock-filters"
 					>
-						<option value="">Todas las bodegas</option>
-						{data.warehouses.map((warehouse) => (
-							<option key={warehouse.id} value={warehouse.id}>
-								{warehouse.code} · {warehouse.name}
-							</option>
-						))}
-					</select>
-				</label>
-				<label>
-					<span className="sr-only">Filtrar por estado</span>
-					<select
-						className={inventoryInputClass}
-						defaultValue={filterValue(params.status)}
-						name="status"
-					>
-						<option value="">Todos los estados</option>
-						<option value="available">Disponible</option>
-						<option value="low">Bajo mínimo</option>
-						<option value="empty">Sin existencias</option>
-					</select>
-				</label>
-			</AutoFilterForm>
-			<p className="-mt-2 px-1 text-xs font-medium text-[#63706b]">
-				Los resultados se actualizan al cambiar los filtros.
-			</p>
-			<InventoryStockDashboard data={data} />
+						<input name="view" type="hidden" value="stock" />
+						<label className="relative">
+							<span className="sr-only">Buscar material o código</span>
+							<Search
+								aria-hidden="true"
+								className="absolute left-3.5 top-3.5 text-[#6d7974]"
+								size={18}
+							/>
+							<input
+								className={`${inventoryInputClass} pl-10`}
+								defaultValue={filterValue(params.q)}
+								name="q"
+								placeholder="Buscar material o código"
+								type="text"
+							/>
+						</label>
+						<label>
+							<span className="sr-only">Filtrar por bodega</span>
+							<select
+								className={inventoryInputClass}
+								defaultValue={filterValue(params.warehouseId)}
+								name="warehouseId"
+							>
+								<option value="">Todas las bodegas</option>
+								{data.warehouses.map((warehouse) => (
+									<option key={warehouse.id} value={warehouse.id}>
+										{warehouse.code} · {warehouse.name}
+									</option>
+								))}
+							</select>
+						</label>
+						<label>
+							<span className="sr-only">Filtrar por estado</span>
+							<select
+								className={inventoryInputClass}
+								defaultValue={filterValue(params.status)}
+								name="status"
+							>
+								<option value="">Todos los estados</option>
+								<option value="available">Disponible</option>
+								<option value="low">Bajo mínimo</option>
+								<option value="empty">Sin existencias</option>
+							</select>
+						</label>
+					</AutoFilterForm>
+				}
+			/>
 		</main>
 	);
 }

@@ -2,13 +2,9 @@
 
 import {
 	AlertTriangle,
-	ArrowDownToLine,
 	ArrowLeftRight,
-	ArrowUpFromLine,
 	CheckCircle2,
-	CircleDollarSign,
 	ClipboardList,
-	History,
 	PackageOpen,
 	Plus,
 	Search,
@@ -18,6 +14,7 @@ import {
 } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { AutoFilterForm } from "@/shared/ui/auto-filter-form";
+import { StatStrip } from "@/shared/ui/stat-strip";
 import {
 	recordStockMovementAction,
 	reviewWasteMovementAction,
@@ -33,7 +30,6 @@ import {
 } from "../domain/waste-review";
 import {
 	InventoryEmpty,
-	InventoryMetric,
 	InventoryPanel,
 	InventorySectionHeader,
 	InventoryStatus,
@@ -149,57 +145,41 @@ export function InventoryMovements({
 
 	return (
 		<div className="space-y-5">
-			<InventoryPanel>
-				<InventorySectionHeader
-					action={
-						<button
-							className={inventoryPrimaryButtonClass}
-							onClick={() => setOpen(true)}
-							type="button"
-						>
-							<Plus aria-hidden="true" size={17} />
-							Registrar movimiento
-						</button>
-					}
-					description="Entradas, salidas, traslados y ajustes con trazabilidad."
-					icon={ArrowLeftRight}
-					title="Movimientos de inventario"
-				/>
-			</InventoryPanel>
-
-			<section
-				aria-label="Resumen de movimientos"
-				className="kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-			>
-				<InventoryMetric
-					detail="según los filtros actuales"
-					icon={History}
-					label="Movimientos"
-					tone="graphite"
-					value={data.total}
-				/>
-				<InventoryMetric
-					detail="entradas y devoluciones"
-					icon={ArrowDownToLine}
-					label="Ingresos"
-					tone="green"
-					value={incoming}
-				/>
-				<InventoryMetric
-					detail="salidas y desperdicios"
-					icon={ArrowUpFromLine}
-					label="Egresos"
-					tone="red"
-					value={outgoing}
-				/>
-				<InventoryMetric
-					detail="costo acumulado filtrado"
-					icon={CircleDollarSign}
-					label="Valor movilizado"
-					tone="amber"
-					value={currency.format(data.movedValue)}
-				/>
-			</section>
+			<StatStrip
+				items={[
+					{
+						key: "all",
+						label: "Movimientos",
+						value: String(data.total),
+						detail: "Según los filtros actuales",
+						active: !first(params.type),
+						href: href(params, { view: "movement", type: "", page: "1" }),
+					},
+					{
+						key: "in",
+						label: "Entradas",
+						value: String(incoming),
+						detail: "Entradas y devoluciones",
+						active: first(params.type) === "IN",
+						href: href(params, { view: "movement", type: "IN", page: "1" }),
+					},
+					{
+						key: "out",
+						label: "Salidas",
+						value: String(outgoing),
+						detail: "Salidas y desperdicios",
+						active: first(params.type) === "OUT",
+						href: href(params, { view: "movement", type: "OUT", page: "1" }),
+					},
+					{
+						key: "value",
+						label: "Valor movilizado",
+						value: currency.format(data.movedValue),
+						detail: "Costo de lo filtrado",
+					},
+				]}
+				label="Resumen de movimientos"
+			/>
 
 			{canReviewWaste && data.pendingWasteReviews > 0 ? (
 				<a
@@ -233,108 +213,128 @@ export function InventoryMovements({
 				</a>
 			) : null}
 
-			<AutoFilterForm
-				action="/inventory"
-				className="inventory-panel grid gap-2 p-3 sm:p-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_175px_195px_190px]"
-			>
-				<input name="view" type="hidden" value="movement" />
-				<label className="relative">
-					<span className="sr-only">Buscar material o referencia</span>
-					<Search
-						aria-hidden="true"
-						className="absolute left-3.5 top-3.5 text-[#6d7974]"
-						size={18}
-					/>
-					<input
-						className={`${inventoryInputClass} pl-10`}
-						defaultValue={first(params.q)}
-						name="q"
-						placeholder="Material o referencia"
-						type="text"
-					/>
-				</label>
-				<label>
-					<span className="sr-only">Filtrar por tipo</span>
-					<select
-						className={inventoryInputClass}
-						defaultValue={first(params.type) ?? ""}
-						name="type"
-					>
-						<option value="">Todos los tipos</option>
-						{types.map(([value, label]) => (
-							<option key={value} value={value}>
-								{label}
-							</option>
-						))}
-					</select>
-				</label>
-				<label>
-					<span className="sr-only">Filtrar revisión de desperdicio</span>
-					<select
-						className={inventoryInputClass}
-						defaultValue={first(params.review) ?? ""}
-						name="review"
-					>
-						<option value="">Todo seguimiento</option>
-						<option value="pending">Por revisar</option>
-						<option value="reviewed">Revisados</option>
-						<option value="normal">Sin revisión requerida</option>
-					</select>
-				</label>
-				<label>
-					<span className="sr-only">Filtrar por bodega</span>
-					<select
-						className={inventoryInputClass}
-						defaultValue={first(params.warehouseId) ?? ""}
-						name="warehouseId"
-					>
-						<option value="">Todas las bodegas</option>
-						{data.warehouses.map((item) => (
-							<option key={item.id} value={item.id}>
-								{item.code} · {item.name}
-							</option>
-						))}
-					</select>
-				</label>
-			</AutoFilterForm>
-			<p className="-mt-2 px-1 text-xs font-medium text-[#63706b]">
-				Los resultados se actualizan al cambiar los filtros.
-			</p>
-
 			<InventoryPanel>
 				<InventorySectionHeader
-					description={`${data.total} ${data.total === 1 ? "registro encontrado" : "registros encontrados"}.`}
+					action={
+						<button
+							className={inventoryPrimaryButtonClass}
+							onClick={() => setOpen(true)}
+							type="button"
+						>
+							<Plus aria-hidden="true" size={17} />
+							Registrar movimiento
+						</button>
+					}
+					description={`${data.total} ${data.total === 1 ? "registro encontrado" : "registros encontrados"} · entradas, salidas, traslados y ajustes con trazabilidad.`}
 					icon={ClipboardList}
 					title="Kardex"
 				/>
+				<nav aria-label="Tipo de movimiento" className="inventory-type-tabs">
+					<a
+						aria-current={!first(params.type) ? "page" : undefined}
+						href={href(params, { view: "movement", type: "", page: "1" })}
+					>
+						Todos
+					</a>
+					{types.map(([value, label]) => (
+						<a
+							aria-current={first(params.type) === value ? "page" : undefined}
+							href={href(params, { view: "movement", type: value, page: "1" })}
+							key={value}
+						>
+							{label}
+						</a>
+					))}
+				</nav>
+				<AutoFilterForm
+					action="/inventory"
+					className="inventory-movement-filters"
+				>
+					<input name="view" type="hidden" value="movement" />
+					<label className="relative">
+						<span className="sr-only">Buscar material o referencia</span>
+						<Search
+							aria-hidden="true"
+							className="absolute left-3.5 top-3.5 text-[#6d7974]"
+							size={18}
+						/>
+						<input
+							className={`${inventoryInputClass} pl-10`}
+							defaultValue={first(params.q)}
+							name="q"
+							placeholder="Material o referencia"
+							type="text"
+						/>
+					</label>
+					{first(params.type) ? (
+						<input name="type" type="hidden" value={first(params.type)} />
+					) : null}
+					<label>
+						<span className="sr-only">Filtrar revisión de desperdicio</span>
+						<select
+							className={inventoryInputClass}
+							defaultValue={first(params.review) ?? ""}
+							name="review"
+						>
+							<option value="">Todo seguimiento</option>
+							<option value="pending">Por revisar</option>
+							<option value="reviewed">Revisados</option>
+							<option value="normal">Sin revisión requerida</option>
+						</select>
+					</label>
+					<label>
+						<span className="sr-only">Filtrar por bodega</span>
+						<select
+							className={inventoryInputClass}
+							defaultValue={first(params.warehouseId) ?? ""}
+							name="warehouseId"
+						>
+							<option value="">Todas las bodegas</option>
+							{data.warehouses.map((item) => (
+								<option key={item.id} value={item.id}>
+									{item.code} · {item.name}
+								</option>
+							))}
+						</select>
+					</label>
+				</AutoFilterForm>
+
 				{data.items.length ? (
 					<>
 						<div className="inventory-scrollbar hidden overflow-x-auto md:block">
-							<table className="inventory-table w-full min-w-[1180px] text-sm">
+							<table className="inventory-table inventory-kardex w-full min-w-[880px] text-sm">
+								<colgroup>
+									<col style={{ width: "13%" }} />
+									<col style={{ width: "12%" }} />
+									<col style={{ width: "28%" }} />
+									<col style={{ width: "12%" }} />
+									<col style={{ width: "13%" }} />
+									<col style={{ width: "16%" }} />
+									<col style={{ width: "6%" }} />
+								</colgroup>
 								<thead>
 									<tr>
-										{[
-											"Fecha",
-											"Tipo",
-											"Material",
-											"Bodega",
-											"Proyecto",
-											"Cantidad",
-											"Costo",
-											"Total",
-											"Referencia",
-											"Usuario",
-											"Acción",
-										].map((heading) => (
-											<th key={heading}>{heading}</th>
-										))}
+										<th>Fecha</th>
+										<th>Tipo</th>
+										<th>Recurso y bodega</th>
+										<th className="text-right">Cantidad</th>
+										<th className="text-right">Total</th>
+										<th>Referencia</th>
+										<th>
+											<span className="sr-only">Acción</span>
+										</th>
 									</tr>
 								</thead>
 								<tbody>
 									{data.items.map((item) => (
 										<tr key={item.id}>
-											<td className="whitespace-nowrap text-xs">
+											<td className="text-xs">
 												{item.createdAtLabel}
+												{item.project ? (
+													<small className="mt-0.5 block text-xs text-[var(--muted)]">
+														Proyecto {item.project.code}
+													</small>
+												) : null}
 											</td>
 											<td>
 												<div className="flex flex-col items-start gap-1.5">
@@ -350,34 +350,38 @@ export function InventoryMovements({
 													) : null}
 												</div>
 											</td>
-											<td className="font-bold">
-												{item.material.name}
-												<small className="mt-0.5 block text-xs font-medium text-[#6a7671]">
-													{item.material.code}
-												</small>
-											</td>
 											<td>
-												{item.warehouse.name}
-												<small className="mt-0.5 block text-xs text-[#6a7671]">
-													{item.warehouse.code}
+												<strong className="block truncate">
+													{item.material.name}
+												</strong>
+												<small className="mt-0.5 block truncate text-xs text-[var(--muted)]">
+													{item.material.code} · {item.warehouse.name}
 												</small>
 											</td>
-											<td>{item.project?.code ?? "—"}</td>
-											<td className="font-bold tabular-nums">
+											<td className="text-right font-bold tabular-nums">
 												{signedQuantity(item)}
 											</td>
-											<td className="tabular-nums">
-												{currency.format(item.unitCost)}
-											</td>
-											<td className="font-semibold tabular-nums">
-												{currency.format(item.totalCost)}
-											</td>
-											<td>{item.reference ?? "—"}</td>
-											<td title={item.createdBy?.name ?? "Sin usuario"}>
-												{item.createdBy?.name?.replace(" Constructora", "") ??
-													"—"}
+											<td className="text-right tabular-nums">
+												<span className="font-semibold">
+													{currency.format(item.totalCost)}
+												</span>
+												<small className="mt-0.5 block text-xs text-[var(--muted)]">
+													{currency.format(item.unitCost)} c/u
+												</small>
 											</td>
 											<td>
+												<span className="block truncate">
+													{item.reference ?? "—"}
+												</span>
+												<small
+													className="mt-0.5 block truncate text-xs text-[var(--muted)]"
+													title={item.createdBy?.name ?? "Sin usuario"}
+												>
+													{item.createdBy?.name?.replace(" Constructora", "") ??
+														"Sin usuario"}
+												</small>
+											</td>
+											<td className="text-right">
 												<button
 													className={inventorySecondaryButtonClass}
 													onClick={() => setSelected(item)}
@@ -391,7 +395,7 @@ export function InventoryMovements({
 								</tbody>
 							</table>
 						</div>
-						<div className="grid gap-3 p-3 md:hidden">
+						<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
 							{data.items.map((item) => (
 								<article
 									className="rounded-2xl bg-[#f3f5f1] p-4 shadow-[inset_0_0_0_1px_rgba(48,62,56,0.08)]"
