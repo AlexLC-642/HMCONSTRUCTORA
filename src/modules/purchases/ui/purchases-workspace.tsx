@@ -34,29 +34,34 @@ import {
 	useTransition,
 } from "react";
 import { useFormStatus } from "react-dom";
+import { HelpTip } from "@/shared/ui/help-tip";
+import { SelectMenu, type SelectMenuOption } from "@/shared/ui/select-menu";
 import {
 	createPurchaseOrderAction,
 	issuePurchaseOrderAction,
 	type PurchaseOrderFormState,
-	quickCreatePurchaseMaterialAction,
 	type PurchaseOrderStepState,
+	quickCreatePurchaseMaterialAction,
 	receivePurchaseOrderAction,
 	registerPurchaseInvoiceAction,
 	type SupplierFormState,
 	saveSupplierAction,
 } from "../application/actions";
 import type { getPurchaseWorkspace } from "../application/queries";
-import { HelpTip } from "@/shared/ui/help-tip";
-import { SelectMenu, type SelectMenuOption } from "@/shared/ui/select-menu";
 import {
 	type PurchaseBudgetScope,
 	purchaseBudgetScopeLabels,
 	purchaseOrderCancelBlocker,
 } from "../domain/order-rules";
+import {
+	type PurchaseResourceType,
+	purchaseResourceTypeLabels,
+	purchaseResourceTypes,
+} from "../domain/resource-types";
 import { purchaseOrderStatusLabels } from "../domain/validation";
 import {
-	CancelOrderDialog,
 	CanceledOrdersTable,
+	CancelOrderDialog,
 	CompanyInvoicesTable,
 	formatCompactMoney,
 	KpiStrip,
@@ -1184,6 +1189,8 @@ function QuickMaterialForm({
 	onCancel: () => void;
 }) {
 	const [name, setName] = useState(initialName);
+	const [resourceType, setResourceType] =
+		useState<PurchaseResourceType>("MATERIAL");
 	const [unit, setUnit] = useState("");
 	const [unitCost, setUnitCost] = useState("");
 	const [error, setError] = useState("");
@@ -1197,6 +1204,7 @@ function QuickMaterialForm({
 				name,
 				unit,
 				unitCost: Number(unitCost) || 0,
+				resourceType,
 			});
 			if (result.status === "error") {
 				setError(result.message);
@@ -1229,6 +1237,21 @@ function QuickMaterialForm({
 					value={name}
 				/>
 			</label>
+			<fieldset className="purchases-quick-material__types">
+				<legend>Tipo de recurso</legend>
+				{purchaseResourceTypes.map((type) => (
+					<label key={type}>
+						<input
+							checked={resourceType === type}
+							name="quick-resource-type"
+							onChange={() => setResourceType(type)}
+							type="radio"
+							value={type}
+						/>
+						<span>{purchaseResourceTypeLabels[type]}</span>
+					</label>
+				))}
+			</fieldset>
 			<div className="purchases-quick-material__pair">
 				<label>
 					<span>Unidad</span>
@@ -1757,7 +1780,10 @@ function DirectPurchaseForm({
 																	<span>
 																		<strong>{material.name}</strong>
 																		<small>
-																			{material.code} · {material.unit}
+																			{material.code} · {material.unit} ·{" "}
+																			{purchaseResourceTypeLabels[
+																				material.resourceType as PurchaseResourceType
+																			] ?? "Material"}
 																		</small>
 																	</span>
 																	{checked ? (
@@ -1875,7 +1901,7 @@ function DirectPurchaseForm({
 													label: item.name,
 													description: takenByOtherLine.has(item.id)
 														? `${item.code} · ya está en la compra`
-														: `${item.code} · ${item.unit}`,
+														: `${item.code} · ${item.unit} · ${purchaseResourceTypeLabels[item.resourceType as PurchaseResourceType] ?? "Material"}`,
 													disabled: takenByOtherLine.has(item.id),
 												}))}
 												placeholder="Elegir artículo"

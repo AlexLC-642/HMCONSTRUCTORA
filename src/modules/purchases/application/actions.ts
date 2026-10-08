@@ -8,21 +8,22 @@ import {
 	requireScopedProjectPermission,
 } from "@/modules/auth/application/authorization";
 import { createPurchaseInvoice } from "@/modules/finances/application/service";
+import { createInventoryMaterial } from "@/modules/inventory/application/service";
+import { parsePurchaseResourceType } from "../domain/resource-types";
 import {
 	purchaseCancelInputSchema,
 	purchaseOrderInputSchema,
 	purchaseReceiptInputSchema,
 	supplierInputSchema,
 } from "../domain/validation";
-import { createInventoryMaterial } from "@/modules/inventory/application/service";
 import {
 	cancelPurchaseOrder,
 	createPurchaseOrder,
+	findOrderOwner,
 	issuePurchaseOrder,
 	receivePurchaseOrder,
 	saveSupplier,
 	setSupplierActive,
-	findOrderOwner,
 } from "./service";
 
 export type SupplierFormState = {
@@ -334,6 +335,7 @@ export type QuickMaterialState =
 				name: string;
 				unit: string;
 				unitCost: number;
+				resourceType: "MATERIAL" | "TOOL" | "EQUIPMENT";
 			};
 	  };
 
@@ -346,6 +348,7 @@ export async function quickCreatePurchaseMaterialAction(input: {
 	name: string;
 	unit: string;
 	unitCost: number;
+	resourceType: string;
 }): Promise<QuickMaterialState> {
 	const user = await requireProjectScopePortfolioPermission(
 		"compras.gestionar",
@@ -369,9 +372,16 @@ export async function quickCreatePurchaseMaterialAction(input: {
 	if (!Number.isFinite(unitCost) || unitCost < 0) {
 		return { status: "error", message: "El costo debe ser cero o mayor." };
 	}
+	const resourceType = parsePurchaseResourceType(input?.resourceType);
+	if (!resourceType) {
+		return {
+			status: "error",
+			message: "Elige si es material, herramienta o maquinaria y equipo.",
+		};
+	}
 	try {
 		const material = await createInventoryMaterial(
-			{ name, unit, unitCost, resourceType: "MATERIAL" },
+			{ name, unit, unitCost, resourceType },
 			{ userId: user.id },
 		);
 		revalidatePath("/inventory");
@@ -383,6 +393,7 @@ export async function quickCreatePurchaseMaterialAction(input: {
 				name: material.name,
 				unit: material.unit,
 				unitCost: material.unitCost.toNumber(),
+				resourceType: material.resourceType,
 			},
 		};
 	} catch (error) {

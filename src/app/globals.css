@@ -26650,3 +26650,47 @@ button.inventory-catalog-tab:disabled {
 	border-top: 1px solid var(--border);
 	background: color-mix(in srgb, var(--surface-raised) 55%, var(--surface));
 }
+
+/* Compras · alta rápida: tipo de recurso (material, herramienta, maquinaria). */
+.purchases-quick-material__types {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	border: 0;
+	padding: 0;
+}
+.purchases-quick-material__types legend {
+	width: 100%;
+	margin-bottom: 0.3rem;
+	color: var(--muted);
+	font-size: 0.7rem;
+	font-weight: 600;
+}
+.purchases-order-form .purchases-quick-material__types label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	cursor: pointer;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	padding: 0.3rem 0.7rem;
+	color: var(--foreground);
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+.purchases-order-form .purchases-quick-material__types label:has(input:checked) {
+	border-color: var(--foreground);
+	background: var(--foreground);
+	color: var(--surface);
+}
+.purchases-order-form .purchases-quick-material__types input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	min-height: 0;
+	opacity: 0;
+}
+.purchases-order-form .purchases-quick-material__types label:has(input:focus-visible) {
+	outline: 2px solid var(--primary);
+	outline-offset: 2px;
+}
