@@ -87,7 +87,7 @@ export function AccountStatement({
         .account-statement .deposit-row { background: #f5f6f5; }
         .account-statement .total-amount { background: #1b2325; color: #fff; font-weight: 700; }
         .account-statement .col-no { width: 34px; }
-        .account-statement .col-desc { width: 43%; }
+        /* Sin ancho: toma el espacio restante. Con 43% las columnas sumaban 100% + 34px y la tabla se salía de la hoja. */
         .account-statement .col-company { width: 13%; }
         .account-statement .col-qty { width: 12%; }
         .account-statement .col-unit { width: 9%; }

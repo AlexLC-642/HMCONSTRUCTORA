@@ -26694,3 +26694,17 @@ button.inventory-catalog-tab:disabled {
 	outline: 2px solid var(--primary);
 	outline-offset: 2px;
 }
+
+/* En pantallas angostas la hoja conserva su ancho real (carta) en lugar de
+   encogerse: así las tablas no se salen del borde ni se aprietan, y
+   PrintActions la reduce completa al ancho del teléfono, como un PDF. */
+@media screen and (max-width: 1024px) {
+	.print-surface[class*="max-w-[8.5in]"] {
+		width: 8.5in;
+		max-width: none;
+	}
+	.print-surface[class*="max-w-[1280px]"] {
+		width: 1280px;
+		max-width: none;
+	}
+}

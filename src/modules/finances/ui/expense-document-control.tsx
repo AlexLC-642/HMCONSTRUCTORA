@@ -33,7 +33,7 @@ export function ExpenseDocumentControl({
 		<>
 			{document ? (
 				<button
-					className="focus-ring inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-semibold text-[#176f54] underline decoration-[#9acbb8] underline-offset-4 transition hover:bg-[#eaf6f0]"
+					className="focus-ring inline-flex max-w-full flex-wrap items-center justify-center gap-1 rounded-md px-1 py-1 font-semibold text-[#176f54] underline decoration-[#9acbb8] underline-offset-4 transition hover:bg-[#eaf6f0]"
 					onClick={() => setShowPreview(true)}
 					title="Abrir comprobante"
 					type="button"
@@ -42,7 +42,7 @@ export function ExpenseDocumentControl({
 				</button>
 			) : canRegister ? (
 				<button
-					className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[#aebbb4] bg-white px-2.5 py-1.5 text-xs font-semibold print:border-0 print:bg-transparent text-[#52615c] transition hover:-translate-y-0.5 hover:border-[#278362] hover:bg-[#eff8f3] hover:text-[#176f54]"
+					className="focus-ring inline-flex max-w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-dashed border-[#aebbb4] bg-white px-1.5 py-1 text-xs font-semibold print:border-0 print:bg-transparent text-[#52615c] transition hover:-translate-y-0.5 hover:border-[#278362] hover:bg-[#eff8f3] hover:text-[#176f54]"
 					onClick={() => setShowUpload(true)}
 					type="button"
 				>
