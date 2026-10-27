@@ -1237,6 +1237,8 @@ function KpiComposition({
 	);
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 function GanttRow({
 	bounds,
 	row,
@@ -1261,8 +1263,16 @@ function GanttRow({
 					),
 				}
 			: null;
+	// La marca "Hoy" solo necesita precisión de día. Con Date.now() el servidor y
+	// el navegador calculaban milisegundos distintos y la hidratación no
+	// coincidía; el inicio del día en UTC da el mismo valor en ambos.
+	const todayStart = Math.floor(Date.now() / DAY_MS) * DAY_MS;
 	const todayPercent = bounds
-		? clamp(((Date.now() - bounds.min) / (bounds.max - bounds.min)) * 100)
+		? Number(
+				clamp(
+					((todayStart - bounds.min) / (bounds.max - bounds.min)) * 100,
+				).toFixed(3),
+			)
 		: null;
 	const riskColor =
 		row.risk === "Riesgo"
