@@ -6,6 +6,8 @@ import "./public-experience.css";
 export const metadata: Metadata = {
 	title: "Control de obra",
 	description: "Sistema interno de gestión de proyectos",
+	authors: [{ name: "Alex Lem" }],
+	creator: "Alex Lem",
 	manifest: "/manifest.webmanifest",
 	appleWebApp: {
 		capable: true,

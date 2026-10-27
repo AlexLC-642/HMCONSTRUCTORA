@@ -26708,3 +26708,42 @@ button.inventory-catalog-tab:disabled {
 		max-width: none;
 	}
 }
+
+/* Sello del autor (src/shared/ui/creator-mark.tsx): discreto, se aviva al pasar. */
+.creator-sign {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	opacity: 0.55;
+	transition: opacity 180ms ease;
+}
+.creator-sign:hover {
+	opacity: 0.95;
+}
+.creator-sign__mark {
+	flex-shrink: 0;
+}
+.app-shell-signature {
+	display: flex;
+	justify-content: center;
+	padding: 0 0.75rem 0.85rem;
+	color: #edf5f4;
+}
+.app-shell[data-sidebar-collapsed="true"]
+	.app-shell-signature
+	.creator-sign__name {
+	display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.creator-sign {
+		transition: none;
+	}
+}
+@media print {
+	.creator-sign {
+		display: none;
+	}
+}

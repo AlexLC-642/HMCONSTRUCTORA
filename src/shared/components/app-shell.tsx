@@ -21,6 +21,7 @@ import { DevicePasskeyMark } from "@/modules/auth/ui/device-passkey-mark";
 import type { SystemNotification } from "@/modules/notifications/domain/types";
 import { PwaInstallButton } from "@/shared/offline/pwa-install-button";
 import { PwaRuntime } from "@/shared/offline/pwa-runtime";
+import { CreatorSignature } from "@/shared/ui/creator-mark";
 import { displayUserName } from "@/shared/utils/display-user-name";
 import { InlineScript } from "./inline-script";
 import { SidebarNav } from "./sidebar-nav";
@@ -261,6 +262,9 @@ export function AppShell({
 							{isSidebarCollapsed ? "Mostrar menú" : "Ocultar menú"}
 						</span>
 					</button>
+					<div className="app-shell-signature">
+						<CreatorSignature />
+					</div>
 				</aside>
 
 				<div className="app-shell-content print:pl-0">
