@@ -19,6 +19,7 @@ export const permissionKeys = [
 	"finanzas.ver",
 	"finanzas.registrar",
 	"documentos.compartir",
+	"documentos.eliminar",
 	"portal.gestionar",
 	"usuarios.gestionar",
 	"usuarios.administradores",

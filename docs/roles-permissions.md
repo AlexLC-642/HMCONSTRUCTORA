@@ -35,6 +35,7 @@ No existe rol de cliente.
 - `finanzas.ver`
 - `finanzas.registrar`
 - `documentos.compartir`
+- `documentos.eliminar` — borrar un documento de forma definitiva (archivo y todas sus versiones). Solo superadministrador y administrador; quien tiene `proyectos.editar` puede archivar/restaurar (reversible) y subir nuevas versiones (las anteriores se conservan).
 - `portal.gestionar`
 - `usuarios.gestionar`
 - `usuarios.administradores` — gestionar cuentas con rol de superadministrador (mas restrictivo que `usuarios.gestionar`).

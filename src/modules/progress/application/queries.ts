@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/shared/lib/prisma";
 
 export async function getProjectProgressWorkspace(projectId: string) {
@@ -179,4 +180,47 @@ export async function getProjectEvidenceGallery(projectId: string) {
 		orderBy: [{ reportDate: "desc" }, { createdAt: "desc" }],
 		take: 24,
 	});
+}
+
+export const reportHistoryPeriods = ["30", "90", "todos"] as const;
+export const reportHistoryStatuses = ["", "pendientes", "aprobados"] as const;
+export type ReportHistoryPeriod = (typeof reportHistoryPeriods)[number];
+export type ReportHistoryStatus = (typeof reportHistoryStatuses)[number];
+
+export const REPORT_HISTORY_PAGE_SIZE = 20;
+
+// Historial paginado: por defecto solo los últimos 30 días para que la vista
+// diaria no se llene de informes viejos; "todos" sigue dando acceso completo.
+export async function getProjectReportHistory(
+	projectId: string,
+	filters: {
+		period: ReportHistoryPeriod;
+		status: ReportHistoryStatus;
+		page: number;
+	},
+) {
+	const where: Prisma.DailyReportWhereInput = { projectId };
+	if (filters.period !== "todos") {
+		const since = new Date();
+		since.setHours(0, 0, 0, 0);
+		since.setDate(since.getDate() - Number(filters.period));
+		where.reportDate = { gte: since };
+	}
+	if (filters.status === "pendientes") {
+		where.status = { in: ["DRAFT", "SUBMITTED", "REVIEWED"] };
+	} else if (filters.status === "aprobados") {
+		where.status = { in: ["APPROVED", "PUBLISHED"] };
+	}
+
+	const [total, reports] = await Promise.all([
+		prisma.dailyReport.count({ where }),
+		prisma.dailyReport.findMany({
+			where,
+			orderBy: [{ reportDate: "desc" }, { createdAt: "desc" }],
+			skip: (filters.page - 1) * REPORT_HISTORY_PAGE_SIZE,
+			take: REPORT_HISTORY_PAGE_SIZE,
+		}),
+	]);
+
+	return { total, reports };
 }

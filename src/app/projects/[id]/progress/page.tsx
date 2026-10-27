@@ -2,10 +2,12 @@ import {
 	AlertTriangle,
 	CheckCircle2,
 	ClipboardList,
+	Eye,
 	FileText,
 	HardHat,
 	type LucideIcon,
 	PackageCheck,
+	Pencil,
 	Printer,
 	Send,
 	Share2,
@@ -23,13 +25,25 @@ import {
 import {
 	getProjectEvidenceGallery,
 	getProjectProgressWorkspace,
+	getProjectReportHistory,
+	REPORT_HISTORY_PAGE_SIZE,
+	type ReportHistoryPeriod,
+	type ReportHistoryStatus,
+	reportHistoryPeriods,
+	reportHistoryStatuses,
 } from "@/modules/progress/application/queries";
+import { isInReview } from "@/modules/progress/domain/report-editing";
 import {
 	DailyReportEvidenceGallery,
 	ProjectEvidenceGallery,
 } from "@/modules/progress/ui/daily-report-evidence-gallery";
 import { DailyReportForm } from "@/modules/progress/ui/daily-report-form";
 import { ProgressSummaryCharts } from "@/modules/progress/ui/progress-summary-charts";
+import {
+	ActionMenu,
+	ActionMenuLink,
+	ActionMenuScope,
+} from "@/shared/ui/action-menu";
 
 const statusLabels = {
 	DRAFT: "Borrador",
@@ -49,7 +63,45 @@ const statusTone = {
 
 type Search = {
 	tab?: string | string[];
+	periodo?: string | string[];
+	estado?: string | string[];
+	page?: string | string[];
 };
+
+function firstValue(value?: string | string[]) {
+	return Array.isArray(value) ? value[0] : value;
+}
+
+type HistoryFilters = {
+	period: ReportHistoryPeriod;
+	status: ReportHistoryStatus;
+	page: number;
+};
+
+const historyPeriodLabels: Record<ReportHistoryPeriod, string> = {
+	"30": "Últimos 30 días",
+	"90": "Últimos 90 días",
+	todos: "Todo el historial",
+};
+
+const historyStatusLabels: Record<ReportHistoryStatus, string> = {
+	"": "Todos los estados",
+	pendientes: "Pendientes de aprobar",
+	aprobados: "Aprobados",
+};
+
+function historyHref(
+	projectId: string,
+	filters: HistoryFilters,
+	next: Partial<HistoryFilters>,
+) {
+	const merged = { ...filters, page: 1, ...next };
+	const query = new URLSearchParams({ tab: "historial" });
+	if (merged.period !== "30") query.set("periodo", merged.period);
+	if (merged.status) query.set("estado", merged.status);
+	if (merged.page > 1) query.set("page", String(merged.page));
+	return `/projects/${projectId}/progress?${query.toString()}`;
+}
 
 function toNumber(value: { toNumber(): number } | number | null | undefined) {
 	return typeof value === "number" ? value : (value?.toNumber() ?? 0);
@@ -96,6 +148,21 @@ export default async function ProjectProgressPage({
 	) as typeof workspace;
 	const evidenceGallery =
 		activeTab === "evidencias" ? await getProjectEvidenceGallery(id) : [];
+	const rawPeriod = firstValue(search.periodo);
+	const rawStatus = firstValue(search.estado);
+	const historyFilters: HistoryFilters = {
+		period: reportHistoryPeriods.includes(rawPeriod as ReportHistoryPeriod)
+			? (rawPeriod as ReportHistoryPeriod)
+			: "30",
+		status: reportHistoryStatuses.includes(rawStatus as ReportHistoryStatus)
+			? (rawStatus as ReportHistoryStatus)
+			: "",
+		page: Math.max(1, Math.floor(Number(firstValue(search.page))) || 1),
+	};
+	const history =
+		activeTab === "historial"
+			? await getProjectReportHistory(id, historyFilters)
+			: null;
 
 	if (!workspace.project) notFound();
 
@@ -286,8 +353,14 @@ export default async function ProjectProgressPage({
 				</div>
 			</section>
 
-			{activeTab === "historial" ? (
-				<HistoryPanel reports={workspace.reports} />
+			{history ? (
+				<HistoryPanel
+					canApprove={canApprove}
+					filters={historyFilters}
+					projectId={id}
+					reports={history.reports}
+					total={history.total}
+				/>
 			) : activeTab === "evidencias" ? (
 				<ProjectEvidenceGallery projectId={id} reports={evidenceGallery} />
 			) : activeTab === "registro" ? (
@@ -605,12 +678,59 @@ function ReviewLine({ label, value }: { label: string; value: string }) {
 }
 
 function HistoryPanel({
+	canApprove,
+	filters,
+	projectId,
 	reports,
+	total,
 }: {
-	reports: Awaited<ReturnType<typeof getProjectProgressWorkspace>>["reports"];
+	canApprove: boolean;
+	filters: HistoryFilters;
+	projectId: string;
+	reports: Awaited<ReturnType<typeof getProjectReportHistory>>["reports"];
+	total: number;
 }) {
+	const totalPages = Math.max(1, Math.ceil(total / REPORT_HISTORY_PAGE_SIZE));
+	const renderReportMenu = (report: (typeof reports)[number]) => {
+		const href = `/projects/${report.projectId}/progress/reports/${report.id}`;
+		return (
+			<ActionMenu label={`Acciones de ${report.reportNumber}`}>
+				<ActionMenuLink
+					href={href}
+					icon={
+						report.status === "DRAFT" ? (
+							<Pencil aria-hidden="true" size={14} />
+						) : (
+							<Eye aria-hidden="true" size={14} />
+						)
+					}
+				>
+					{report.status === "DRAFT" ? "Editar informe" : "Ver informe"}
+				</ActionMenuLink>
+				{canApprove && isInReview(report.status) ? (
+					<ActionMenuLink
+						href={href}
+						icon={<CheckCircle2 aria-hidden="true" size={14} />}
+						tone="success"
+					>
+						Revisar y aprobar
+					</ActionMenuLink>
+				) : null}
+				<ActionMenuLink
+					href={`${href}/print`}
+					icon={<Printer aria-hidden="true" size={14} />}
+				>
+					PDF / imprimir
+				</ActionMenuLink>
+			</ActionMenu>
+		);
+	};
+	const isDefaultView = filters.period === "30" && !filters.status;
+	const chipClass = (active: boolean) =>
+		`focus-ring rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? "border-[var(--foreground)] bg-[var(--foreground)] text-white" : "border-[var(--border)] bg-white text-[var(--muted)] hover:text-[var(--foreground)]"}`;
+
 	return (
-		<section className="rounded-[18px] border border-[var(--border)] bg-white shadow-[0_16px_38px_rgba(20,25,27,0.08)]">
+		<ActionMenuScope className="rounded-[18px] border border-[var(--border)] bg-white shadow-[0_16px_38px_rgba(20,25,27,0.08)]">
 			<div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
 				<div>
 					<h2 className="text-lg font-semibold">Historial de informes</h2>
@@ -619,8 +739,34 @@ function HistoryPanel({
 					</p>
 				</div>
 				<span className="rounded-full border border-[var(--border)] bg-[#fbfaf6] px-3 py-1 text-xs font-semibold text-[var(--muted)]">
-					{reports.length} recientes
+					{total} {total === 1 ? "informe" : "informes"}
 				</span>
+			</div>
+			<div className="flex flex-col gap-2 border-b border-[var(--border)] px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+				<nav aria-label="Período" className="flex flex-wrap gap-2">
+					{reportHistoryPeriods.map((period) => (
+						<a
+							aria-current={filters.period === period ? "page" : undefined}
+							className={chipClass(filters.period === period)}
+							href={historyHref(projectId, filters, { period })}
+							key={period}
+						>
+							{historyPeriodLabels[period]}
+						</a>
+					))}
+				</nav>
+				<nav aria-label="Estado" className="flex flex-wrap gap-2">
+					{reportHistoryStatuses.map((status) => (
+						<a
+							aria-current={filters.status === status ? "page" : undefined}
+							className={chipClass(filters.status === status)}
+							href={historyHref(projectId, filters, { status })}
+							key={status || "todos"}
+						>
+							{historyStatusLabels[status]}
+						</a>
+					))}
+				</nav>
 			</div>
 			{reports.length ? (
 				<>
@@ -638,6 +784,7 @@ function HistoryPanel({
 								{reports.map((report) => (
 									<tr
 										className="border-t border-[var(--border)]"
+										data-action-row=""
 										key={report.id}
 									>
 										<td className="px-5 py-4 font-semibold">
@@ -667,6 +814,7 @@ function HistoryPanel({
 												>
 													PDF
 												</a>
+												{renderReportMenu(report)}
 											</div>
 										</td>
 									</tr>
@@ -678,6 +826,7 @@ function HistoryPanel({
 						{reports.map((report) => (
 							<article
 								className="rounded-2xl border border-[var(--border)] bg-[#fbfaf6] p-4"
+								data-action-row=""
 								key={report.id}
 							>
 								<div className="flex items-start justify-between gap-3">
@@ -707,10 +856,45 @@ function HistoryPanel({
 									>
 										PDF
 									</a>
+									{renderReportMenu(report)}
 								</div>
 							</article>
 						))}
 					</div>
+					{totalPages > 1 ? (
+						<nav
+							aria-label="Páginas del historial"
+							className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-3 text-sm"
+						>
+							{filters.page > 1 ? (
+								<a
+									className={chipClass(false)}
+									href={historyHref(projectId, filters, {
+										page: filters.page - 1,
+									})}
+								>
+									Anterior
+								</a>
+							) : (
+								<span />
+							)}
+							<span className="text-[var(--muted)]">
+								Página {filters.page} de {totalPages}
+							</span>
+							{filters.page < totalPages ? (
+								<a
+									className={chipClass(false)}
+									href={historyHref(projectId, filters, {
+										page: filters.page + 1,
+									})}
+								>
+									Siguiente
+								</a>
+							) : (
+								<span />
+							)}
+						</nav>
+					) : null}
 				</>
 			) : (
 				<div className="grid min-h-64 place-items-center px-5 py-12 text-center">
@@ -721,14 +905,28 @@ function HistoryPanel({
 							size={34}
 						/>
 						<p className="mt-3 font-semibold">
-							Todavia no hay informes de avance.
+							{isDefaultView
+								? "No hay informes en los últimos 30 días."
+								: "No hay informes con estos filtros."}
 						</p>
 						<p className="mt-1 text-sm text-[var(--muted)]">
-							Cuando guardes el primer informe aparecera en este historial.
+							{filters.period === "todos" && !filters.status ? (
+								"Cuando guardes el primer informe aparecera en este historial."
+							) : (
+								<a
+									className="font-semibold underline underline-offset-4"
+									href={historyHref(projectId, filters, {
+										period: "todos",
+										status: "",
+									})}
+								>
+									Ver todo el historial
+								</a>
+							)}
 						</p>
 					</div>
 				</div>
 			)}
-		</section>
+		</ActionMenuScope>
 	);
 }

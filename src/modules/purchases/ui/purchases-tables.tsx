@@ -6,6 +6,7 @@ import {
 	Mail,
 	Pencil,
 	Phone,
+	Power,
 	Search,
 	UserRound,
 	X,
@@ -18,6 +19,12 @@ import {
 	type PurchaseOrderStepState,
 	setSupplierActiveAction,
 } from "../application/actions";
+import {
+	ActionMenu,
+	ActionMenuButton,
+	ActionMenuLink,
+	ActionMenuScope,
+} from "@/shared/ui/action-menu";
 import { StatStrip } from "@/shared/ui/stat-strip";
 import type { getCompanyInvoices } from "../application/company-invoices";
 import type { getPurchaseWorkspace } from "../application/queries";
@@ -233,7 +240,7 @@ export function SuppliersTable({
 			{suppliers.length === 0 ? (
 				empty
 			) : (
-				<div className="purchases-table-wrap">
+				<ActionMenuScope className="purchases-table-wrap">
 					<table className="purchases-table">
 						<thead>
 							<tr>
@@ -257,10 +264,71 @@ export function SuppliersTable({
 						<tbody>
 							{suppliers.map((supplier) => (
 								<tr
+									data-action-row=""
 									data-inactive={supplier.status !== "ACTIVE" || undefined}
 									key={supplier.id}
 								>
 									<td data-label="Proveedor">
+										{canManage || supplier.phone || supplier.email ? (
+											<ActionMenu
+												hideTrigger
+												label={`Acciones de ${supplier.businessName}`}
+											>
+												{canManage ? (
+													<ActionMenuButton
+														icon={<Pencil aria-hidden="true" size={14} />}
+														onClick={() => onEdit(supplier)}
+														type="button"
+													>
+														Editar proveedor
+													</ActionMenuButton>
+												) : null}
+												{supplier.phone ? (
+													<ActionMenuLink
+														href={`tel:${supplier.phone}`}
+														icon={<Phone aria-hidden="true" size={14} />}
+													>
+														Llamar
+													</ActionMenuLink>
+												) : null}
+												{supplier.email ? (
+													<ActionMenuLink
+														href={`mailto:${supplier.email}`}
+														icon={<Mail aria-hidden="true" size={14} />}
+													>
+														Enviar correo
+													</ActionMenuLink>
+												) : null}
+												{canManage ? (
+													<form action={setSupplierActiveAction}>
+														<input
+															name="supplierId"
+															type="hidden"
+															value={supplier.id}
+														/>
+														<input
+															name="active"
+															type="hidden"
+															value={
+																supplier.status === "ACTIVE" ? "false" : "true"
+															}
+														/>
+														<ActionMenuButton
+															icon={<Power aria-hidden="true" size={14} />}
+															tone={
+																supplier.status === "ACTIVE"
+																	? "warning"
+																	: "success"
+															}
+														>
+															{supplier.status === "ACTIVE"
+																? "Desactivar"
+																: "Activar"}
+														</ActionMenuButton>
+													</form>
+												) : null}
+											</ActionMenu>
+										) : null}
 										<strong>{supplier.businessName}</strong>
 										<small>
 											{supplier.code}
@@ -361,7 +429,7 @@ export function SuppliersTable({
 							))}
 						</tbody>
 					</table>
-				</div>
+				</ActionMenuScope>
 			)}
 		</div>
 	);

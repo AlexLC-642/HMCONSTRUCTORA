@@ -5,14 +5,17 @@ import {
 	CheckCircle2,
 	ClipboardCheck,
 	Link2,
+	Lock,
 	PackageCheck,
 	Plus,
 	ShoppingCart,
 	Truck,
 	Warehouse,
+	XCircle,
 } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { requirePermission } from "@/modules/auth/application/authorization";
 import {
 	approveRequisitionAction,
@@ -30,6 +33,13 @@ import {
 import { RequisitionCreateDialog } from "@/modules/requisitions/ui/requisition-create-dialog";
 import { RequisitionMaterialLinkDialog } from "@/modules/requisitions/ui/requisition-material-link-dialog";
 import { RequisitionStatusStepper } from "@/modules/requisitions/ui/requisition-status-stepper";
+import {
+	ActionMenu,
+	ActionMenuButton,
+	ActionMenuLink,
+	ActionMenuScope,
+	type ActionMenuTone,
+} from "@/shared/ui/action-menu";
 import { AutoFilterForm } from "@/shared/ui/auto-filter-form";
 import { StatStrip } from "@/shared/ui/stat-strip";
 
@@ -58,6 +68,19 @@ const priorityTone = {
 	HIGH: "warning",
 	URGENT: "danger",
 } as const;
+
+type RowAction = {
+	key: string;
+	label: string;
+	icon: ReactNode;
+} & (
+	| {
+			action: (formData: FormData) => Promise<void>;
+			primary?: boolean;
+			tone?: ActionMenuTone;
+	  }
+	| { href: Route; linkClass?: string }
+);
 
 function ActionButton({
 	action,
@@ -462,7 +485,7 @@ export default async function RequisitionsPage({
 								</Link>
 							))}
 						</nav>
-						<div className="req-list">
+						<ActionMenuScope className="req-list">
 							{requisitions.map((requisition) => (
 								<RequisitionRow
 									canApprove={canApprove}
@@ -491,7 +514,7 @@ export default async function RequisitionsPage({
 									</Link>
 								</div>
 							) : null}
-						</div>
+						</ActionMenuScope>
 					</>
 				)}
 			</section>
@@ -613,8 +636,92 @@ function RequisitionRow({
 			? `${requisition.project.code} · ${requisition.project.name}`
 			: `Existencia de ${requisition.warehouse?.name ?? "bodega"}`;
 
+	const actions: RowAction[] = [];
+	if (canApprove) {
+		const status = requisition.status;
+		if (status === "REQUESTED" || status === "REVIEWED")
+			actions.push({
+				key: "approve",
+				label: "Autorizar",
+				action: approveRequisitionAction,
+				primary: true,
+				icon: <CheckCircle2 aria-hidden="true" size={15} />,
+			});
+		if (
+			status === "REQUESTED" ||
+			status === "REVIEWED" ||
+			status === "APPROVED"
+		)
+			actions.push({
+				key: "reject",
+				label: "Rechazar",
+				action: rejectRequisitionAction,
+				tone: "danger",
+				icon: <XCircle aria-hidden="true" size={15} />,
+			});
+		if (status === "APPROVED" && canFulfillFromStock)
+			actions.push({
+				key: "fulfill",
+				label: "Entregar desde inventario",
+				action: fulfillRequisitionFromStockAction,
+				primary: true,
+				icon: <PackageCheck aria-hidden="true" size={15} />,
+			});
+		if (status === "APPROVED" && !canFulfillFromStock)
+			actions.push({
+				key: "purchase",
+				label: "Enviar a Compras",
+				href: `/purchases?view=requisitions&requisitionId=${requisition.id}` as Route,
+				linkClass: "requisitions-action--primary",
+				icon: <ShoppingCart aria-hidden="true" size={15} />,
+			});
+		if (status === "PURCHASED" && allInventoryItemsLinked)
+			actions.push({
+				key: "receive",
+				label: "Registrar recepción en Compras",
+				href: "/purchases?view=orders" as Route,
+				icon: <Truck aria-hidden="true" size={15} />,
+			});
+		if (
+			status === "RECEIVED" &&
+			requisition.destinationType === "PROJECT" &&
+			allInventoryItemsLinked
+		)
+			actions.push({
+				key: "deliver",
+				label: "Entregar a obra",
+				action: deliverRequisitionAction,
+				primary: true,
+				icon: <Truck aria-hidden="true" size={15} />,
+			});
+		if (
+			status === "DELIVERED" ||
+			(status === "RECEIVED" && requisition.destinationType === "WAREHOUSE")
+		)
+			actions.push({
+				key: "close",
+				label: "Cerrar",
+				action: closeRequisitionAction,
+				icon: <Lock aria-hidden="true" size={15} />,
+			});
+		if (
+			(status === "REQUESTED" ||
+				status === "REVIEWED" ||
+				status === "APPROVED" ||
+				status === "PURCHASED") &&
+			missingInventoryItem
+		)
+			actions.push({
+				key: "link",
+				label: "Vincular recurso",
+				href: `/requisitions?linkItem=${missingInventoryItem.id}` as Route,
+				linkClass: "requisitions-action--link",
+				icon: <Link2 aria-hidden="true" size={15} />,
+			});
+	}
+
 	return (
-		<article className="req-row">
+		<article className="req-row" data-action-row="">
 			<div className="req-row__main">
 				<div className="req-row__title">
 					<span className="requisitions-card__number">
@@ -667,6 +774,32 @@ function RequisitionRow({
 					<CheckCircle2 aria-hidden="true" size={14} />
 					{nextStepText(requisition, canFulfillFromStock)}
 				</span>
+				{actions.length ? (
+					<ActionMenu label={`Acciones de ${requisition.number}`}>
+						{actions.map((item) =>
+							"href" in item ? (
+								<ActionMenuLink
+									href={item.href}
+									icon={item.icon}
+									key={item.key}
+								>
+									{item.label}
+								</ActionMenuLink>
+							) : (
+								<form action={item.action} key={item.key}>
+									<input
+										name="requisitionId"
+										type="hidden"
+										value={requisition.id}
+									/>
+									<ActionMenuButton icon={item.icon} tone={item.tone}>
+										{item.label}
+									</ActionMenuButton>
+								</form>
+							),
+						)}
+					</ActionMenu>
+				) : null}
 			</div>
 
 			<details className="req-row__items">
@@ -731,85 +864,28 @@ function RequisitionRow({
 				</div>
 			</details>
 
-			{canApprove ? (
+			{actions.length ? (
 				<footer className="req-row__actions">
-					{["REQUESTED", "REVIEWED"].includes(requisition.status) ? (
-						<ActionButton
-							action={approveRequisitionAction}
-							id={requisition.id}
-							label="Autorizar"
-							primary
-						/>
-					) : null}
-					{["REQUESTED", "REVIEWED", "APPROVED"].includes(
-						requisition.status,
-					) ? (
-						<ActionButton
-							action={rejectRequisitionAction}
-							id={requisition.id}
-							label="Rechazar"
-						/>
-					) : null}
-					{requisition.status === "APPROVED" && canFulfillFromStock ? (
-						<ActionButton
-							action={fulfillRequisitionFromStockAction}
-							id={requisition.id}
-							label="Entregar desde inventario"
-							primary
-						/>
-					) : null}
-					{requisition.status === "APPROVED" && !canFulfillFromStock ? (
-						<Link
-							className="focus-ring requisitions-action requisitions-action--primary"
-							href={
-								`/purchases?view=requisitions&requisitionId=${requisition.id}` as Route
-							}
-						>
-							<ShoppingCart aria-hidden="true" size={15} />
-							Enviar a Compras
-						</Link>
-					) : null}
-					{requisition.status === "PURCHASED" && allInventoryItemsLinked ? (
-						<Link
-							className="focus-ring requisitions-action"
-							href={"/purchases?view=orders" as Route}
-						>
-							<Truck aria-hidden="true" size={15} />
-							Registrar recepción en Compras
-						</Link>
-					) : null}
-					{requisition.status === "RECEIVED" &&
-					requisition.destinationType === "PROJECT" &&
-					allInventoryItemsLinked ? (
-						<ActionButton
-							action={deliverRequisitionAction}
-							id={requisition.id}
-							label="Entregar a obra"
-							primary
-						/>
-					) : null}
-					{requisition.status === "DELIVERED" ||
-					(requisition.status === "RECEIVED" &&
-						requisition.destinationType === "WAREHOUSE") ? (
-						<ActionButton
-							action={closeRequisitionAction}
-							id={requisition.id}
-							label="Cerrar"
-						/>
-					) : null}
-					{["REQUESTED", "REVIEWED", "APPROVED", "PURCHASED"].includes(
-						requisition.status,
-					) && missingInventoryItem ? (
-						<Link
-							className="requisitions-action requisitions-action--link focus-ring"
-							href={
-								`/requisitions?linkItem=${missingInventoryItem.id}` as Route
-							}
-						>
-							<Link2 aria-hidden="true" size={15} />
-							Vincular recurso
-						</Link>
-					) : null}
+					{actions.map((item) =>
+						"href" in item ? (
+							<Link
+								className={`focus-ring requisitions-action ${item.linkClass ?? ""}`}
+								href={item.href}
+								key={item.key}
+							>
+								{item.icon}
+								{item.label}
+							</Link>
+						) : (
+							<ActionButton
+								action={item.action}
+								id={requisition.id}
+								key={item.key}
+								label={item.label}
+								primary={item.primary}
+							/>
+						),
+					)}
 				</footer>
 			) : null}
 		</article>

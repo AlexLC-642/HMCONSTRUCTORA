@@ -1,23 +1,42 @@
 import type { ProjectStatus } from "@prisma/client";
 import {
+	Archive,
 	Calculator,
 	CalendarDays,
+	CheckCircle2,
 	ClipboardList,
+	FileText,
 	FolderKanban,
+	FolderOpen,
 	MapPin,
+	Pencil,
 	Plus,
+	RotateCcw,
 	Search,
 	UserRound,
+	Wallet,
 } from "lucide-react";
 import {
 	hasPortfolioAccess,
 	requirePermission,
 } from "@/modules/auth/application/authorization";
+import {
+	archiveProjectAction,
+	completeProjectAction,
+	reactivateProjectAction,
+} from "@/modules/projects/application/actions";
 import { listProjects } from "@/modules/projects/application/queries";
 import {
 	projectStatuses,
 	projectStatusLabels,
 } from "@/modules/projects/domain/validation";
+import {
+	ActionMenu,
+	ActionMenuButton,
+	ActionMenuLink,
+	ActionMenuScope,
+	ActionMenuSeparator,
+} from "@/shared/ui/action-menu";
 import { AutoFilterForm } from "@/shared/ui/auto-filter-form";
 import { displayUserName } from "@/shared/utils/display-user-name";
 
@@ -140,6 +159,101 @@ export default async function ProjectsPage({
 		(project) => project.status === "ARCHIVED",
 	).length;
 
+	const canEditProjects = user.permissions.includes("proyectos.editar");
+	const canSeeFinances = user.permissions.includes("finanzas.ver");
+
+	function renderProjectMenu(project: (typeof projects)[number]) {
+		const base = `/projects/${project.id}`;
+		const canComplete =
+			project.status !== "COMPLETED" && project.status !== "ARCHIVED";
+		const canReactivate =
+			project.status === "ARCHIVED" ||
+			project.status === "COMPLETED" ||
+			project.status === "PAUSED";
+		return (
+			<ActionMenu label={`Acciones de ${project.code}`}>
+				<ActionMenuLink
+					href={base}
+					icon={<FolderOpen aria-hidden="true" size={14} />}
+				>
+					Abrir expediente
+				</ActionMenuLink>
+				<ActionMenuLink
+					href={`${base}/budget`}
+					icon={<Calculator aria-hidden="true" size={14} />}
+				>
+					Presupuesto
+				</ActionMenuLink>
+				<ActionMenuLink
+					href={`${base}/schedule`}
+					icon={<CalendarDays aria-hidden="true" size={14} />}
+				>
+					Cronograma
+				</ActionMenuLink>
+				<ActionMenuLink
+					href={`${base}/progress`}
+					icon={<ClipboardList aria-hidden="true" size={14} />}
+				>
+					Avance diario
+				</ActionMenuLink>
+				<ActionMenuLink
+					href={`${base}/documents`}
+					icon={<FileText aria-hidden="true" size={14} />}
+				>
+					Documentos
+				</ActionMenuLink>
+				{canSeeFinances ? (
+					<ActionMenuLink
+						href={`${base}/finance`}
+						icon={<Wallet aria-hidden="true" size={14} />}
+					>
+						Finanzas
+					</ActionMenuLink>
+				) : null}
+				{canEditProjects ? (
+					<>
+						<ActionMenuSeparator />
+						<ActionMenuLink
+							href={`${base}/information`}
+							icon={<Pencil aria-hidden="true" size={14} />}
+						>
+							Editar información
+						</ActionMenuLink>
+						{canComplete ? (
+							<form action={completeProjectAction.bind(null, project.id)}>
+								<ActionMenuButton
+									icon={<CheckCircle2 aria-hidden="true" size={14} />}
+									tone="success"
+								>
+									Finalizar
+								</ActionMenuButton>
+							</form>
+						) : null}
+						{project.status === "COMPLETED" ? (
+							<form action={archiveProjectAction.bind(null, project.id)}>
+								<ActionMenuButton
+									icon={<Archive aria-hidden="true" size={14} />}
+									tone="warning"
+								>
+									Archivar
+								</ActionMenuButton>
+							</form>
+						) : null}
+						{canReactivate ? (
+							<form action={reactivateProjectAction.bind(null, project.id)}>
+								<ActionMenuButton
+									icon={<RotateCcw aria-hidden="true" size={14} />}
+								>
+									Reactivar
+								</ActionMenuButton>
+							</form>
+						) : null}
+					</>
+				) : null}
+			</ActionMenu>
+		);
+	}
+
 	return (
 		<main className="projects-workspace mx-auto max-w-[1520px] space-y-5">
 			<section className="projects-hero relative overflow-hidden rounded-[22px] border border-[#1f2b2d] bg-[radial-gradient(circle_at_top_left,_rgba(74,88,92,0.34),transparent_38%),linear-gradient(135deg,#1a2124_0%,#171d1f_45%,#12181a_100%)] text-white shadow-[0_28px_64px_rgba(18,24,27,0.24),0_4px_10px_rgba(18,24,27,0.3),inset_0_1px_0_rgba(255,255,255,0.06)]">
@@ -234,13 +348,14 @@ export default async function ProjectsPage({
 					</span>
 				</div>
 
-				<div className="projects-list divide-y divide-[#e6e9e3] bg-[#f4f3f1]">
+				<ActionMenuScope className="projects-list divide-y divide-[#e6e9e3] bg-[#f4f3f1]">
 					{projects.map((project) => {
 						const progress = project.progressPercentage.toNumber();
 						const risk = statusRisk(project.status, progress);
 						return (
 							<article
 								className="projects-list__row grid gap-4 border-b border-[#e4e8e1] bg-white/70 px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_18px_26px_rgba(17,24,39,0.06)] 2xl:grid-cols-[minmax(280px,1fr)_210px_180px_430px] 2xl:items-center"
+								data-action-row=""
 								key={project.id}
 							>
 								<div className="min-w-0">
@@ -336,6 +451,7 @@ export default async function ProjectsPage({
 									>
 										Expediente
 									</a>
+									{renderProjectMenu(project)}
 								</div>
 							</article>
 						);
@@ -359,7 +475,7 @@ export default async function ProjectsPage({
 							</div>
 						</div>
 					) : null}
-				</div>
+				</ActionMenuScope>
 			</section>
 		</main>
 	);

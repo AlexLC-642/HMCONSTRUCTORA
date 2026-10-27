@@ -95,7 +95,9 @@ export async function deleteProjectDocumentAction(
 	projectId: string,
 	documentId: string,
 ) {
-	const user = await requireProjectPermission(projectId, "proyectos.editar");
+	// Borrado definitivo (archivo + versiones): solo administración. Quien
+	// edita documentos puede archivarlos, que es reversible.
+	const user = await requireProjectPermission(projectId, "documentos.eliminar");
 	await deleteProjectDocument(documentId, { userId: user.id });
 	returnToProject(projectId);
 }

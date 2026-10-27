@@ -58,6 +58,7 @@ const permissionLabels: Record<string, string> = {
 	"cronograma.editar": "Editar cronograma",
 	"cronograma.ver": "Ver cronograma",
 	"documentos.compartir": "Compartir documentos",
+	"documentos.eliminar": "Eliminar documentos definitivamente",
 	"finanzas.registrar": "Registrar finanzas",
 	"finanzas.ver": "Ver finanzas",
 	"inventario.mover": "Mover inventario",

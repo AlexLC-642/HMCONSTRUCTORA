@@ -1,3 +1,4 @@
+import type { WebsiteInquiryStatus } from "@prisma/client";
 import {
 	CalendarClock,
 	Camera,
@@ -117,6 +118,18 @@ function Metric({
 	);
 }
 
+const inquiryViews: ReadonlyArray<{
+	key: string;
+	label: string;
+	statuses: readonly WebsiteInquiryStatus[] | null;
+}> = [
+	{ key: "abiertas", label: "Por atender", statuses: ["NEW", "IN_PROGRESS"] },
+	{ key: "cerradas", label: "Cerradas", statuses: ["CLOSED"] },
+	{ key: "spam", label: "Spam", statuses: ["SPAM"] },
+	{ key: "todas", label: "Todas", statuses: null },
+];
+type InquiryViewKey = (typeof inquiryViews)[number]["key"];
+
 export default async function WebsitePage({
 	searchParams,
 }: {
@@ -131,6 +144,19 @@ export default async function WebsitePage({
 	const publishedCopy = resolveWebsiteCopy(settings);
 
 	const newInquiries = inquiries.filter((item) => item.status === "NEW").length;
+	// Por defecto solo se atiende lo abierto; cerradas y spam quedan a un clic.
+	const rawInquiryView = Array.isArray(params.estado)
+		? params.estado[0]
+		: params.estado;
+	const inquiryView = inquiryViews.some((view) => view.key === rawInquiryView)
+		? (rawInquiryView as InquiryViewKey)
+		: "abiertas";
+	const inquiryViewStatuses = inquiryViews.find(
+		(view) => view.key === inquiryView,
+	)?.statuses;
+	const visibleInquiries = inquiryViewStatuses
+		? inquiries.filter((item) => inquiryViewStatuses.includes(item.status))
+		: inquiries;
 	const activeServices = services.filter((item) => item.active).length;
 	const activePhotos = photos.filter((item) => item.active).length;
 	const galleryAlbums = Array.from(
@@ -532,7 +558,34 @@ export default async function WebsitePage({
 				<div
 					className={`${panelClass} divide-y divide-[#e1e5df] overflow-hidden`}
 				>
-					{inquiries.map((inquiry) => (
+					<nav
+						aria-label="Filtrar solicitudes"
+						className="flex flex-wrap gap-2 p-4"
+					>
+						{inquiryViews.map((view) => {
+							const statuses = view.statuses;
+							const count = statuses
+								? inquiries.filter((item) => statuses.includes(item.status))
+										.length
+								: inquiries.length;
+							const active = inquiryView === view.key;
+							return (
+								<a
+									aria-current={active ? "page" : undefined}
+									className={`focus-ring rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active ? "border-[var(--steel)] bg-[var(--steel)] text-white" : "border-[#dfe3dc] bg-white text-[#46504c] hover:bg-[#f3f5f1]"}`}
+									href={
+										view.key === "abiertas"
+											? "/website?tab=solicitudes"
+											: `/website?tab=solicitudes&estado=${view.key}`
+									}
+									key={view.key}
+								>
+									{view.label} ({count})
+								</a>
+							);
+						})}
+					</nav>
+					{visibleInquiries.map((inquiry) => (
 						<div
 							className="grid gap-3 p-4 lg:grid-cols-[1fr_260px]"
 							key={inquiry.id}
@@ -602,7 +655,7 @@ export default async function WebsitePage({
 							</form>
 						</div>
 					))}
-					{inquiries.length === 0 ? (
+					{visibleInquiries.length === 0 ? (
 						<div className="grid min-h-[240px] place-items-center px-5 py-10 text-center">
 							<div>
 								<Inbox
@@ -610,7 +663,13 @@ export default async function WebsitePage({
 									className="mx-auto text-[#8d9792]"
 									size={32}
 								/>
-								<p className="mt-3 font-semibold">Sin solicitudes todavía.</p>
+								<p className="mt-3 font-semibold">
+									{inquiries.length === 0
+										? "Sin solicitudes todavía."
+										: inquiryView === "abiertas"
+											? "No hay solicitudes pendientes de atender."
+											: "No hay solicitudes en esta vista."}
+								</p>
 							</div>
 						</div>
 					) : null}

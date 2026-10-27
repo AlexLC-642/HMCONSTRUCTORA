@@ -34,6 +34,12 @@ import {
 	useTransition,
 } from "react";
 import { useFormStatus } from "react-dom";
+import {
+	ActionMenu,
+	ActionMenuButton,
+	ActionMenuLink,
+	ActionMenuScope,
+} from "@/shared/ui/action-menu";
 import { HelpTip } from "@/shared/ui/help-tip";
 import { SelectMenu, type SelectMenuOption } from "@/shared/ui/select-menu";
 import {
@@ -2274,6 +2280,23 @@ function withAttempt(
 
 const issueWithAttempt = withAttempt(issuePurchaseOrderAction);
 
+// Qué pasos admite una orden: lo usan el panel de detalle y el menú contextual
+// de la lista, para que ambos muestren siempre lo mismo.
+function orderStepAvailability(
+	order: Order,
+	canManage: boolean,
+	canRegisterFinance: boolean,
+) {
+	return {
+		showFinance:
+			(order.project ? canRegisterFinance : canManage) &&
+			order.status !== "DRAFT" &&
+			order.total - order.invoicedAmount > 0.004,
+		showReceive: canManage && ["ISSUED", "PARTIAL"].includes(order.status),
+		showIssue: canManage && order.status === "DRAFT",
+	};
+}
+
 function OrderStepActions({
 	order,
 	canManage,
@@ -2295,12 +2318,11 @@ function OrderStepActions({
 		hasReceipts: order.items.some((item) => item.receivedQuantity > 0),
 	});
 	const error = issueState.status === "error" ? issueState.message : null;
-	const showFinance =
-		(order.project ? canRegisterFinance : canManage) &&
-		order.status !== "DRAFT" &&
-		order.total - order.invoicedAmount > 0.004;
-	const showReceive = canManage && ["ISSUED", "PARTIAL"].includes(order.status);
-	const showIssue = canManage && order.status === "DRAFT";
+	const { showFinance, showReceive, showIssue } = orderStepAvailability(
+		order,
+		canManage,
+		canRegisterFinance,
+	);
 	const showCancel =
 		canManage && ["DRAFT", "ISSUED"].includes(order.status) && !cancelBlocker;
 
@@ -2431,6 +2453,60 @@ export function PurchasesWorkspace({
 	);
 	const preferRequisitions = data.readyRequisitions.length > 0;
 	const outsideBudgetCount = data.metrics.outsideBudgetOrders;
+
+	// Menú contextual de una orden: mismas acciones que el panel de detalle.
+	function renderOrderMenu(order: Order) {
+		const { showFinance, showReceive, showIssue } = orderStepAvailability(
+			order,
+			canManage,
+			canRegisterFinance,
+		);
+		return (
+			<ActionMenu hideTrigger label={`Acciones de ${order.number}`}>
+				<ActionMenuButton
+					icon={<FileText aria-hidden="true" size={14} />}
+					onClick={() => setSelectedOrderId(order.id)}
+					type="button"
+				>
+					Ver detalle
+				</ActionMenuButton>
+				{showReceive ? (
+					<ActionMenuButton
+						icon={<PackageCheck aria-hidden="true" size={14} />}
+						onClick={() => {
+							setSelectedOrderId(order.id);
+							setReceiptOrder(order);
+						}}
+						tone="success"
+						type="button"
+					>
+						Registrar recepción
+					</ActionMenuButton>
+				) : null}
+				{showFinance ? (
+					<ActionMenuButton
+						icon={<ReceiptText aria-hidden="true" size={14} />}
+						onClick={() => {
+							setSelectedOrderId(order.id);
+							setInvoiceOrder(order);
+						}}
+						type="button"
+					>
+						Registrar factura
+					</ActionMenuButton>
+				) : null}
+				{showIssue ? (
+					<ActionMenuButton
+						icon={<Check aria-hidden="true" size={14} />}
+						onClick={() => setSelectedOrderId(order.id)}
+						type="button"
+					>
+						Emitir o anular (abre el detalle)
+					</ActionMenuButton>
+				) : null}
+			</ActionMenu>
+		);
+	}
 
 	return (
 		<div className="purchases-workspace">
@@ -2662,34 +2738,36 @@ export function PurchasesWorkspace({
 									Fuera de presupuesto <span>{outsideBudgetCount}</span>
 								</button>
 							</fieldset>
-							<div className="purchases-order-list__scroll">
+							<ActionMenuScope className="purchases-order-list__scroll">
 								{filteredOrders.length ? (
 									filteredOrders.map((order) => (
-										<button
-											aria-pressed={selectedOrder?.id === order.id}
-											className="purchases-order-row focus-ring"
-											key={order.id}
-											onClick={() => setSelectedOrderId(order.id)}
-											type="button"
-										>
-											<div className="purchases-order-row__top">
-												<strong>{order.number}</strong>
-												<StatusBadge status={order.status} />
-											</div>
-											<p>{order.supplier.businessName}</p>
-											<div className="purchases-order-row__meta">
-												<BudgetTag scope={order.budgetScope} />
-												<small className="purchases-order-row__trace">
-													{getOrderTrace(order)}
-												</small>
-											</div>
-											<div>
-												<span>
-													{destinationLabel(order.requisition, order)}
-												</span>
-												<strong>{formatCurrency(order.total)}</strong>
-											</div>
-										</button>
+										<div className="contents" data-action-row="" key={order.id}>
+											{renderOrderMenu(order)}
+											<button
+												aria-pressed={selectedOrder?.id === order.id}
+												className="purchases-order-row focus-ring"
+												onClick={() => setSelectedOrderId(order.id)}
+												type="button"
+											>
+												<div className="purchases-order-row__top">
+													<strong>{order.number}</strong>
+													<StatusBadge status={order.status} />
+												</div>
+												<p>{order.supplier.businessName}</p>
+												<div className="purchases-order-row__meta">
+													<BudgetTag scope={order.budgetScope} />
+													<small className="purchases-order-row__trace">
+														{getOrderTrace(order)}
+													</small>
+												</div>
+												<div>
+													<span>
+														{destinationLabel(order.requisition, order)}
+													</span>
+													<strong>{formatCurrency(order.total)}</strong>
+												</div>
+											</button>
+										</div>
 									))
 								) : (
 									<div className="purchases-empty">
@@ -2698,7 +2776,7 @@ export function PurchasesWorkspace({
 										<p>Cambia la búsqueda o registra una nueva compra.</p>
 									</div>
 								)}
-							</div>
+							</ActionMenuScope>
 						</div>
 						<div
 							className="purchases-order-detail purchases-order-detail--animated"
@@ -3006,12 +3084,35 @@ export function PurchasesWorkspace({
 							</div>
 						) : null}
 						{data.readyRequisitions.length ? (
-							<div className="purchases-requisition-grid">
+							<ActionMenuScope className="purchases-requisition-grid">
 								{data.readyRequisitions.map((requisition) => (
 									<article
 										className="purchases-requisition"
+										data-action-row=""
 										key={requisition.id}
 									>
+										<ActionMenu
+											hideTrigger
+											label={`Acciones de ${requisition.number}`}
+										>
+											{canManage ? (
+												<ActionMenuButton
+													disabled={data.metrics.activeSuppliers === 0}
+													icon={<ShoppingCart aria-hidden="true" size={14} />}
+													onClick={() => setOrderRequisition(requisition)}
+													tone="success"
+													type="button"
+												>
+													Iniciar compra
+												</ActionMenuButton>
+											) : null}
+											<ActionMenuLink
+												href="/requisitions"
+												icon={<ClipboardCheck aria-hidden="true" size={14} />}
+											>
+												Ir a Requerimientos
+											</ActionMenuLink>
+										</ActionMenu>
 										<header>
 											<div>
 												<span>{requisition.number}</span>
@@ -3080,7 +3181,7 @@ export function PurchasesWorkspace({
 										</footer>
 									</article>
 								))}
-							</div>
+							</ActionMenuScope>
 						) : (
 							<div className="purchases-empty purchases-empty--large">
 								<ClipboardCheck size={34} />

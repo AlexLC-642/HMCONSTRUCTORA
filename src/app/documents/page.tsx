@@ -8,7 +8,9 @@ import {
 	FileText,
 	FolderKanban,
 	FolderOpen,
+	History,
 	Layers3,
+	Pencil,
 	Plus,
 	Search,
 	X,
@@ -37,6 +39,12 @@ import {
 import { DocumentUploadDrawer } from "@/modules/documents/ui/document-upload-drawer";
 import { prisma } from "@/shared/lib/prisma";
 import { AnimatedFolderIcon } from "@/shared/ui/animated-folder-icon";
+import {
+	ActionMenu,
+	ActionMenuLink,
+	ActionMenuScope,
+	ActionMenuSeparator,
+} from "@/shared/ui/action-menu";
 import { AutoFilterForm } from "@/shared/ui/auto-filter-form";
 
 const dateFormatter = new Intl.DateTimeFormat("es-GT", { dateStyle: "medium" });
@@ -151,7 +159,14 @@ export default async function DocumentsPage({
 	// Apply filters
 	const filteredDocuments = documents.filter((document) => {
 		if (projectFilter && document.project.id !== projectFilter) return false;
-		if (statusFilter && document.status !== statusFilter) return false;
+		// Sin estado elegido se muestran solo los vigentes; "ALL" incluye archivados.
+		if (!statusFilter && document.status === "ARCHIVED") return false;
+		if (
+			statusFilter &&
+			statusFilter !== "ALL" &&
+			document.status !== statusFilter
+		)
+			return false;
 		if (categoryFilter && document.category.key !== categoryFilter)
 			return false;
 		if (!query) return true;
@@ -226,539 +241,346 @@ export default async function DocumentsPage({
 	const tabClass = (tabName: string) =>
 		`documents-tab focus-ring ${activeTab === tabName ? "documents-tab--active" : ""}`;
 
+	const canEdit = user.permissions.includes("proyectos.editar");
+
+	function renderDocumentMenu(document: (typeof documents)[number]) {
+		const latest = document.versions[0];
+		const projectDocs = `/projects/${document.project.id}/documents`;
+		return (
+			<ActionMenu label={`Acciones de ${document.title}`}>
+				{latest ? (
+					<>
+						<ActionMenuLink
+							href={documentsHref(params, { preview: document.id })}
+							icon={<Eye aria-hidden="true" size={14} />}
+						>
+							Ver
+						</ActionMenuLink>
+						<ActionMenuLink
+							download
+							href={documentFileUrl(latest.id)}
+							icon={<Download aria-hidden="true" size={14} />}
+						>
+							Descargar
+						</ActionMenuLink>
+					</>
+				) : null}
+				<ActionMenuSeparator />
+				<ActionMenuLink
+					href={projectDocs}
+					icon={<FolderOpen aria-hidden="true" size={14} />}
+				>
+					Abrir expediente del proyecto
+				</ActionMenuLink>
+				<ActionMenuLink
+					href={`${projectDocs}?versions=${document.id}`}
+					icon={<History aria-hidden="true" size={14} />}
+				>
+					{canEdit ? "Historial / reemplazar archivo" : "Historial y versiones"}
+				</ActionMenuLink>
+				{canEdit ? (
+					<ActionMenuLink
+						href={`${projectDocs}?edit=${document.id}`}
+						icon={<Pencil aria-hidden="true" size={14} />}
+					>
+						Editar información
+					</ActionMenuLink>
+				) : null}
+			</ActionMenu>
+		);
+	}
+
 	return (
-		<main className="mx-auto max-w-[1480px] space-y-5">
-			<section className="documents-hero">
-				<div className="relative z-10 flex flex-wrap items-center justify-between gap-6">
-					<div className="flex items-center gap-4">
-						<span className="documents-hero__icon">
-							<Files aria-hidden="true" size={22} />
-						</span>
-						<h1 className="sr-only">Documentos</h1>
-					</div>
-					<a
-						className="documents-primary-action focus-ring"
-						href={documentsHref(params, { upload: "true" })}
-					>
-						<Plus aria-hidden="true" size={17} /> Subir documento
-					</a>
-				</div>
-			</section>
-
-			<section
-				aria-label="Resumen documental"
-				className="kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-			>
-				<DocumentMetric
-					detail="Archivos registrados"
-					icon={Files}
-					label="Documentos"
-					value={documents.length}
-				/>
-				<DocumentMetric
-					detail="Con expediente activo"
-					icon={FolderOpen}
-					label="Proyectos"
-					tone="red"
-					value={projectsWithDocuments}
-				/>
-				<DocumentMetric
-					detail="Historial acumulado"
-					icon={Layers3}
-					label="Versiones"
-					tone="amber"
-					value={totalVersions}
-				/>
-				<DocumentMetric
-					detail="Listos para consulta"
-					icon={CheckCircle2}
-					label="Aprobados"
-					tone="green"
-					value={approvedDocuments}
-				/>
-			</section>
-
-			<section className="documents-panel documents-toolbar">
-				<nav aria-label="Vistas de documentos" className="documents-tabs">
-					<a
-						className={tabClass("por-proyecto")}
-						href={documentsHref(params, { tab: "por-proyecto", page: "1" })}
-					>
-						<FolderKanban size={16} /> Por proyecto
-					</a>
-					<a
-						className={tabClass("recientes")}
-						href={documentsHref(params, { tab: "recientes", page: "1" })}
-					>
-						<Clock3 size={16} /> Recientes
-					</a>
-					<a
-						className={tabClass("todos")}
-						href={documentsHref(params, { tab: "todos", page: "1" })}
-					>
-						<FileArchive size={16} /> Todos
-					</a>
-				</nav>
-
-				<AutoFilterForm action="/documents" className="w-full sm:max-w-md">
-					{activeTab !== "por-proyecto" && (
-						<input type="hidden" name="tab" value={activeTab} />
-					)}
-					<label className="documents-search">
-						<Search aria-hidden="true" size={17} />
-						<input
-							aria-label="Buscar documentos"
-							defaultValue={searchValue(params.q)}
-							name="q"
-							placeholder="Buscar documento, código o archivo"
-						/>
-					</label>
-				</AutoFilterForm>
-			</section>
-
-			{/* Tabs Content */}
-			{activeTab === "por-proyecto" && (
-				<section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-					{matchingProjects.map((project) => {
-						const projectDocs = filteredDocuments.filter(
-							(d) => d.projectId === project.id,
-						);
-						const totalCount = projectDocs.length;
-						if (totalCount === 0 && query !== "") return null;
-
-						const contratosCount = projectDocs.filter(
-							(d) => getVisualGroup(d.category.key) === "contractual",
-						).length;
-						const planosCount = projectDocs.filter(
-							(d) => getVisualGroup(d.category.key) === "tecnico",
-						).length;
-						const financierosCount = projectDocs.filter(
-							(d) => getVisualGroup(d.category.key) === "financiero",
-						).length;
-						const informesCount = projectDocs.filter(
-							(d) => getVisualGroup(d.category.key) === "informes",
-						).length;
-						const otrosCount = projectDocs.filter(
-							(d) => getVisualGroup(d.category.key) === "administrativo",
-						).length;
-
-						const lastUpdate =
-							projectDocs.length > 0
-								? new Date(
-										Math.max(
-											...projectDocs.map((d) =>
-												new Date(d.updatedAt).getTime(),
-											),
-										),
-									)
-								: null;
-						const lastUpdateText = lastUpdate
-							? lastUpdate.toLocaleDateString("es-GT", {
-									day: "2-digit",
-									month: "2-digit",
-									year: "numeric",
-								})
-							: "Sin documentos";
-
-						return (
-							<div className="documents-project-card group" key={project.id}>
-								<div>
-									<div className="flex items-start justify-between gap-3">
-										<AnimatedFolderIcon />
-										<span className="rounded-full bg-[#fce9eb] px-2.5 py-1 text-xs font-bold text-[#b91c2c]">
-											{totalCount}{" "}
-											{totalCount === 1 ? "documento" : "documentos"}
-										</span>
-									</div>
-									<h3 className="mt-4 text-lg font-extrabold tracking-[-0.02em] text-[#172122]">
-										{project.code}
-									</h3>
-									<p className="mt-1 line-clamp-1 text-sm text-[#65736e]">
-										{project.name}
-									</p>
-
-									<div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-[var(--muted)]">
-										<div className="flex justify-between border-b border-[#f4f0ed] pb-1">
-											<span>Contratos</span>
-											<strong className="text-[var(--foreground)]">
-												{contratosCount}
-											</strong>
-										</div>
-										<div className="flex justify-between border-b border-[#f4f0ed] pb-1">
-											<span>Planos</span>
-											<strong className="text-[var(--foreground)]">
-												{planosCount}
-											</strong>
-										</div>
-										<div className="flex justify-between border-b border-[#f4f0ed] pb-1">
-											<span>Financieros</span>
-											<strong className="text-[var(--foreground)]">
-												{financierosCount}
-											</strong>
-										</div>
-										<div className="flex justify-between border-b border-[#f4f0ed] pb-1">
-											<span>Informes</span>
-											<strong className="text-[var(--foreground)]">
-												{informesCount}
-											</strong>
-										</div>
-										<div className="col-span-2 flex justify-between border-b border-[#f4f0ed] pb-1">
-											<span>Otros</span>
-											<strong className="text-[var(--foreground)]">
-												{otrosCount}
-											</strong>
-										</div>
-									</div>
-								</div>
-
-								<div className="mt-5 flex items-center justify-between gap-3 border-t border-[#dce2dd] pt-3">
-									<span className="text-[11px] text-[var(--muted)]">
-										Actualizado: {lastUpdateText}
-									</span>
-									<a
-										className="documents-project-link focus-ring"
-										href={`/projects/${project.id}/documents`}
-									>
-										Abrir documentos →
-									</a>
-								</div>
-							</div>
-						);
-					})}
-					{matchingProjects.length === 0 && (
-						<div className="documents-panel col-span-full">
-							<DocumentEmpty
-								detail="Prueba con otro nombre, código o archivo para encontrar el expediente."
-								icon={FolderKanban}
-								title="No hay proyectos que coincidan"
-							/>
+		<main className="mx-auto max-w-[1480px]">
+			<ActionMenuScope className="space-y-5">
+				<section className="documents-hero">
+					<div className="relative z-10 flex flex-wrap items-center justify-between gap-6">
+						<div className="flex items-center gap-4">
+							<span className="documents-hero__icon">
+								<Files aria-hidden="true" size={22} />
+							</span>
+							<h1 className="sr-only">Documentos</h1>
 						</div>
-					)}
-				</section>
-			)}
-
-			{activeTab === "recientes" && (
-				<section className="documents-panel">
-					<div className="flex items-center justify-between border-b border-[#dce2dd] px-5 py-4">
-						<div>
-							<h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#172122]">
-								Documentos recientes
-							</h2>
-							<p className="mt-0.5 text-xs text-[#65736e]">
-								Últimas versiones incorporadas al sistema
-							</p>
-						</div>
-						<Clock3 className="text-[#68756f]" size={19} />
+						<a
+							className="documents-primary-action focus-ring"
+							href={documentsHref(params, { upload: "true" })}
+						>
+							<Plus aria-hidden="true" size={17} /> Subir documento
+						</a>
 					</div>
-					{recentDocuments.length ? (
-						<>
-							<div className="documents-scrollbar hidden overflow-x-auto md:block">
-								<table className="documents-table min-w-[800px]">
-									<thead>
-										<tr>
-											<th className="px-4 py-3">Documento</th>
-											<th className="px-4 py-3">Proyecto</th>
-											<th className="px-4 py-3">Categoría</th>
-											<th className="px-4 py-3">Modificado</th>
-											<th className="px-4 py-3">Versión</th>
-											<th className="px-4 py-3 text-right">Acciones</th>
-										</tr>
-									</thead>
-									<tbody>
-										{recentDocuments.map((doc) => {
-											const latest = doc.versions[0];
-											const modDate = latest
-												? new Date(latest.createdAt)
-												: new Date(doc.updatedAt);
-											return (
-												<tr key={doc.id}>
-													<td>
-														<p className="font-semibold text-[var(--foreground)]">
-															{doc.title}
-														</p>
-														{doc.description && (
-															<p className="mt-0.5 text-xs text-[var(--muted)] truncate max-w-[320px]">
-																{doc.description}
-															</p>
-														)}
-													</td>
-													<td>
-														<p className="font-medium text-[var(--foreground)]">
-															{doc.project.code}
-														</p>
-														<p className="text-xs text-[var(--muted)] truncate max-w-[200px]">
-															{doc.project.name}
-														</p>
-													</td>
-													<td>
-														<span className="documents-category">
-															<FileText size={13} />
-															{doc.category.name}
-														</span>
-													</td>
-													<td className="text-xs text-[var(--muted)]">
-														{formatRelativeTime(modDate)}
-													</td>
-													<td>
-														<span className="documents-version">
-															v{latest?.versionNumber ?? 1}
-														</span>
-													</td>
-													<td className="text-right">
-														<a
-															className="documents-row-action focus-ring"
-															href={documentsHref(params, { preview: doc.id })}
-														>
-															<Eye size={14} />
-															Ver
-														</a>
-													</td>
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							</div>
-							<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
-								{recentDocuments.map((doc) => {
-									const latest = doc.versions[0];
-									const modDate = latest
-										? new Date(latest.createdAt)
-										: new Date(doc.updatedAt);
-									return (
-										<div
-											className="rounded-2xl border border-[#e5e8e3] bg-[#f9faf8] p-4"
-											key={doc.id}
-										>
-											<div className="flex items-start justify-between gap-3">
-												<div className="min-w-0">
-													<p className="truncate font-semibold text-[var(--foreground)]">
-														{doc.title}
-													</p>
-													<p className="mt-0.5 truncate text-xs text-[var(--muted)]">
-														{doc.project.code} · {doc.project.name}
-													</p>
-												</div>
-												<span className="documents-version shrink-0">
-													v{latest?.versionNumber ?? 1}
-												</span>
-											</div>
-											<div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-												<span className="documents-category">
-													<FileText size={13} />
-													{doc.category.name}
-												</span>
-												<span className="text-xs text-[var(--muted)]">
-													{formatRelativeTime(modDate)}
-												</span>
-											</div>
-											<a
-												className="documents-row-action focus-ring mt-3 w-full justify-center"
-												href={documentsHref(params, { preview: doc.id })}
-											>
-												<Eye size={14} />
-												Ver
-											</a>
-										</div>
-									);
-								})}
-							</div>
-						</>
-					) : (
-						<DocumentEmpty
-							detail="Cuando se cargue o actualice un archivo, aparecerá en esta vista."
-							icon={Clock3}
-							title="Aún no hay documentos recientes"
-						/>
-					)}
 				</section>
-			)}
 
-			{activeTab === "todos" && (
-				<div className="space-y-4">
-					{/* Filters Form */}
-					<AutoFilterForm
-						action="/documents"
-						className="documents-panel grid items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
-					>
-						<input type="hidden" name="tab" value="todos" />
-						{searchValue(params.q) && (
-							<input type="hidden" name="q" value={searchValue(params.q)} />
+				<section
+					aria-label="Resumen documental"
+					className="kpi-grid grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+				>
+					<DocumentMetric
+						detail="Archivos registrados"
+						icon={Files}
+						label="Documentos"
+						value={documents.length}
+					/>
+					<DocumentMetric
+						detail="Con expediente activo"
+						icon={FolderOpen}
+						label="Proyectos"
+						tone="red"
+						value={projectsWithDocuments}
+					/>
+					<DocumentMetric
+						detail="Historial acumulado"
+						icon={Layers3}
+						label="Versiones"
+						tone="amber"
+						value={totalVersions}
+					/>
+					<DocumentMetric
+						detail="Listos para consulta"
+						icon={CheckCircle2}
+						label="Aprobados"
+						tone="green"
+						value={approvedDocuments}
+					/>
+				</section>
+
+				<section className="documents-panel documents-toolbar">
+					<nav aria-label="Vistas de documentos" className="documents-tabs">
+						<a
+							className={tabClass("por-proyecto")}
+							href={documentsHref(params, { tab: "por-proyecto", page: "1" })}
+						>
+							<FolderKanban size={16} /> Por proyecto
+						</a>
+						<a
+							className={tabClass("recientes")}
+							href={documentsHref(params, { tab: "recientes", page: "1" })}
+						>
+							<Clock3 size={16} /> Recientes
+						</a>
+						<a
+							className={tabClass("todos")}
+							href={documentsHref(params, { tab: "todos", page: "1" })}
+						>
+							<FileArchive size={16} /> Todos
+						</a>
+					</nav>
+
+					<AutoFilterForm action="/documents" className="w-full sm:max-w-md">
+						{activeTab !== "por-proyecto" && (
+							<input type="hidden" name="tab" value={activeTab} />
 						)}
-
-						<label className="documents-field">
-							Proyecto
-							<select
-								className={documentInputClass}
-								defaultValue={projectFilter}
-								name="project"
-							>
-								<option value="">Todos los proyectos</option>
-								{allProjects.map((project) => (
-									<option key={project.id} value={project.id}>
-										{project.code} - {project.name}
-									</option>
-								))}
-							</select>
+						<label className="documents-search">
+							<Search aria-hidden="true" size={17} />
+							<input
+								aria-label="Buscar documentos"
+								defaultValue={searchValue(params.q)}
+								name="q"
+								placeholder="Buscar documento, código o archivo"
+							/>
 						</label>
-
-						<label className="documents-field">
-							Categoría
-							<select
-								className={documentInputClass}
-								defaultValue={categoryFilter}
-								name="category"
-							>
-								<option value="">Todas las categorías</option>
-								{allCategories.map((category) => (
-									<option key={category.key} value={category.key}>
-										{category.name}
-									</option>
-								))}
-							</select>
-						</label>
-
-						<label className="documents-field">
-							Estado
-							<select
-								className={documentInputClass}
-								defaultValue={statusFilter}
-								name="status"
-							>
-								<option value="">Todos los estados</option>
-								{Object.entries(documentStatusLabels).map(([status, label]) => (
-									<option key={status} value={status}>
-										{label}
-									</option>
-								))}
-							</select>
-						</label>
-
-						<div className="flex gap-2">
-							{(projectFilter || categoryFilter || statusFilter || query) && (
-								<a
-									className="documents-clear focus-ring"
-									href="/documents?tab=todos"
-								>
-									Limpiar filtros
-								</a>
-							)}
-						</div>
 					</AutoFilterForm>
+				</section>
 
-					{/* Documents Table */}
-					<article className="documents-panel">
-						{paginatedDocuments.length ? (
+				{/* Tabs Content */}
+				{activeTab === "por-proyecto" && (
+					<section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+						{matchingProjects.map((project) => {
+							const projectDocs = filteredDocuments.filter(
+								(d) => d.projectId === project.id,
+							);
+							const totalCount = projectDocs.length;
+							if (totalCount === 0 && query !== "") return null;
+
+							const contratosCount = projectDocs.filter(
+								(d) => getVisualGroup(d.category.key) === "contractual",
+							).length;
+							const planosCount = projectDocs.filter(
+								(d) => getVisualGroup(d.category.key) === "tecnico",
+							).length;
+							const financierosCount = projectDocs.filter(
+								(d) => getVisualGroup(d.category.key) === "financiero",
+							).length;
+							const informesCount = projectDocs.filter(
+								(d) => getVisualGroup(d.category.key) === "informes",
+							).length;
+							const otrosCount = projectDocs.filter(
+								(d) => getVisualGroup(d.category.key) === "administrativo",
+							).length;
+
+							const lastUpdate =
+								projectDocs.length > 0
+									? new Date(
+											Math.max(
+												...projectDocs.map((d) =>
+													new Date(d.updatedAt).getTime(),
+												),
+											),
+										)
+									: null;
+							const lastUpdateText = lastUpdate
+								? lastUpdate.toLocaleDateString("es-GT", {
+										day: "2-digit",
+										month: "2-digit",
+										year: "numeric",
+									})
+								: "Sin documentos";
+
+							return (
+								<div className="documents-project-card group" key={project.id}>
+									<div>
+										<div className="flex items-start justify-between gap-3">
+											<AnimatedFolderIcon />
+											<span className="rounded-full bg-[#fce9eb] px-2.5 py-1 text-xs font-bold text-[#b91c2c]">
+												{totalCount}{" "}
+												{totalCount === 1 ? "documento" : "documentos"}
+											</span>
+										</div>
+										<h3 className="mt-4 text-lg font-extrabold tracking-[-0.02em] text-[#172122]">
+											{project.code}
+										</h3>
+										<p className="mt-1 line-clamp-1 text-sm text-[#65736e]">
+											{project.name}
+										</p>
+
+										<div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-[var(--muted)]">
+											<div className="flex justify-between border-b border-[#f4f0ed] pb-1">
+												<span>Contratos</span>
+												<strong className="text-[var(--foreground)]">
+													{contratosCount}
+												</strong>
+											</div>
+											<div className="flex justify-between border-b border-[#f4f0ed] pb-1">
+												<span>Planos</span>
+												<strong className="text-[var(--foreground)]">
+													{planosCount}
+												</strong>
+											</div>
+											<div className="flex justify-between border-b border-[#f4f0ed] pb-1">
+												<span>Financieros</span>
+												<strong className="text-[var(--foreground)]">
+													{financierosCount}
+												</strong>
+											</div>
+											<div className="flex justify-between border-b border-[#f4f0ed] pb-1">
+												<span>Informes</span>
+												<strong className="text-[var(--foreground)]">
+													{informesCount}
+												</strong>
+											</div>
+											<div className="col-span-2 flex justify-between border-b border-[#f4f0ed] pb-1">
+												<span>Otros</span>
+												<strong className="text-[var(--foreground)]">
+													{otrosCount}
+												</strong>
+											</div>
+										</div>
+									</div>
+
+									<div className="mt-5 flex items-center justify-between gap-3 border-t border-[#dce2dd] pt-3">
+										<span className="text-[11px] text-[var(--muted)]">
+											Actualizado: {lastUpdateText}
+										</span>
+										<a
+											className="documents-project-link focus-ring"
+											href={`/projects/${project.id}/documents`}
+										>
+											Abrir documentos →
+										</a>
+									</div>
+								</div>
+							);
+						})}
+						{matchingProjects.length === 0 && (
+							<div className="documents-panel col-span-full">
+								<DocumentEmpty
+									detail="Prueba con otro nombre, código o archivo para encontrar el expediente."
+									icon={FolderKanban}
+									title="No hay proyectos que coincidan"
+								/>
+							</div>
+						)}
+					</section>
+				)}
+
+				{activeTab === "recientes" && (
+					<section className="documents-panel">
+						<div className="flex items-center justify-between border-b border-[#dce2dd] px-5 py-4">
+							<div>
+								<h2 className="text-lg font-extrabold tracking-[-0.02em] text-[#172122]">
+									Documentos recientes
+								</h2>
+								<p className="mt-0.5 text-xs text-[#65736e]">
+									Últimas versiones incorporadas al sistema
+								</p>
+							</div>
+							<Clock3 className="text-[#68756f]" size={19} />
+						</div>
+						{recentDocuments.length ? (
 							<>
 								<div className="documents-scrollbar hidden overflow-x-auto md:block">
-									<table className="documents-table min-w-[1040px]">
+									<table className="documents-table min-w-[800px]">
 										<thead>
 											<tr>
 												<th className="px-4 py-3">Documento</th>
 												<th className="px-4 py-3">Proyecto</th>
 												<th className="px-4 py-3">Categoría</th>
-												<th className="px-4 py-3">Estado</th>
+												<th className="px-4 py-3">Modificado</th>
 												<th className="px-4 py-3">Versión</th>
-												<th className="px-4 py-3">Archivo</th>
-												<th className="px-4 py-3">Fecha</th>
 												<th className="px-4 py-3 text-right">Acciones</th>
 											</tr>
 										</thead>
 										<tbody>
-											{paginatedDocuments.map((document) => {
-												const latest = document.versions[0];
+											{recentDocuments.map((doc) => {
+												const latest = doc.versions[0];
+												const modDate = latest
+													? new Date(latest.createdAt)
+													: new Date(doc.updatedAt);
 												return (
-													<tr key={document.id}>
+													<tr data-action-row="" key={doc.id}>
 														<td>
 															<p className="font-semibold text-[var(--foreground)]">
-																{document.title}
+																{doc.title}
 															</p>
-															{(document.description ?? document.tags) ? (
-																<p className="mt-1 max-w-[300px] truncate text-xs text-[var(--muted)]">
-																	{document.description ?? document.tags}
+															{doc.description && (
+																<p className="mt-0.5 text-xs text-[var(--muted)] truncate max-w-[320px]">
+																	{doc.description}
 																</p>
-															) : null}
+															)}
 														</td>
 														<td>
 															<p className="font-medium text-[var(--foreground)]">
-																{document.project.code}
+																{doc.project.code}
 															</p>
-															<p className="max-w-[220px] truncate text-xs text-[var(--muted)]">
-																{document.project.name}
+															<p className="text-xs text-[var(--muted)] truncate max-w-[200px]">
+																{doc.project.name}
 															</p>
 														</td>
 														<td>
 															<span className="documents-category">
 																<FileText size={13} />
-																{document.category.name}
+																{doc.category.name}
 															</span>
 														</td>
-														<td>
-															<DocumentStatus
-																label={
-																	documentStatusLabels[
-																		document.status as keyof typeof documentStatusLabels
-																	] || document.status
-																}
-																status={document.status}
-															/>
-														</td>
-														<td>
-															{latest ? (
-																<span className="documents-version">
-																	v{latest.versionNumber}
-																</span>
-															) : (
-																"-"
-															)}
-														</td>
-														<td>
-															{latest ? (
-																<>
-																	<p className="text-xs">
-																		{formatBytes(latest.fileSize)}
-																	</p>
-																	<p
-																		className="max-w-[180px] truncate text-[11px] text-[var(--muted)]"
-																		title={latest.originalName}
-																	>
-																		{latest.originalName}
-																	</p>
-																</>
-															) : (
-																"-"
-															)}
-														</td>
 														<td className="text-xs text-[var(--muted)]">
-															{latest
-																? dateFormatter.format(
-																		new Date(latest.createdAt),
-																	)
-																: "-"}
+															{formatRelativeTime(modDate)}
+														</td>
+														<td>
+															<span className="documents-version">
+																v{latest?.versionNumber ?? 1}
+															</span>
 														</td>
 														<td className="text-right">
-															<div className="inline-flex gap-2">
-																{latest ? (
-																	<a
-																		className="documents-row-action focus-ring"
-																		href={documentsHref(params, {
-																			preview: document.id,
-																		})}
-																	>
-																		<Eye size={14} />
-																		Ver
-																	</a>
-																) : null}
-																{latest ? (
-																	<a
-																		className="documents-row-action documents-row-action--dark focus-ring"
-																		download
-																		href={documentFileUrl(latest.id)}
-																	>
-																		<Download size={14} />
-																		Descargar
-																	</a>
-																) : null}
+															<div className="inline-flex items-center gap-1.5">
+																<a
+																	className="documents-row-action focus-ring"
+																	href={documentsHref(params, {
+																		preview: doc.id,
+																	})}
+																>
+																	<Eye size={14} />
+																	Ver
+																</a>
+																{renderDocumentMenu(doc)}
 															</div>
 														</td>
 													</tr>
@@ -768,69 +590,49 @@ export default async function DocumentsPage({
 									</table>
 								</div>
 								<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
-									{paginatedDocuments.map((document) => {
-										const latest = document.versions[0];
+									{recentDocuments.map((doc) => {
+										const latest = doc.versions[0];
+										const modDate = latest
+											? new Date(latest.createdAt)
+											: new Date(doc.updatedAt);
 										return (
 											<div
 												className="rounded-2xl border border-[#e5e8e3] bg-[#f9faf8] p-4"
-												key={document.id}
+												data-action-row=""
+												key={doc.id}
 											>
 												<div className="flex items-start justify-between gap-3">
 													<div className="min-w-0">
 														<p className="truncate font-semibold text-[var(--foreground)]">
-															{document.title}
+															{doc.title}
 														</p>
 														<p className="mt-0.5 truncate text-xs text-[var(--muted)]">
-															{document.project.code} · {document.project.name}
+															{doc.project.code} · {doc.project.name}
 														</p>
 													</div>
-													<DocumentStatus
-														label={
-															documentStatusLabels[
-																document.status as keyof typeof documentStatusLabels
-															] || document.status
-														}
-														status={document.status}
-													/>
+													<span className="documents-version shrink-0">
+														v{latest?.versionNumber ?? 1}
+													</span>
 												</div>
-												<div className="mt-3 flex flex-wrap items-center gap-2">
+												<div className="mt-3 flex flex-wrap items-center justify-between gap-2">
 													<span className="documents-category">
 														<FileText size={13} />
-														{document.category.name}
+														{doc.category.name}
 													</span>
-													{latest ? (
-														<span className="documents-version">
-															v{latest.versionNumber}
-														</span>
-													) : null}
+													<span className="text-xs text-[var(--muted)]">
+														{formatRelativeTime(modDate)}
+													</span>
 												</div>
-												{latest ? (
-													<p className="mt-2 text-xs text-[var(--muted)]">
-														{formatBytes(latest.fileSize)} ·{" "}
-														{dateFormatter.format(new Date(latest.createdAt))}
-													</p>
-												) : null}
-												{latest ? (
-													<div className="mt-3 flex gap-2">
-														<a
-															className="documents-row-action focus-ring flex-1 justify-center"
-															href={documentsHref(params, {
-																preview: document.id,
-															})}
-														>
-															<Eye size={14} />
-															Ver
-														</a>
-														<a
-															className="documents-row-action documents-row-action--dark focus-ring flex-1 justify-center"
-															download
-															href={documentFileUrl(latest.id)}
-														>
-															<Download size={14} />
-															Descargar
-														</a>
-													</div>
-												) : null}
+												<div className="mt-3 flex items-center gap-2">
+													<a
+														className="documents-row-action focus-ring flex-1 justify-center"
+														href={documentsHref(params, { preview: doc.id })}
+													>
+														<Eye size={14} />
+														Ver
+													</a>
+													{renderDocumentMenu(doc)}
+												</div>
 											</div>
 										);
 									})}
@@ -838,229 +640,511 @@ export default async function DocumentsPage({
 							</>
 						) : (
 							<DocumentEmpty
-								detail="Cambia los filtros o sube el primer archivo para comenzar el expediente."
-								icon={FileArchive}
-								title="No hay documentos en esta vista"
+								detail="Cuando se cargue o actualice un archivo, aparecerá en esta vista."
+								icon={Clock3}
+								title="Aún no hay documentos recientes"
 							/>
 						)}
+					</section>
+				)}
 
-						{/* Pagination Controls */}
-						{totalPages > 1 && (
-							<div className="flex items-center justify-between border-t border-[var(--border)] px-4 py-3.5 bg-[#fbfbf8] text-sm">
-								<span className="text-xs text-[var(--muted)]">
-									Página {currentPage} de {totalPages} (
-									{filteredDocuments.length} documentos totales)
-								</span>
-								<div className="flex gap-2">
-									<a
-										className={`focus-ring rounded border px-3 py-1.5 text-xs font-semibold transition ${
-											currentPage <= 1
-												? "pointer-events-none text-[var(--muted)] bg-[#f5f5f5]"
-												: "bg-white hover:bg-[#f4f0ed]"
-										}`}
-										href={documentsHref(params, {
-											page: String(currentPage - 1),
-										})}
-									>
-										Anterior
-									</a>
-									<a
-										className={`focus-ring rounded border px-3 py-1.5 text-xs font-semibold transition ${
-											currentPage >= totalPages
-												? "pointer-events-none text-[var(--muted)] bg-[#f5f5f5]"
-												: "bg-white hover:bg-[#f4f0ed]"
-										}`}
-										href={documentsHref(params, {
-											page: String(currentPage + 1),
-										})}
-									>
-										Siguiente
-									</a>
-								</div>
-							</div>
-						)}
-					</article>
-				</div>
-			)}
-
-			{/* Global Upload Modal */}
-			{false && showUpload && (
-				<div className="fixed inset-0 z-50 grid place-items-center bg-[#111819]/60 p-4 backdrop-blur-sm">
-					<section className="w-[min(560px,94vw)] rounded-2xl bg-white p-5 shadow-[0_24px_70px_rgba(0,0,0,0.3)]">
-						<header className="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
-							<h2 className="text-lg font-semibold flex items-center gap-2">
-								<FolderKanban className="text-[var(--brand-red)]" size={20} />
-								Subir documento
-							</h2>
-							<a
-								aria-label="Cerrar modal"
-								className="focus-ring grid h-8 w-8 place-items-center rounded-lg hover:bg-[#f4f0ed] text-[var(--muted)]"
-								href={documentsHref(params, { upload: "" })}
-							>
-								<X size={18} />
-							</a>
-						</header>
-
-						<form
-							action={createProjectDocumentGlobalAction}
-							className="space-y-4"
+				{activeTab === "todos" && (
+					<div className="space-y-4">
+						{/* Filters Form */}
+						<AutoFilterForm
+							action="/documents"
+							className="documents-panel grid items-end gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
 						>
-							<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-								Proyecto *
+							<input type="hidden" name="tab" value="todos" />
+							{searchValue(params.q) && (
+								<input type="hidden" name="q" value={searchValue(params.q)} />
+							)}
+
+							<label className="documents-field">
+								Proyecto
 								<select
-									className={`${inputClass} mt-1`}
-									name="projectId"
-									required
+									className={documentInputClass}
+									defaultValue={projectFilter}
+									name="project"
 								>
-									<option value="">Selecciona un proyecto</option>
-									{allProjects.map((p) => (
-										<option key={p.id} value={p.id}>
-											{p.code} - {p.name}
+									<option value="">Todos los proyectos</option>
+									{allProjects.map((project) => (
+										<option key={project.id} value={project.id}>
+											{project.code} - {project.name}
 										</option>
 									))}
 								</select>
 							</label>
 
-							<div className="grid gap-3 sm:grid-cols-2">
+							<label className="documents-field">
+								Categoría
+								<select
+									className={documentInputClass}
+									defaultValue={categoryFilter}
+									name="category"
+								>
+									<option value="">Todas las categorías</option>
+									{allCategories.map((category) => (
+										<option key={category.key} value={category.key}>
+											{category.name}
+										</option>
+									))}
+								</select>
+							</label>
+
+							<label className="documents-field">
+								Estado
+								<select
+									className={documentInputClass}
+									defaultValue={statusFilter}
+									name="status"
+								>
+									<option value="">Vigentes (sin archivados)</option>
+									<option value="ALL">Todos, incluso archivados</option>
+									{Object.entries(documentStatusLabels).map(
+										([status, label]) => (
+											<option key={status} value={status}>
+												{label}
+											</option>
+										),
+									)}
+								</select>
+							</label>
+
+							<div className="flex gap-2">
+								{(projectFilter || categoryFilter || statusFilter || query) && (
+									<a
+										className="documents-clear focus-ring"
+										href="/documents?tab=todos"
+									>
+										Limpiar filtros
+									</a>
+								)}
+							</div>
+						</AutoFilterForm>
+
+						{/* Documents Table */}
+						<article className="documents-panel">
+							{paginatedDocuments.length ? (
+								<>
+									<div className="documents-scrollbar hidden overflow-x-auto md:block">
+										<table className="documents-table min-w-[1040px]">
+											<thead>
+												<tr>
+													<th className="px-4 py-3">Documento</th>
+													<th className="px-4 py-3">Proyecto</th>
+													<th className="px-4 py-3">Categoría</th>
+													<th className="px-4 py-3">Estado</th>
+													<th className="px-4 py-3">Versión</th>
+													<th className="px-4 py-3">Archivo</th>
+													<th className="px-4 py-3">Fecha</th>
+													<th className="px-4 py-3 text-right">Acciones</th>
+												</tr>
+											</thead>
+											<tbody>
+												{paginatedDocuments.map((document) => {
+													const latest = document.versions[0];
+													return (
+														<tr data-action-row="" key={document.id}>
+															<td>
+																<p className="font-semibold text-[var(--foreground)]">
+																	{document.title}
+																</p>
+																{(document.description ?? document.tags) ? (
+																	<p className="mt-1 max-w-[300px] truncate text-xs text-[var(--muted)]">
+																		{document.description ?? document.tags}
+																	</p>
+																) : null}
+															</td>
+															<td>
+																<p className="font-medium text-[var(--foreground)]">
+																	{document.project.code}
+																</p>
+																<p className="max-w-[220px] truncate text-xs text-[var(--muted)]">
+																	{document.project.name}
+																</p>
+															</td>
+															<td>
+																<span className="documents-category">
+																	<FileText size={13} />
+																	{document.category.name}
+																</span>
+															</td>
+															<td>
+																<DocumentStatus
+																	label={
+																		documentStatusLabels[
+																			document.status as keyof typeof documentStatusLabels
+																		] || document.status
+																	}
+																	status={document.status}
+																/>
+															</td>
+															<td>
+																{latest ? (
+																	<span className="documents-version">
+																		v{latest.versionNumber}
+																	</span>
+																) : (
+																	"-"
+																)}
+															</td>
+															<td>
+																{latest ? (
+																	<>
+																		<p className="text-xs">
+																			{formatBytes(latest.fileSize)}
+																		</p>
+																		<p
+																			className="max-w-[180px] truncate text-[11px] text-[var(--muted)]"
+																			title={latest.originalName}
+																		>
+																			{latest.originalName}
+																		</p>
+																	</>
+																) : (
+																	"-"
+																)}
+															</td>
+															<td className="text-xs text-[var(--muted)]">
+																{latest
+																	? dateFormatter.format(
+																			new Date(latest.createdAt),
+																		)
+																	: "-"}
+															</td>
+															<td className="text-right">
+																<div className="inline-flex gap-2">
+																	{latest ? (
+																		<a
+																			className="documents-row-action focus-ring"
+																			href={documentsHref(params, {
+																				preview: document.id,
+																			})}
+																		>
+																			<Eye size={14} />
+																			Ver
+																		</a>
+																	) : null}
+																	{latest ? (
+																		<a
+																			className="documents-row-action documents-row-action--dark focus-ring"
+																			download
+																			href={documentFileUrl(latest.id)}
+																		>
+																			<Download size={14} />
+																			Descargar
+																		</a>
+																	) : null}
+																	{renderDocumentMenu(document)}
+																</div>
+															</td>
+														</tr>
+													);
+												})}
+											</tbody>
+										</table>
+									</div>
+									<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
+										{paginatedDocuments.map((document) => {
+											const latest = document.versions[0];
+											return (
+												<div
+													className="rounded-2xl border border-[#e5e8e3] bg-[#f9faf8] p-4"
+													data-action-row=""
+													key={document.id}
+												>
+													<div className="flex items-start justify-between gap-3">
+														<div className="min-w-0">
+															<p className="truncate font-semibold text-[var(--foreground)]">
+																{document.title}
+															</p>
+															<p className="mt-0.5 truncate text-xs text-[var(--muted)]">
+																{document.project.code} ·{" "}
+																{document.project.name}
+															</p>
+														</div>
+														<DocumentStatus
+															label={
+																documentStatusLabels[
+																	document.status as keyof typeof documentStatusLabels
+																] || document.status
+															}
+															status={document.status}
+														/>
+													</div>
+													<div className="mt-3 flex flex-wrap items-center gap-2">
+														<span className="documents-category">
+															<FileText size={13} />
+															{document.category.name}
+														</span>
+														{latest ? (
+															<span className="documents-version">
+																v{latest.versionNumber}
+															</span>
+														) : null}
+													</div>
+													{latest ? (
+														<p className="mt-2 text-xs text-[var(--muted)]">
+															{formatBytes(latest.fileSize)} ·{" "}
+															{dateFormatter.format(new Date(latest.createdAt))}
+														</p>
+													) : null}
+													{latest ? (
+														<div className="mt-3 flex gap-2">
+															<a
+																className="documents-row-action focus-ring flex-1 justify-center"
+																href={documentsHref(params, {
+																	preview: document.id,
+																})}
+															>
+																<Eye size={14} />
+																Ver
+															</a>
+															<a
+																className="documents-row-action documents-row-action--dark focus-ring flex-1 justify-center"
+																download
+																href={documentFileUrl(latest.id)}
+															>
+																<Download size={14} />
+																Descargar
+															</a>
+															{renderDocumentMenu(document)}
+														</div>
+													) : null}
+												</div>
+											);
+										})}
+									</div>
+								</>
+							) : (
+								<DocumentEmpty
+									detail="Cambia los filtros o sube el primer archivo para comenzar el expediente."
+									icon={FileArchive}
+									title="No hay documentos en esta vista"
+								/>
+							)}
+
+							{/* Pagination Controls */}
+							{totalPages > 1 && (
+								<div className="flex items-center justify-between border-t border-[var(--border)] px-4 py-3.5 bg-[#fbfbf8] text-sm">
+									<span className="text-xs text-[var(--muted)]">
+										Página {currentPage} de {totalPages} (
+										{filteredDocuments.length} documentos totales)
+									</span>
+									<div className="flex gap-2">
+										<a
+											className={`focus-ring rounded border px-3 py-1.5 text-xs font-semibold transition ${
+												currentPage <= 1
+													? "pointer-events-none text-[var(--muted)] bg-[#f5f5f5]"
+													: "bg-white hover:bg-[#f4f0ed]"
+											}`}
+											href={documentsHref(params, {
+												page: String(currentPage - 1),
+											})}
+										>
+											Anterior
+										</a>
+										<a
+											className={`focus-ring rounded border px-3 py-1.5 text-xs font-semibold transition ${
+												currentPage >= totalPages
+													? "pointer-events-none text-[var(--muted)] bg-[#f5f5f5]"
+													: "bg-white hover:bg-[#f4f0ed]"
+											}`}
+											href={documentsHref(params, {
+												page: String(currentPage + 1),
+											})}
+										>
+											Siguiente
+										</a>
+									</div>
+								</div>
+							)}
+						</article>
+					</div>
+				)}
+
+				{/* Global Upload Modal */}
+				{false && showUpload && (
+					<div className="fixed inset-0 z-50 grid place-items-center bg-[#111819]/60 p-4 backdrop-blur-sm">
+						<section className="w-[min(560px,94vw)] rounded-2xl bg-white p-5 shadow-[0_24px_70px_rgba(0,0,0,0.3)]">
+							<header className="flex items-center justify-between border-b border-[var(--border)] pb-3 mb-4">
+								<h2 className="text-lg font-semibold flex items-center gap-2">
+									<FolderKanban className="text-[var(--brand-red)]" size={20} />
+									Subir documento
+								</h2>
+								<a
+									aria-label="Cerrar modal"
+									className="focus-ring grid h-8 w-8 place-items-center rounded-lg hover:bg-[#f4f0ed] text-[var(--muted)]"
+									href={documentsHref(params, { upload: "" })}
+								>
+									<X size={18} />
+								</a>
+							</header>
+
+							<form
+								action={createProjectDocumentGlobalAction}
+								className="space-y-4"
+							>
 								<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-									Tipo / Categoría *
+									Proyecto *
 									<select
 										className={`${inputClass} mt-1`}
-										name="categoryId"
+										name="projectId"
 										required
 									>
-										{allCategories.map((cat) => (
-											<option key={cat.id} value={cat.id}>
-												{cat.name}
+										<option value="">Selecciona un proyecto</option>
+										{allProjects.map((p) => (
+											<option key={p.id} value={p.id}>
+												{p.code} - {p.name}
 											</option>
 										))}
 									</select>
 								</label>
 
-								<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-									Estado *
-									<select
-										className={`${inputClass} mt-1`}
-										name="status"
-										defaultValue="DRAFT"
-									>
-										<option value="DRAFT">Borrador</option>
-										<option value="REVIEW">En revisión</option>
-										<option value="APPROVED">Aprobado</option>
-									</select>
-								</label>
-							</div>
+								<div className="grid gap-3 sm:grid-cols-2">
+									<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+										Tipo / Categoría *
+										<select
+											className={`${inputClass} mt-1`}
+											name="categoryId"
+											required
+										>
+											{allCategories.map((cat) => (
+												<option key={cat.id} value={cat.id}>
+													{cat.name}
+												</option>
+											))}
+										</select>
+									</label>
 
-							<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-								Título (Nombre visible)
-								<input
-									className={`${inputClass} mt-1`}
-									name="title"
-									placeholder="Ej. Contrato de Obra Civil"
-								/>
-							</label>
-
-							<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-								Archivo *
-								<input
-									className={`${inputClass} mt-1`}
-									name="file"
-									required
-									type="file"
-								/>
-							</label>
-
-							<div className="grid gap-3 sm:grid-cols-2">
-								<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-									Etiquetas
-									<input
-										className={`${inputClass} mt-1`}
-										name="tags"
-										placeholder="ej. fase 1, plano, aprobado"
-									/>
-								</label>
-
-								<div className="flex items-center gap-2 rounded-lg border border-[#cfd5ce] bg-[#fbfbf8] px-3 self-end h-11">
-									<input
-										id="portalVisible"
-										name="portalVisible"
-										type="checkbox"
-										className="h-4 w-4 rounded"
-									/>
-									<label
-										htmlFor="portalVisible"
-										className="text-xs text-[var(--muted)] cursor-pointer select-none"
-									>
-										Visible en portal *
+									<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+										Estado *
+										<select
+											className={`${inputClass} mt-1`}
+											name="status"
+											defaultValue="DRAFT"
+										>
+											<option value="DRAFT">Borrador</option>
+											<option value="REVIEW">En revisión</option>
+											<option value="APPROVED">Aprobado</option>
+										</select>
 									</label>
 								</div>
-							</div>
 
-							<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-								Descripción
-								<textarea
-									className={`${textareaClass} mt-1`}
-									name="description"
-									placeholder="Añade una descripción sobre este archivo..."
-								/>
-							</label>
+								<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+									Título (Nombre visible)
+									<input
+										className={`${inputClass} mt-1`}
+										name="title"
+										placeholder="Ej. Contrato de Obra Civil"
+									/>
+								</label>
 
-							<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-								Notas de versión (v1)
-								<textarea
-									className={`${textareaClass} mt-1`}
-									name="versionNotes"
-									placeholder="Detalles de la primera carga..."
-								/>
-							</label>
+								<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+									Archivo *
+									<input
+										className={`${inputClass} mt-1`}
+										name="file"
+										required
+										type="file"
+									/>
+								</label>
 
-							<p className="text-[10px] text-[var(--muted)] leading-normal italic">
-								* Nota: El documento solo se hará visible al cliente en el
-								portal si su estado es "Aprobado".
-							</p>
+								<div className="grid gap-3 sm:grid-cols-2">
+									<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+										Etiquetas
+										<input
+											className={`${inputClass} mt-1`}
+											name="tags"
+											placeholder="ej. fase 1, plano, aprobado"
+										/>
+									</label>
 
-							<div className="flex gap-2 border-t border-[var(--border)] pt-4 mt-2 justify-end">
-								<a
-									className="focus-ring inline-flex h-10 items-center justify-center rounded-lg border border-[#cfd5ce] bg-white px-4 text-sm font-semibold text-[var(--muted)] hover:bg-[#f4f0ed]"
-									href={documentsHref(params, { upload: "" })}
-								>
-									Cancelar
-								</a>
-								<button
-									className="focus-ring inline-flex h-10 items-center justify-center rounded-lg bg-[var(--brand-red)] px-5 text-sm font-semibold text-white hover:bg-[#b51d2a] shadow-sm"
-									type="submit"
-								>
-									Subir Documento
-								</button>
-							</div>
-						</form>
-					</section>
-				</div>
-			)}
+									<div className="flex items-center gap-2 rounded-lg border border-[#cfd5ce] bg-[#fbfbf8] px-3 self-end h-11">
+										<input
+											id="portalVisible"
+											name="portalVisible"
+											type="checkbox"
+											className="h-4 w-4 rounded"
+										/>
+										<label
+											htmlFor="portalVisible"
+											className="text-xs text-[var(--muted)] cursor-pointer select-none"
+										>
+											Visible en portal *
+										</label>
+									</div>
+								</div>
 
-			{showUpload && (
-				<DocumentUploadDrawer
-					action={createProjectDocumentGlobalAction}
-					categories={allCategories
-						.filter((category) => manualDocumentCategoryKeys.has(category.key))
-						.map((category) => ({
-							id: category.id,
-							key: category.key,
-							name: category.name,
-							description: category.description,
-						}))}
-					closeHref={documentsHref(params, { upload: "" })}
-					projects={allProjects}
-				/>
-			)}
+								<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+									Descripción
+									<textarea
+										className={`${textareaClass} mt-1`}
+										name="description"
+										placeholder="Añade una descripción sobre este archivo..."
+									/>
+								</label>
 
-			{/* Preview Modal */}
-			{previewDocument && (
-				<DocumentPreviewModal
-					closeHref={documentsHref(params, { preview: "" })}
-					document={previewDocument}
-				/>
-			)}
+								<label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+									Notas de versión (v1)
+									<textarea
+										className={`${textareaClass} mt-1`}
+										name="versionNotes"
+										placeholder="Detalles de la primera carga..."
+									/>
+								</label>
+
+								<p className="text-[10px] text-[var(--muted)] leading-normal italic">
+									* Nota: El documento solo se hará visible al cliente en el
+									portal si su estado es "Aprobado".
+								</p>
+
+								<div className="flex gap-2 border-t border-[var(--border)] pt-4 mt-2 justify-end">
+									<a
+										className="focus-ring inline-flex h-10 items-center justify-center rounded-lg border border-[#cfd5ce] bg-white px-4 text-sm font-semibold text-[var(--muted)] hover:bg-[#f4f0ed]"
+										href={documentsHref(params, { upload: "" })}
+									>
+										Cancelar
+									</a>
+									<button
+										className="focus-ring inline-flex h-10 items-center justify-center rounded-lg bg-[var(--brand-red)] px-5 text-sm font-semibold text-white hover:bg-[#b51d2a] shadow-sm"
+										type="submit"
+									>
+										Subir Documento
+									</button>
+								</div>
+							</form>
+						</section>
+					</div>
+				)}
+
+				{showUpload && (
+					<DocumentUploadDrawer
+						action={createProjectDocumentGlobalAction}
+						categories={allCategories
+							.filter((category) =>
+								manualDocumentCategoryKeys.has(category.key),
+							)
+							.map((category) => ({
+								id: category.id,
+								key: category.key,
+								name: category.name,
+								description: category.description,
+							}))}
+						closeHref={documentsHref(params, { upload: "" })}
+						projects={allProjects}
+					/>
+				)}
+
+				{/* Preview Modal */}
+				{previewDocument && (
+					<DocumentPreviewModal
+						closeHref={documentsHref(params, { preview: "" })}
+						document={previewDocument}
+					/>
+				)}
+			</ActionMenuScope>
 		</main>
 	);
 }

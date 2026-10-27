@@ -1,5 +1,6 @@
 import {
 	Archive,
+	ArchiveRestore,
 	ArrowLeft,
 	CheckCircle2,
 	Download,
@@ -11,12 +12,12 @@ import {
 	History,
 	Layers3,
 	Lock,
-	MoreVertical,
 	Pencil,
 	Play,
 	Plus,
 	Search,
 	Trash2,
+	Upload,
 	Users,
 } from "lucide-react";
 import { notFound } from "next/navigation";
@@ -47,6 +48,11 @@ import {
 import { DocumentUploadDrawer } from "@/modules/documents/ui/document-upload-drawer";
 import { DocumentVersionsDrawer } from "@/modules/documents/ui/document-versions-drawer";
 import { ConfirmSubmitButton } from "@/shared/components/confirm-submit-button";
+import {
+	ActionMenu,
+	ActionMenuScope,
+	ActionMenuSeparator,
+} from "@/shared/ui/action-menu";
 
 const dateFormatter = new Intl.DateTimeFormat("es-GT", {
 	dateStyle: "medium",
@@ -60,6 +66,7 @@ type ProjectDocumentsSearch = {
 	group?: string | string[];
 	upload?: string | string[];
 	q?: string | string[];
+	archivados?: string | string[];
 };
 
 type WorkspaceDocument = NonNullable<
@@ -95,11 +102,16 @@ export default async function ProjectDocumentsPage({
 	const showUpload =
 		(Array.isArray(query.upload) ? query.upload[0] : query.upload) === "true";
 	const searchText = (Array.isArray(query.q) ? query.q[0] : query.q) ?? "";
+	const showArchived =
+		(Array.isArray(query.archivados)
+			? query.archivados[0]
+			: query.archivados) === "1";
 
 	const workspace = await getProjectDocumentsWorkspace(id);
 	if (!workspace) notFound();
 
 	const canEdit = user.permissions.includes("proyectos.editar");
+	const canDelete = user.permissions.includes("documentos.eliminar");
 	const createAction = createProjectDocumentAction.bind(
 		null,
 		workspace.project.id,
@@ -148,7 +160,12 @@ export default async function ProjectDocumentsPage({
 			.map((category) => ({ key: category.key, name: category.name })),
 	];
 
+	const archivedCount = workspace.documents.filter(
+		(doc) => doc.status === "ARCHIVED",
+	).length;
+
 	const filteredDocuments = workspace.documents.filter((doc) => {
+		if (!showArchived && doc.status === "ARCHIVED") return false;
 		const matchesGroup =
 			activeGroup === "todos" || doc.category.key === activeGroup;
 		if (!matchesGroup) return false;
@@ -200,6 +217,7 @@ export default async function ProjectDocumentsPage({
 		const urlParams = new URLSearchParams({
 			group: activeGroup,
 			q: searchText,
+			archivados: showArchived ? "1" : "",
 			...extra,
 		});
 		for (const [key, value] of Array.from(urlParams.entries())) {
@@ -211,96 +229,140 @@ export default async function ProjectDocumentsPage({
 	const tabClass = (groupKey: string) =>
 		`documents-tab focus-ring ${activeGroup === groupKey ? "documents-tab--active" : ""}`;
 
-	function renderActionsMenu(document: WorkspaceDocument, openUpward = false) {
+	const menuItemClass =
+		"flex w-full items-center gap-2.5 px-3 py-2 text-left transition focus:outline-none focus-visible:bg-[#f4f0ed]";
+
+	function renderActionsMenu(document: WorkspaceDocument) {
+		const latest = document.versions[0];
 		return (
-			<details className="group relative">
-				<summary
-					aria-label="Más acciones del documento"
-					className="focus-ring flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md border border-[var(--border)] bg-white text-[var(--muted)] transition hover:bg-[#f4f0ed] hover:text-[var(--foreground)]"
-				>
-					<MoreVertical size={15} />
-				</summary>
-				<div
-					className={`absolute right-0 z-30 w-52 rounded-xl border border-[#dfe3dc] bg-white shadow-[0_16px_42px_rgba(22,27,29,0.16)] overflow-hidden ${openUpward ? "bottom-full mb-1" : "top-full mt-1"}`}
-				>
-					<div className="space-y-0.5 py-1 text-[13px]">
-						{canEdit ? (
-							<a
-								className="w-full flex items-center gap-2.5 px-3 py-2 text-[var(--foreground)] hover:bg-[#f9f7f4] transition"
-								href={baseHref({ edit: document.id })}
-							>
-								<Pencil size={14} />
-								<span>Editar información</span>
-							</a>
-						) : null}
+			<ActionMenu label={`Acciones de ${document.title}`}>
+				{latest ? (
+					<>
 						<a
-							className="w-full flex items-center gap-2.5 px-3 py-2 text-[var(--foreground)] hover:bg-[#f9f7f4] transition"
-							href={baseHref({ versions: document.id })}
+							className={`${menuItemClass} text-[var(--foreground)] hover:bg-[#f9f7f4]`}
+							href={baseHref({ preview: document.id })}
+							role="menuitem"
 						>
-							<History size={14} />
-							<span>Historial y versiones</span>
+							<Eye aria-hidden="true" size={14} />
+							<span>Ver</span>
 						</a>
+						<a
+							className={`${menuItemClass} text-[var(--foreground)] hover:bg-[#f9f7f4]`}
+							download
+							href={documentFileUrl(latest.id)}
+							role="menuitem"
+						>
+							<Download aria-hidden="true" size={14} />
+							<span>Descargar</span>
+						</a>
+					</>
+				) : null}
+				{canEdit ? (
+					<a
+						className={`${menuItemClass} text-[var(--foreground)] hover:bg-[#f9f7f4]`}
+						href={baseHref({ edit: document.id })}
+						role="menuitem"
+					>
+						<Pencil aria-hidden="true" size={14} />
+						<span>Editar información</span>
+					</a>
+				) : null}
+				<a
+					className={`${menuItemClass} text-[var(--foreground)] hover:bg-[#f9f7f4]`}
+					href={baseHref({ versions: document.id })}
+					role="menuitem"
+				>
+					<History aria-hidden="true" size={14} />
+					<span>Historial y versiones</span>
+				</a>
+				{canEdit ? (
+					<a
+						className={`${menuItemClass} text-[var(--foreground)] hover:bg-[#f9f7f4]`}
+						href={baseHref({ versions: document.id })}
+						role="menuitem"
+					>
+						<Upload aria-hidden="true" size={14} />
+						<span>Reemplazar archivo (nueva versión)</span>
+					</a>
+				) : null}
 
-						{canEdit && document.status === "APPROVED" ? (
-							<>
-								<div className="my-1 h-px bg-[#e5e7eb]" />
-								{!document.portalVisible ? (
-									<form action={reviewAction.bind(null, document.id)}>
-										<input name="status" type="hidden" value="APPROVED" />
-										<input name="portalVisible" type="hidden" value="on" />
-										<button
-											className="w-full flex items-center gap-2.5 px-3 py-2 text-[#0f766e] hover:bg-[#ecfeff] transition"
-											type="submit"
-										>
-											<Globe size={14} />
-											<span>Publicar en portal</span>
-										</button>
-									</form>
-								) : (
-									<form action={reviewAction.bind(null, document.id)}>
-										<input name="status" type="hidden" value="APPROVED" />
-										<button
-											className="w-full flex items-center gap-2.5 px-3 py-2 text-[var(--muted)] hover:bg-[#f9f7f4] transition"
-											type="submit"
-										>
-											<Lock size={14} />
-											<span>Retirar del portal</span>
-										</button>
-									</form>
-								)}
-							</>
-						) : null}
-
-						{canEdit ? (
-							<>
-								<div className="my-1 h-px bg-[#e5e7eb]" />
-								{document.status !== "ARCHIVED" ? (
-									<form action={reviewAction.bind(null, document.id)}>
-										<input name="status" type="hidden" value="ARCHIVED" />
-										<button
-											className="w-full flex items-center gap-2.5 px-3 py-2 text-[#7c2d12] hover:bg-[#fef2f2] transition"
-											type="submit"
-										>
-											<Archive size={14} />
-											<span>Archivar</span>
-										</button>
-									</form>
-								) : null}
-								<form action={deleteAction.bind(null, document.id)}>
-									<ConfirmSubmitButton
-										className="w-full flex items-center gap-2.5 px-3 py-2 text-[#b3261e] hover:bg-[#fef2f2] transition"
-										description={`Se eliminará "${document.title}" de forma permanente, junto con su archivo y el historial de versiones. Esta acción no se puede deshacer.`}
-										title="Eliminar documento"
+				{canEdit && document.status === "APPROVED" ? (
+					<>
+						<ActionMenuSeparator />
+						<form action={reviewAction.bind(null, document.id)}>
+							<input name="status" type="hidden" value="APPROVED" />
+							{document.portalVisible ? (
+								<button
+									className={`${menuItemClass} text-[var(--muted)] hover:bg-[#f9f7f4]`}
+									role="menuitem"
+									type="submit"
+								>
+									<Lock aria-hidden="true" size={14} />
+									<span>Retirar del portal</span>
+								</button>
+							) : (
+								<>
+									<input name="portalVisible" type="hidden" value="on" />
+									<button
+										className={`${menuItemClass} text-[#0f766e] hover:bg-[#ecfeff]`}
+										role="menuitem"
+										type="submit"
 									>
-										<Trash2 size={14} />
-										<span>Eliminar</span>
-									</ConfirmSubmitButton>
-								</form>
-							</>
+										<Globe aria-hidden="true" size={14} />
+										<span>Publicar en portal</span>
+									</button>
+								</>
+							)}
+						</form>
+					</>
+				) : null}
+
+				{canEdit ? (
+					<>
+						<ActionMenuSeparator />
+						<form action={reviewAction.bind(null, document.id)}>
+							{document.status === "ARCHIVED" ? (
+								<>
+									{/* Vuelve a revisión: la aprobación se perdió al archivar. */}
+									<input name="status" type="hidden" value="REVIEW" />
+									<button
+										className={`${menuItemClass} text-[var(--foreground)] hover:bg-[#f9f7f4]`}
+										role="menuitem"
+										type="submit"
+									>
+										<ArchiveRestore aria-hidden="true" size={14} />
+										<span>Restaurar</span>
+									</button>
+								</>
+							) : (
+								<>
+									<input name="status" type="hidden" value="ARCHIVED" />
+									<button
+										className={`${menuItemClass} text-[#7c2d12] hover:bg-[#fef2f2]`}
+										role="menuitem"
+										type="submit"
+									>
+										<Archive aria-hidden="true" size={14} />
+										<span>Archivar</span>
+									</button>
+								</>
+							)}
+						</form>
+						{canDelete ? (
+							<form action={deleteAction.bind(null, document.id)}>
+								<ConfirmSubmitButton
+									className={`${menuItemClass} text-[#b3261e] hover:bg-[#fef2f2]`}
+									description={`Se eliminará "${document.title}" de forma permanente, junto con su archivo y todas sus versiones. Esta acción no se puede deshacer. Si solo quieres sacarlo de la lista, usa Archivar.`}
+									title="Eliminar documento"
+								>
+									<Trash2 aria-hidden="true" size={14} />
+									<span>Eliminar</span>
+								</ConfirmSubmitButton>
+							</form>
 						) : null}
-					</div>
-				</div>
-			</details>
+					</>
+				) : null}
+			</ActionMenu>
 		);
 	}
 
@@ -374,7 +436,7 @@ export default async function ProjectDocumentsPage({
 				/>
 			</section>
 
-			<div className="space-y-4">
+			<ActionMenuScope className="space-y-4">
 				<div className="documents-panel space-y-4 p-4">
 					<nav
 						aria-label="Categorías documentales"
@@ -405,7 +467,20 @@ export default async function ProjectDocumentsPage({
 								placeholder="Buscar por título, archivo o etiqueta"
 							/>
 							<input name="group" type="hidden" value={activeGroup} />
+							{showArchived ? (
+								<input name="archivados" type="hidden" value="1" />
+							) : null}
 						</form>
+						{archivedCount > 0 && (
+							<a
+								className="focus-ring shrink-0 text-sm font-semibold text-[var(--muted)] underline-offset-4 hover:text-[var(--foreground)] hover:underline"
+								href={baseHref({ archivados: showArchived ? "" : "1" })}
+							>
+								{showArchived
+									? "Ocultar archivados"
+									: `Ver archivados (${archivedCount})`}
+							</a>
+						)}
 						{canEdit && (
 							<a
 								className="documents-primary-action focus-ring"
@@ -432,6 +507,7 @@ export default async function ProjectDocumentsPage({
 								return (
 									<div
 										className="group relative rounded-xl border border-[var(--border)] bg-[#101719]"
+										data-action-row=""
 										key={document.id}
 									>
 										<a
@@ -486,7 +562,7 @@ export default async function ProjectDocumentsPage({
 												>
 													<Download size={13} />
 												</a>
-												{canEdit && renderActionsMenu(document, true)}
+												{renderActionsMenu(document)}
 											</div>
 										</div>
 									</div>
@@ -519,7 +595,7 @@ export default async function ProjectDocumentsPage({
 										const previewHref = baseHref({ preview: document.id });
 
 										return (
-											<tr key={document.id}>
+											<tr data-action-row="" key={document.id}>
 												<td className="max-w-[360px]">
 													<div className="flex gap-3">
 														<div className="mt-0.5 grid size-9 place-items-center rounded-lg bg-[#e8ede9] text-[#4f5e58]">
@@ -643,104 +719,105 @@ export default async function ProjectDocumentsPage({
 									)}
 								</tbody>
 							</table>
-							<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
-								{fileDocuments.map((document) => {
-									const latest = document.versions[0];
-									const isPortal =
-										document.status === "APPROVED" && document.portalVisible;
-									const previewHref = baseHref({ preview: document.id });
-									return (
-										<div
-											className="rounded-2xl border border-[#e5e8e3] bg-[#f9faf8] p-4"
-											key={document.id}
-										>
-											<div className="flex items-start justify-between gap-3">
-												<div className="flex min-w-0 gap-3">
-													<div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-[#e8ede9] text-[#4f5e58]">
-														<FileText size={16} />
-													</div>
-													<div className="min-w-0">
-														<p className="truncate font-semibold text-[var(--foreground)]">
-															{document.title}
+						</div>
+						<div className="grid grid-cols-1 gap-3 p-3 md:hidden">
+							{fileDocuments.map((document) => {
+								const latest = document.versions[0];
+								const isPortal =
+									document.status === "APPROVED" && document.portalVisible;
+								const previewHref = baseHref({ preview: document.id });
+								return (
+									<div
+										className="rounded-2xl border border-[#e5e8e3] bg-[#f9faf8] p-4"
+										data-action-row=""
+										key={document.id}
+									>
+										<div className="flex items-start justify-between gap-3">
+											<div className="flex min-w-0 gap-3">
+												<div className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-[#e8ede9] text-[#4f5e58]">
+													<FileText size={16} />
+												</div>
+												<div className="min-w-0">
+													<p className="truncate font-semibold text-[var(--foreground)]">
+														{document.title}
+													</p>
+													{document.description ? (
+														<p className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">
+															{document.description}
 														</p>
-														{document.description ? (
-															<p className="mt-1 line-clamp-2 text-xs text-[var(--muted)]">
-																{document.description}
-															</p>
-														) : null}
-													</div>
+													) : null}
 												</div>
-												{renderActionsMenu(document)}
 											</div>
-											<div className="mt-3 flex flex-wrap items-center gap-2">
-												<span className="documents-category">
-													<FileText size={13} />
-													{document.category.name}
+											{renderActionsMenu(document)}
+										</div>
+										<div className="mt-3 flex flex-wrap items-center gap-2">
+											<span className="documents-category">
+												<FileText size={13} />
+												{document.category.name}
+											</span>
+											<DocumentStatus
+												label={
+													documentStatusLabels[
+														document.status as keyof typeof documentStatusLabels
+													] || document.status
+												}
+												status={document.status}
+											/>
+											{isPortal ? (
+												<span className="inline-flex items-center gap-1 rounded border border-[#b7dfcc] bg-[#edf9f2] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--success)]">
+													Cliente
 												</span>
-												<DocumentStatus
-													label={
-														documentStatusLabels[
-															document.status as keyof typeof documentStatusLabels
-														] || document.status
-													}
-													status={document.status}
-												/>
-												{isPortal ? (
-													<span className="inline-flex items-center gap-1 rounded border border-[#b7dfcc] bg-[#edf9f2] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--success)]">
-														Cliente
-													</span>
-												) : null}
-											</div>
-											{latest ? (
-												<p className="mt-2 text-xs text-[var(--muted)]">
-													v{latest.versionNumber} ·{" "}
-													{dateFormatter.format(new Date(latest.createdAt))}
-												</p>
-											) : null}
-											{latest ? (
-												<div className="mt-3 flex gap-2">
-													<a
-														className="documents-row-action focus-ring flex-1 justify-center"
-														href={previewHref}
-													>
-														<Eye size={13} />
-														Ver
-													</a>
-													<a
-														className="documents-row-action documents-row-action--dark focus-ring flex-1 justify-center"
-														download
-														href={documentFileUrl(latest.id)}
-													>
-														<Download size={13} />
-														Descargar
-													</a>
-												</div>
 											) : null}
 										</div>
-									);
-								})}
-								{fileDocuments.length === 0 && (
-									<DocumentEmpty
-										action={
-											canEdit ? (
+										{latest ? (
+											<p className="mt-2 text-xs text-[var(--muted)]">
+												v{latest.versionNumber} ·{" "}
+												{dateFormatter.format(new Date(latest.createdAt))}
+											</p>
+										) : null}
+										{latest ? (
+											<div className="mt-3 flex gap-2">
 												<a
-													className="documents-primary-action focus-ring"
-													href={baseHref({ upload: "true" })}
+													className="documents-row-action focus-ring flex-1 justify-center"
+													href={previewHref}
 												>
-													<Plus size={16} /> Subir documento
+													<Eye size={13} />
+													Ver
 												</a>
-											) : undefined
-										}
-										detail="Cambia la categoría o incorpora el primer archivo de este expediente."
-										icon={FileArchive}
-										title="No hay documentos en esta categoría"
-									/>
-								)}
-							</div>
+												<a
+													className="documents-row-action documents-row-action--dark focus-ring flex-1 justify-center"
+													download
+													href={documentFileUrl(latest.id)}
+												>
+													<Download size={13} />
+													Descargar
+												</a>
+											</div>
+										) : null}
+									</div>
+								);
+							})}
+							{fileDocuments.length === 0 && (
+								<DocumentEmpty
+									action={
+										canEdit ? (
+											<a
+												className="documents-primary-action focus-ring"
+												href={baseHref({ upload: "true" })}
+											>
+												<Plus size={16} /> Subir documento
+											</a>
+										) : undefined
+									}
+									detail="Cambia la categoría o incorpora el primer archivo de este expediente."
+									icon={FileArchive}
+									title="No hay documentos en esta categoría"
+								/>
+							)}
 						</div>
 					</article>
 				)}
-			</div>
+			</ActionMenuScope>
 
 			{canEdit && showUpload && (
 				<DocumentUploadDrawer
